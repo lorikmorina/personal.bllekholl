@@ -2,24 +2,24 @@
 
 import { useRef, useEffect, useState } from "react"
 import { motion, useAnimation, useMotionValue } from "framer-motion"
+import { KeySquare, Shield, Zap } from "lucide-react"
 
 const features = [
   {
-    title: "Minimal Design",
-    description: "Clean engraving that makes your design pop.",
-    icon: "✨",
+    title: "API Key Detection",
+    description: "Scan your website for exposed API keys and credentials that could be used by attackers.",
+    icon: <KeySquare className="w-12 h-12 mb-4 text-blue-500" />,
   },
   {
-    title: "Ease",
-    description: "Finish the order all online.",
-    icon: "📱",
+    title: "Security Headers",
+    description: "Check if your website has all the necessary security headers to protect against common attacks.",
+    icon: <Shield className="w-12 h-12 mb-4 text-green-500" />,
   },
   {
-    title: "Fast Delivery",
-    description: "We make sure to deliver your order as soon as possible.",
-    icon: "⚡",
+    title: "Fast Scans",
+    description: "Get results in seconds with our efficient scanning technology.",
+    icon: <Zap className="w-12 h-12 mb-4 text-yellow-500" />,
   },
- 
 ]
 
 export default function FeatureCarousel() {
@@ -44,9 +44,9 @@ export default function FeatureCarousel() {
   }
 
   return (
-    <div className="py-20 bg-gradient-to-b from-background to-secondary/20">
+    <div className="py-20 bg-gradient-to-b from-background to-secondary/20" id="features">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="text-3xl font-bold text-center mb-12 text-foreground">Why Choose Us</h2>
+        <h2 className="text-3xl font-bold text-center mb-12 text-foreground">Why Choose Secure Viber</h2>
         <motion.div ref={carousel} className="cursor-grab overflow-hidden">
           <motion.div
             drag="x"
@@ -63,18 +63,16 @@ export default function FeatureCarousel() {
                 className="min-w-[300px] h-[400px] p-8 m-4 bg-background rounded-3xl shadow-lg flex flex-col justify-between hover-lift transition-all duration-300 ease-in-out border-2 border-transparent hover:border-primary/10"
               >
                 <div>
-                  <div className="text-4xl mb-4">{feature.icon}</div>
+                  <div className="mb-4">{feature.icon}</div>
                   <h3 className="text-xl font-semibold mb-2 text-foreground">{feature.title}</h3>
                   <p className="text-muted-foreground">{feature.description}</p>
                 </div>
                 <div className="mt-4">
                   <a
-                    href="https://www.flowersandsaints.com.au"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="/signup"
                     className="text-primary hover:underline"
                   >
-                    Explore more →
+                    Signup Now →
                   </a>
                 </div>
               </motion.div>

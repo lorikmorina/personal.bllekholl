@@ -43,9 +43,9 @@ export default function NewsletterSubscribe() {
           transition={{ duration: 0.8 }}
           className="bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl p-8 shadow-lg"
         >
-          <h2 className="text-2xl font-bold text-foreground mb-4 text-center">Stay Inspired</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-4 text-center">Stay Secure</h2>
           <p className="text-muted-foreground mb-6 text-center">
-            Subscribe to our newsletter for the latest updates and new products.
+            Subscribe to our newsletter for the latest updates and security tips.
           </p>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

@@ -8,9 +8,9 @@ import type React from "react"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Minimal Creative Agency",
-  description: "Apple-inspired design portfolio",
-    generator: 'v0.dev'
+  title: "Secure Viber - Website Security Scanner",
+  description: "Scan your website for security vulnerabilities, exposed API keys, and missing security headers",
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({

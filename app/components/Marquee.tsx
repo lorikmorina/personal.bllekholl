@@ -19,7 +19,7 @@ export default function Marquee() {
                 WebkitTextStroke: "1px rgb(156 163 175)", // tailwind gray-400
               }}
             >
-              Personal BllekHoll
+              SECURE VIBING
             </span>
           </div>
         ))}

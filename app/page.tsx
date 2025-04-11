@@ -1,6 +1,6 @@
 import Hero from "./components/Hero"
-import WearYourStory from "./components/WearYourStory"
 import FeatureCarousel from "./components/FeatureCarousel"
+import SecurityEducation from "./components/SecurityEducation"
 import PortfolioGrid from "./components/PortfolioGrid"
 //import Timeline from "./components/Timeline"
 import Marquee from "./components/Marquee"
@@ -11,12 +11,12 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <WearYourStory />
       <FeatureCarousel />
-      <PortfolioGrid />
+      <SecurityEducation />
+      {/* <PortfolioGrid /> */}
       {/* <Timeline /> */}
       <Marquee />
-      <ContactForm />
+      {/* <ContactForm /> */}
       <NewsletterSubscribe />
     </>
   )

@@ -4,8 +4,10 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, ShieldAlert, ShieldCheck } from "lucide-react"
+import { Loader2, Shield, ShieldAlert, ShieldCheck, Globe, Zap } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 type ScanResult = {
   url: string
@@ -22,71 +24,41 @@ type ScanResult = {
   score: number
 }
 
-type SecurityHeader = {
-  name: string;
-  importance: 'critical' | 'high' | 'medium' | 'low';
-  description: string;
+// This matches the header info structure from the Hero component
+const securityHeadersInfo: {[key: string]: {name: string, importance: string, description: string}} = {
+  "strict-transport-security": {
+    name: "Strict-Transport-Security",
+    importance: "high",
+    description: "Ensures the browser only connects via HTTPS, protecting against downgrade attacks."
+  },
+  "content-security-policy": {
+    name: "Content-Security-Policy",
+    importance: "high",
+    description: "Prevents XSS attacks by specifying which domains can load content."
+  },
+  "x-content-type-options": {
+    name: "X-Content-Type-Options",
+    importance: "medium",
+    description: "Prevents MIME-sniffing attacks by telling browsers to respect the declared content type."
+  },
+  "x-frame-options": {
+    name: "X-Frame-Options",
+    importance: "medium",
+    description: "Prevents clickjacking attacks by controlling whether the page can be embedded in an iframe."
+  },
+  "referrer-policy": {
+    name: "Referrer-Policy",
+    importance: "medium",
+    description: "Controls how much referrer information is included with requests."
+  },
+  "permissions-policy": {
+    name: "Permissions-Policy",
+    importance: "low",
+    description: "Controls which browser features can be used by the page."
+  }
 }
 
-const securityHeadersInfo: Record<string, SecurityHeader> = {
-  'content-security-policy': {
-    name: 'Content Security Policy',
-    importance: 'critical',
-    description: 'Prevents XSS attacks by controlling resource loading'
-  },
-  'strict-transport-security': {
-    name: 'Strict Transport Security',
-    importance: 'critical',
-    description: 'Forces HTTPS connections and prevents downgrade attacks'
-  },
-  'x-frame-options': {
-    name: 'X-Frame-Options',
-    importance: 'high',
-    description: 'Prevents clickjacking attacks by controlling iframe embedding'
-  },
-  'referrer-policy': {
-    name: 'Referrer Policy',
-    importance: 'high',
-    description: 'Controls information shared when following links'
-  },
-  'permissions-policy': {
-    name: 'Permissions Policy',
-    importance: 'medium',
-    description: 'Controls which browser features can be used'
-  },
-  'x-content-type-options': {
-    name: 'X-Content-Type-Options',
-    importance: 'medium',
-    description: 'Prevents MIME type sniffing attacks'
-  },
-  'x-xss-protection': {
-    name: 'X-XSS-Protection',
-    importance: 'low',
-    description: 'Enables browser\'s built-in XSS filters'
-  }
-};
-
-const getImportanceColor = (importance: string): string => {
-  switch (importance) {
-    case 'critical': return 'text-red-600 bg-red-50 border-red-200';
-    case 'high': return 'text-orange-600 bg-orange-50 border-orange-200';
-    case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-    case 'low': return 'text-blue-600 bg-blue-50 border-blue-200';
-    default: return 'text-gray-600 bg-gray-50 border-gray-200';
-  }
-};
-
-const getImportanceEmoji = (importance: string): string => {
-  switch (importance) {
-    case 'critical': return '🔴';
-    case 'high': return '🟠';
-    case 'medium': return '🟡';
-    case 'low': return '🔵';
-    default: return '⚪';
-  }
-};
-
-export default function WearYourStory() {
+export default function LightScanTool() {
   const [url, setUrl] = useState("")
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -111,7 +83,7 @@ export default function WearYourStory() {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to scan website")
+        throw new Error(errorData.message || "Failed to scan website")
       }
 
       const data = await response.json()
@@ -123,13 +95,6 @@ export default function WearYourStory() {
     }
   }
 
-  // Score color based on value
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-500"
-    if (score >= 60) return "text-yellow-500"
-    return "text-red-500"
-  }
-
   // Toggle expanded state for header descriptions
   const toggleHeaderExpanded = (header: string) => {
     if (expandedHeaders.includes(header)) {
@@ -139,109 +104,129 @@ export default function WearYourStory() {
     }
   }
 
-  // Sort headers by importance (critical first, then high, medium, low)
-  const sortHeadersByImportance = (headers: string[]): string[] => {
-    const importancePriority = {
-      'critical': 0,
-      'high': 1,
-      'medium': 2,
-      'low': 3
-    };
-    
+  // Toggle expanded state for leak details
+  const toggleLeakExpanded = (index: number) => {
+    if (expandedLeaks.includes(index)) {
+      setExpandedLeaks(expandedLeaks.filter(i => i !== index))
+    } else {
+      setExpandedLeaks([...expandedLeaks, index])
+    }
+  }
+
+  // Sort headers by importance
+  const sortHeadersByImportance = (headers: string[]) => {
     return [...headers].sort((a, b) => {
-      const headerA = securityHeadersInfo[a] || { importance: 'medium' };
-      const headerB = securityHeadersInfo[b] || { importance: 'medium' };
-      
-      return importancePriority[headerA.importance] - importancePriority[headerB.importance];
+      const importanceOrder = { high: 0, medium: 1, low: 2 };
+      const aImportance = securityHeadersInfo[a]?.importance || "low";
+      const bImportance = securityHeadersInfo[b]?.importance || "low";
+      return importanceOrder[aImportance as keyof typeof importanceOrder] - 
+             importanceOrder[bImportance as keyof typeof importanceOrder];
     });
   };
 
-  const toggleLeakExpanded = (index: number) => {
-    if (expandedLeaks.includes(index)) {
-      setExpandedLeaks(expandedLeaks.filter(i => i !== index));
-    } else {
-      setExpandedLeaks([...expandedLeaks, index]);
-    }
-  };
-
   return (
-    <section className="bg-background py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          className="text-center"
-        >
-          <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
-            Vibe Check Your Website
-          </h2>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-10">
-            Scan your website for security issues and common vulnerabilities that could compromise your visitors' data.
-          </p>
-          
-          <form 
-            onSubmit={handleSubmit}
-            className="max-w-2xl mx-auto mb-8"
-          >
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Input
-                type="url"
-                placeholder="https://example.com"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                required
-                className="flex-grow"
-              />
-              <Button 
-                type="submit" 
-                disabled={isScanning || !url}
-                className="sm:w-auto"
-              >
-                {isScanning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Scan Website
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
+    <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <h1 className="text-3xl font-bold mb-2">Light Website Security Scan</h1>
+        <p className="text-muted-foreground mb-6">
+          Quickly scan any website for security vulnerabilities, exposed API keys, and missing security headers.
+        </p>
+      </motion.div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Start New Scan</CardTitle>
+          <CardDescription>
+            Enter a website URL to begin scanning for security issues
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
+            <Input
+              type="url"
+              placeholder="https://example.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+              className="flex-grow"
+            />
+            <Button 
+              type="submit" 
+              disabled={isScanning || !url}
+              className="sm:w-auto"
+            >
+              {isScanning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Scan Website
+                </>
+              )}
+            </Button>
+          </form>
+          
           {error && (
-            <Alert variant="destructive" className="mt-6 max-w-2xl mx-auto">
+            <Alert variant="destructive" className="mt-6">
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+        </CardContent>
+      </Card>
 
-          {result && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="mt-10 max-w-4xl mx-auto text-left bg-card rounded-xl shadow-lg overflow-hidden border border-border"
-            >
-              <div className="p-6 flex items-center justify-between border-b border-border">
+      {result && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-secondary/20">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold">Security Report</h3>
-                  <p className="text-muted-foreground">URL: {result.url}</p>
+                  <CardTitle>Scan Results</CardTitle>
+                  <CardDescription>
+                    <span className="flex items-center mt-1">
+                      <Globe className="h-4 w-4 mr-1" />
+                      {result.url}
+                    </span>
+                  </CardDescription>
                 </div>
                 <div className="text-right">
-                  <div className={`text-3xl font-bold ${getScoreColor(result.score)}`}>
-                    {result.score}/100
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm text-muted-foreground">
+                      {result.jsFilesScanned} files scanned
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">Security Score</p>
+                  <div className="mt-1">
+                    <Badge 
+                      className={
+                        result.score >= 80 
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                          : result.score >= 50 
+                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }
+                    >
+                      Score: {result.score}/100
+                    </Badge>
+                  </div>
                 </div>
               </div>
-
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            </CardHeader>
+            
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
                 <div>
                   <h4 className="text-lg font-semibold mb-3 flex items-center">
                     <ShieldCheck className="mr-2 h-5 w-5 text-green-500" />
@@ -286,23 +271,20 @@ export default function WearYourStory() {
                         
                         return (
                           <li key={header} className="border rounded-md overflow-hidden">
-                            <button 
+                            <button
                               onClick={() => toggleHeaderExpanded(header)}
                               className="w-full text-left p-2 flex items-center justify-between hover:bg-secondary/10"
                             >
                               <div className="flex items-start">
-                                <span className="text-red-500 mr-2">✕</span>
+                                <span className="text-red-500 mr-2">✗</span>
                                 <span className="capitalize font-medium">{headerInfo.name}</span>
-                                <span className={`ml-2 text-xs px-2 py-1 rounded-full ${getImportanceColor(headerInfo.importance)}`}>
-                                  {headerInfo.importance}
-                                </span>
                               </div>
                               <span>{isExpanded ? '▼' : '▶'}</span>
                             </button>
                             
                             {isExpanded && (
-                              <div className="p-3 bg-secondary/5 border-t">
-                                <p className="text-sm">{headerInfo.description}</p>
+                              <div className="p-2 bg-secondary/5 border-t">
+                                <p className="text-sm text-muted-foreground">{headerInfo.description}</p>
                               </div>
                             )}
                           </li>
@@ -310,7 +292,7 @@ export default function WearYourStory() {
                       })}
                     </ul>
                   ) : (
-                    <p className="text-green-500">All recommended headers are present!</p>
+                    <p className="text-green-500">All important security headers are present!</p>
                   )}
                 </div>
               </div>
@@ -351,40 +333,13 @@ export default function WearYourStory() {
                     })}
                   </ul>
                 ) : (
-                  <p className="text-green-500">No obvious security leaks detected!</p>
+                  <p className="text-green-500">No API keys or secrets found exposed in the scanned website! 🎉</p>
                 )}
-                <p className="text-sm text-muted-foreground mt-4">
-                  Scanned {result.jsFilesScanned} JavaScript files for potential API keys and sensitive information.
-                </p>
               </div>
-            </motion.div>
-          )}
-          
-          <motion.div
-            className="mt-10"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-          >
-            <a
-              href="#"
-              className="apple-button inline-flex items-center"
-            >
-              Learn More About Website Security
-              <svg
-                className="w-5 h-5 ml-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </a>
-          </motion.div>
+            </CardContent>
+          </Card>
         </motion.div>
-      </div>
-    </section>
+      )}
+    </div>
   )
-}
-
+} 
