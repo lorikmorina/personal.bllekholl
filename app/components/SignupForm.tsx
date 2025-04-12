@@ -1,76 +1,42 @@
 "use client"
 
 import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
-import { Separator } from "@/components/ui/separator"
-
-const magicLinkFormSchema = z.object({
-  email: z.string().email("Please enter a valid email")
-})
+import { createClient } from "@/lib/supabase/client"
 
 export default function SignupForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const supabase = createClient()
   
-  const form = useForm<z.infer<typeof magicLinkFormSchema>>({
-    resolver: zodResolver(magicLinkFormSchema),
-    defaultValues: {
-      email: "",
-    },
-  })
-
   async function handleGoogleSignIn() {
     setIsSubmitting(true)
     setError(null)
     
     try {
-      // In a real app, you would call an API endpoint to initialize Google OAuth
-      // For demo purposes, we'll just simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback`,
+        }
+      })
       
-      // Set a cookie to "authenticate" the user
-      document.cookie = `auth-token=google-auth-token;path=/;max-age=86400`
+      if (error) throw error
       
-      setSuccessMessage("Successfully signed in with Google!")
-      setTimeout(() => {
-        window.location.href = "/"
-      }, 2000)
+      setSuccessMessage("Redirecting to Google for authentication...")
     } catch (err) {
+      console.error("Google sign in error:", err)
       setError("Failed to sign in with Google. Please try again.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  async function onSubmitMagicLink(values: z.infer<typeof magicLinkFormSchema>) {
-    setIsSubmitting(true)
-    setError(null)
-    
-    try {
-      // In a real app, you would call an API endpoint to send a magic link
-      // For demo purposes, we'll just simulate the API call
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      setSuccessMessage(`Magic link sent to ${values.email}! Check your inbox.`)
-      form.reset()
-    } catch (err) {
-      setError("Failed to send magic link. Please try again.")
-    } finally {
       setIsSubmitting(false)
     }
   }
   
   return (
     <div className="max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border border-border">
-      <h2 className="text-2xl font-bold mb-6">Create an Account</h2>
+      <h2 className="text-2xl font-bold mb-6">Log In or Create an Account</h2>
       <p className="text-muted-foreground mb-6">
         Sign up to get unlimited website security scans.
       </p>
@@ -105,48 +71,6 @@ export default function SignupForm() {
             )}
             <span>Continue with Google</span>
           </Button>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-            </div>
-          </div>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitMagicLink)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="john.doe@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending Magic Link...
-                  </>
-                ) : (
-                  "Send Magic Link"
-                )}
-              </Button>
-            </form>
-          </Form>
           
           {error && (
             <Alert variant="destructive">

@@ -1,13 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, ShieldAlert, ShieldCheck, Globe, Zap } from "lucide-react"
+import { Loader2, Shield, ShieldAlert, ShieldCheck, Globe, Zap, Lock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useDashboard } from "../DashboardProvider"
+import { createClient } from "@/lib/supabase/client"
+import PaywallModal from "../PaywallModal"
 
 type ScanResult = {
   url: string
@@ -65,14 +68,52 @@ export default function LightScanTool() {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [expandedHeaders, setExpandedHeaders] = useState<string[]>([])
   const [expandedLeaks, setExpandedLeaks] = useState<number[]>([])
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const { user } = useDashboard()
+  const supabase = createClient()
+
+  // Fetch user profile to check subscription status
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) throw error
+        
+        setUserProfile(data)
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+      } finally {
+        setIsLoadingProfile(false)
+      }
+    }
+    
+    fetchUserProfile()
+  }, [user, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Check if user is on free plan
+    if (userProfile?.subscription_plan === 'free') {
+      setIsPaywallOpen(true)
+      return
+    }
+    
     setIsScanning(true)
     setError(null)
     setResult(null)
 
     try {
+      // Make a real API call to the scan endpoint
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: {
@@ -88,94 +129,127 @@ export default function LightScanTool() {
 
       const data = await response.json()
       setResult(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred")
+    } catch (error: any) {
+      setError(error.message || "Failed to scan website")
     } finally {
       setIsScanning(false)
     }
   }
 
-  // Toggle expanded state for header descriptions
   const toggleHeaderExpanded = (header: string) => {
-    if (expandedHeaders.includes(header)) {
-      setExpandedHeaders(expandedHeaders.filter(h => h !== header))
-    } else {
-      setExpandedHeaders([...expandedHeaders, header])
-    }
+    setExpandedHeaders(prev => 
+      prev.includes(header) 
+        ? prev.filter(h => h !== header) 
+        : [...prev, header]
+    )
   }
 
-  // Toggle expanded state for leak details
   const toggleLeakExpanded = (index: number) => {
-    if (expandedLeaks.includes(index)) {
-      setExpandedLeaks(expandedLeaks.filter(i => i !== index))
-    } else {
-      setExpandedLeaks([...expandedLeaks, index])
-    }
+    setExpandedLeaks(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index) 
+        : [...prev, index]
+    )
   }
 
-  // Sort headers by importance
   const sortHeadersByImportance = (headers: string[]) => {
     return [...headers].sort((a, b) => {
-      const importanceOrder = { high: 0, medium: 1, low: 2 };
-      const aImportance = securityHeadersInfo[a]?.importance || "low";
-      const bImportance = securityHeadersInfo[b]?.importance || "low";
+      const importanceOrder = { high: 0, medium: 1, low: 2 }
+      const aImportance = securityHeadersInfo[a]?.importance || 'medium'
+      const bImportance = securityHeadersInfo[b]?.importance || 'medium'
       return importanceOrder[aImportance as keyof typeof importanceOrder] - 
-             importanceOrder[bImportance as keyof typeof importanceOrder];
-    });
-  };
+             importanceOrder[bImportance as keyof typeof importanceOrder]
+    })
+  }
+
+  const handleUpgrade = async (plan: string) => {
+    // This would be replaced with your Paddle integration code
+    console.log(`Upgrading to ${plan} plan`)
+    
+    // For demo purposes, let's update the user's plan in Supabase
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_plan: plan })
+        .eq('id', user!.id)
+      
+      if (error) throw error
+      
+      // Update local state
+      setUserProfile({
+        ...userProfile,
+        subscription_plan: plan
+      })
+      
+      // Close the paywall
+      setIsPaywallOpen(false)
+    } catch (error) {
+      console.error("Error updating subscription:", error)
+    }
+  }
 
   return (
-    <div className="space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <h1 className="text-3xl font-bold mb-2">Light Website Security Scan</h1>
-        <p className="text-muted-foreground mb-6">
-          Quickly scan any website for security vulnerabilities, exposed API keys, and missing security headers.
-        </p>
-      </motion.div>
-
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Start New Scan</CardTitle>
+          <CardTitle className="text-2xl">Website Security Scan</CardTitle>
           <CardDescription>
-            Enter a website URL to begin scanning for security issues
+            Quickly scan any website for security vulnerabilities, exposed API keys, and missing security headers.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
             <Input
               type="url"
               placeholder="https://example.com"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
-              className="flex-grow"
+              className="flex-1"
             />
             <Button 
               type="submit" 
-              disabled={isScanning || !url}
-              className="sm:w-auto"
+              disabled={isScanning || isLoadingProfile}
+              className="sm:w-auto w-full"
             >
               {isScanning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Scanning...
                 </>
+              ) : userProfile?.subscription_plan === 'free' ? (
+                <>
+                  <Lock className="mr-2 h-4 w-4" />
+                  Scan Website
+                </>
               ) : (
                 <>
-                  <Shield className="mr-2 h-4 w-4" />
+                  <Zap className="mr-2 h-4 w-4" />
                   Scan Website
                 </>
               )}
             </Button>
           </form>
           
+          {userProfile?.subscription_plan === 'free' && !isLoadingProfile && (
+            <Alert className="mt-4 bg-primary/5 border-primary/20">
+              <Shield className="h-4 w-4" />
+              <AlertTitle>Free Plan Limitation</AlertTitle>
+              <AlertDescription>
+                Upgrade to a paid plan to access unlimited website scans and detailed security reports.
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto font-semibold ml-1"
+                  onClick={() => setIsPaywallOpen(true)}
+                >
+                  Upgrade now
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           {error && (
-            <Alert variant="destructive" className="mt-6">
-              <ShieldAlert className="h-4 w-4" />
+            <Alert variant="destructive" className="mt-4">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -183,66 +257,56 @@ export default function LightScanTool() {
         </CardContent>
       </Card>
 
+      {/* Scan results */}
       {result && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-secondary/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Scan Results</CardTitle>
-                  <CardDescription>
-                    <span className="flex items-center mt-1">
-                      <Globe className="h-4 w-4 mr-1" />
-                      {result.url}
-                    </span>
-                  </CardDescription>
+          <Card>
+            <CardContent className="p-0">
+              <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-border">
+                <div className="flex items-center mb-4 md:mb-0">
+                  <Globe className="h-5 w-5 mr-2 text-muted-foreground" />
+                  <span className="font-medium">{result.url}</span>
                 </div>
-                <div className="text-right">
+                
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-muted-foreground">
-                      {result.jsFilesScanned} files scanned
-                    </span>
+                    <Shield className="h-5 w-5 text-muted-foreground" />
+                    <span>{result.jsFilesScanned} files scanned</span>
                   </div>
-                  <div className="mt-1">
-                    <Badge 
-                      className={
-                        result.score >= 80 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                          : result.score >= 50 
-                          ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                      }
-                    >
-                      Score: {result.score}/100
-                    </Badge>
+                  
+                  <div className={`px-3 py-1 rounded-full flex items-center ${
+                    result.score >= 70
+                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300' // Good score
+                      : result.score >= 40
+                      ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300' // Moderate score
+                      : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300'         // Poor score
+                  }`}>
+                    <span className="font-semibold">Score: {result.score}/100</span>
                   </div>
                 </div>
               </div>
-            </CardHeader>
-            
-            <CardContent className="p-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+              
+              <div className="grid md:grid-cols-2 gap-4 p-6 border-b border-border">
                 <div>
-                  <h4 className="text-lg font-semibold mb-3 flex items-center">
-                    <ShieldCheck className="mr-2 h-5 w-5 text-green-500" />
+                  <h4 className="text-lg font-semibold mb-3">
+                    <ShieldCheck className="inline-block w-5 h-5 mr-2 text-green-500" />
                     Present Security Headers
                   </h4>
                   {result.headers.present.length > 0 ? (
                     <ul className="space-y-2">
                       {result.headers.present.map((header) => {
                         const headerInfo = securityHeadersInfo[header] || {
-                          name: header.replace(/-/g, ' '),
+                          name: header,
                           importance: 'medium',
                           description: 'Security header'
                         };
                         
                         return (
-                          <li key={header} className="flex items-start">
+                          <li key={header} className="border rounded-md p-2 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 flex items-center">
                             <span className="text-green-500 mr-2">✓</span>
                             <span className="capitalize font-medium">{headerInfo.name}</span>
                           </li>
@@ -250,13 +314,13 @@ export default function LightScanTool() {
                       })}
                     </ul>
                   ) : (
-                    <p className="text-yellow-500">No security headers found!</p>
+                    <p className="text-red-500">No security headers found!</p>
                   )}
                 </div>
                 
                 <div>
-                  <h4 className="text-lg font-semibold mb-3 flex items-center">
-                    <ShieldAlert className="mr-2 h-5 w-5 text-red-500" />
+                  <h4 className="text-lg font-semibold mb-3">
+                    <ShieldAlert className="inline-block w-5 h-5 mr-2 text-red-500" />
                     Missing Security Headers
                   </h4>
                   {result.headers.missing.length > 0 ? (
@@ -340,6 +404,13 @@ export default function LightScanTool() {
           </Card>
         </motion.div>
       )}
+      
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        onUpgrade={handleUpgrade}
+      />
     </div>
   )
 } 

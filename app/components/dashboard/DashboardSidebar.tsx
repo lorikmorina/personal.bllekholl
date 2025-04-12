@@ -2,10 +2,12 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, Settings, BarChart3, Users, Menu, X, LogOut, ChevronRight } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
-import { useTheme } from "next-themes"
-import { MoonIcon, SunIcon } from "@heroicons/react/24/outline"
+import { useDashboard } from "./DashboardProvider"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/client"
 
 interface DashboardSidebarProps {
   activeTool: string
@@ -14,149 +16,160 @@ interface DashboardSidebarProps {
 
 export default function DashboardSidebar({ activeTool, setActiveTool }: DashboardSidebarProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const { user, signOut } = useDashboard()
+  const supabase = createClient()
+
+  // Fetch user profile including subscription plan
   useEffect(() => {
-    setMounted(true)
-  }, [])
-  
-  const tools = [
-    {
-      id: "light-scan",
-      name: "Light Scan",
-      icon: <Shield className="w-5 h-5" />,
-      description: "Quick security scan for websites"
+    const fetchUserProfile = async () => {
+      if (!user) return
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) throw error
+        
+        setUserProfile(data)
+      } catch (error) {
+        console.error('Error fetching user profile:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-  ]
-  
-  // Future tools that can be added later
-  const futureTools = [
-    {
-      id: "deep-scan",
-      name: "Deep Scan",
-      icon: <BarChart3 className="w-5 h-5" />,
-      description: "Comprehensive security analysis",
-      comingSoon: true
-    },
-    {
-      id: "team-management",
-      name: "Team",
-      icon: <Users className="w-5 h-5" />,
-      description: "Manage team access",
-      comingSoon: true
-    }
-  ]
-  
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
-  
+    
+    fetchUserProfile()
+  }, [user, supabase])
+
+  // Extract user initials for avatar fallback
+  const getUserInitials = () => {
+    if (!user || !user.email) return "U"
+    const email = user.email
+    return email.substring(0, 2).toUpperCase()
+  }
+
+  // Format subscription plan for display
+  const formatSubscriptionPlan = () => {
+    if (isLoading) return "Loading..."
+    if (!userProfile) return "Free Plan" // Fallback
+    
+    // Capitalize first letter of each word
+    const plan = userProfile.subscription_plan || "free"
+    return plan.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') + " Plan"
+  }
+
   return (
     <>
-      {/* Mobile sidebar toggle - Moved below header */}
-      <div className="lg:hidden fixed top-16 left-4 z-50">
-        <button
-          onClick={toggleSidebar}
-          className="p-2 rounded-md bg-primary/10 text-primary hover:bg-primary/20"
-        >
-          {sidebarOpen ? <X className="w-6 h-6" /> : <ChevronRight className="w-6 h-6" />}
-        </button>
-      </div>
+      {/* Mobile menu button - adjusted top position */}
+      <button
+        type="button"
+        className="fixed top-[4.5rem] left-4 z-40 rounded-md bg-primary/10 p-2 text-primary lg:hidden"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? (
+          <X className="h-6 w-6" aria-hidden="true" />
+        ) : (
+          <Menu className="h-6 w-6" aria-hidden="true" />
+        )}
+        <span className="sr-only">Open sidebar</span>
+      </button>
       
-      {/* Sidebar */}
+      {/* Sidebar - adjusted positioning */}
       <motion.aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:relative lg:w-64 flex-shrink-0`}
+        className={`fixed top-16 bottom-0 left-0 z-30 w-64 bg-card shadow-xl transition-transform lg:translate-x-0 lg:border-r lg:shadow-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
         initial={false}
       >
-        <div className="h-full flex flex-col">
-          {/* Logo and brand */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-            
-            
-            <button
-              onClick={toggleSidebar}
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground lg:hidden"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+        <div className="flex h-full flex-col py-6">
+          {/* User info */}
+          {user && (
+            <div className="px-4 mb-6">
+              <div className="flex items-center gap-3 rounded-lg bg-primary/5 p-3">
+                <Avatar>
+                  <AvatarImage src={user.user_metadata?.avatar_url || ''} />
+                  <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-sm font-medium truncate">{user.email}</p>
+                  <p className="text-xs text-muted-foreground">{formatSubscriptionPlan()}</p>
+                </div>
+              </div>
+            </div>
+          )}
           
-          {/* Tools navigation */}
-          <div className="flex-1 overflow-y-auto py-4 px-3">
+          <div className="flex-1 px-3">
             <div className="space-y-1">
-              <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase px-3 mb-3">
-                Tools
+              <h3 className="px-3 text-xs font-semibold text-muted-foreground">
+                TOOLS
               </h3>
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'light-scan' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('light-scan')}
+              >
+                <div className="flex items-center">
+                  <Shield className="w-5 h-5 mr-3" />
+                  <span>Light Scan</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
               
-              {tools.map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => {
-                    setActiveTool(tool.id)
-                    setSidebarOpen(false)
-                  }}
-                  className={`w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                    activeTool === tool.id
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-secondary/10"
-                  }`}
+              {/* AI-assisted scan button - disabled and greyed out */}
+              <div className="relative">
+                <button 
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground cursor-not-allowed opacity-50"
+                  disabled
                 >
-                  <span className="mr-3">{tool.icon}</span>
-                  <span>{tool.name}</span>
+                  <div className="flex items-center">
+                    <Shield className="w-5 h-5 mr-3" />
+                    <span>AI-assisted Scan</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
                 </button>
-              ))}
+                <Badge 
+                  variant="secondary" 
+                  className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] py-0 px-1.5"
+                >
+                  Coming Soon
+                </Badge>
+              </div>
               
-              {/* Future tools (coming soon) */}
-              {futureTools.length > 0 && (
-                <>
-                  <h3 className="text-xs font-semibold text-muted-foreground tracking-wider uppercase px-3 mb-3 mt-6">
-                    Coming Soon
-                  </h3>
-                  
-                  {futureTools.map((tool) => (
-                    <div
-                      key={tool.id}
-                      className="w-full flex items-center px-3 py-2 text-sm rounded-md text-muted-foreground"
-                    >
-                      <span className="mr-3">{tool.icon}</span>
-                      <span>{tool.name}</span>
-                      <span className="ml-auto text-xs bg-secondary px-1.5 py-0.5 rounded">Soon</span>
-                    </div>
-                  ))}
-                </>
-              )}
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'reports' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('reports')}
+              >
+                <div className="flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-3" />
+                  <span>Reports</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              
+              
             </div>
           </div>
           
-          {/* User and actions */}
           <div className="px-3 py-4 border-t border-border">
-            {/* Theme toggle - Fix hydration mismatch */}
-            <button
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-full flex items-center px-3 py-2 text-sm rounded-md text-foreground hover:bg-secondary/10 mb-2"
-            >
-              {mounted && theme === "dark" ? (
-                <>
-                  <SunIcon className="w-5 h-5 mr-3" />
-                  <span>Light Mode</span>
-                </>
-              ) : (
-                <>
-                  <MoonIcon className="w-5 h-5 mr-3" />
-                  <span>Dark Mode</span>
-                </>
-              )}
-            </button>
-            
-            {/* Settings */}
-            <button className="w-full flex items-center px-3 py-2 text-sm rounded-md text-foreground hover:bg-secondary/10 mb-2">
-              <Settings className="w-5 h-5 mr-3" />
-              <span>Settings</span>
-            </button>
-            
             {/* Logout */}
-            <button className="w-full flex items-center px-3 py-2 text-sm rounded-md text-destructive hover:bg-destructive/10">
+            <button 
+              className="w-full flex items-center px-3 py-2 text-sm rounded-md text-destructive hover:bg-destructive/10"
+              onClick={signOut}
+            >
               <LogOut className="w-5 h-5 mr-3" />
               <span>Logout</span>
             </button>
@@ -167,7 +180,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}

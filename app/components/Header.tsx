@@ -5,14 +5,62 @@ import Link from "next/link"
 import { useTheme } from "next-themes"
 import { motion, AnimatePresence } from "framer-motion"
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline"
-import { Menu, X } from "lucide-react"
+import { Menu, X, User, LogOut } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
 export default function Header() {
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
+  const supabase = createClient()
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setUser(session?.user || null)
+      setLoading(false)
+    }
+    
+    getInitialSession()
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null)
+    })
+    
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  // Extract user initials for avatar fallback
+  const getUserInitials = () => {
+    if (!user || !user.email) return "U"
+    const email = user.email
+    return email.substring(0, 2).toUpperCase()
+  }
 
   return (
     <motion.header
@@ -59,13 +107,15 @@ export default function Header() {
           >
             Pricing
           </Link>
-          <Link
-            href="/signup"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
-          >
-            Signup
-          </Link>
+          {!user && (
+            <Link
+              href="/signup"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
+            >
+              Signup
+            </Link>
+          )}
           <Link
             href="/learn"
             rel="noopener noreferrer"
@@ -73,17 +123,20 @@ export default function Header() {
           >
             Learn Free
           </Link>
-          <Link
-    href="/dashboard"
-    rel="noopener noreferrer"
-    className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
-  >
-    Dashboard
-  </Link>
+          {user && (
+            <Link
+              href="/dashboard"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
+            >
+              Dashboard
+            </Link>
+          )}
         </div>
         
-        {/* Desktop theme toggle */}
-        <div className="hidden lg:flex lg:flex-1 lg:justify-end">
+        {/* Desktop right section */}
+        <div className="hidden lg:flex lg:flex-1 lg:justify-end lg:gap-4 items-center">
+          {/* Theme toggle */}
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -91,6 +144,45 @@ export default function Header() {
             >
               {theme === "dark" ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
             </button>
+          )}
+          
+          {/* User menu (when logged in) */}
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 rounded-full hover:bg-secondary/20 p-1 cursor-pointer">
+                  <Avatar>
+                    <AvatarImage src={user.user_metadata?.avatar_url || ''} />
+                    <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/reports">Reports History</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          
+          {/* Login button when not logged in */}
+          {!user && !loading && (
+            <Link href="/signup" passHref>
+              <Button variant="default" size="sm">
+                <User className="h-4 w-4 mr-2" />
+                Login
+              </Button>
+            </Link>
           )}
         </div>
       </nav>
@@ -113,13 +205,17 @@ export default function Header() {
               >
                 Pricing
               </Link>
-              <Link
-                href="/signup"
-                className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Signup
-              </Link>
+              
+              {!user && (
+                <Link
+                  href="/signup"
+                  className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Signup
+                </Link>
+              )}
+              
               <Link
                 href="/learn"
                 className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
@@ -127,6 +223,29 @@ export default function Header() {
               >
                 Learn Free
               </Link>
+              
+              {user && (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                  
+                  <button
+                    onClick={() => {
+                      handleSignOut();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex w-full items-center rounded-md px-3 py-2 text-base font-medium text-destructive hover:bg-destructive/10"
+                  >
+                    <LogOut className="h-5 w-5 mr-2" />
+                    <span>Logout</span>
+                  </button>
+                </>
+              )}
               
               {/* Mobile theme toggle */}
               {mounted && (
