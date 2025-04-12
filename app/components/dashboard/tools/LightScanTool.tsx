@@ -129,6 +129,30 @@ export default function LightScanTool() {
 
       const data = await response.json()
       setResult(data)
+
+      // Save scan result to database if user is authenticated
+      if (user) {
+        try {
+          const { error: saveError } = await supabase
+            .from('scan_reports')
+            .insert({
+              user_id: user.id,
+              url: data.url,
+              score: data.score,
+              headers: data.headers,
+              leaks: data.leaks,
+              js_files_scanned: data.jsFilesScanned
+            });
+          
+          if (saveError) {
+            console.error('Error saving scan report:', saveError);
+          }
+        } catch (saveError) {
+          console.error('Error saving scan report:', saveError);
+          // We don't want to affect the user experience if saving fails
+          // so we just log the error and don't show it to the user
+        }
+      }
     } catch (error: any) {
       setError(error.message || "Failed to scan website")
     } finally {

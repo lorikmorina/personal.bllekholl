@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Globe, Home, Settings, CreditCard } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "./DashboardProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
+import BillingModal from "./BillingModal"
 
 interface DashboardSidebarProps {
   activeTool: string
@@ -20,6 +21,8 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
   const [isLoading, setIsLoading] = useState(true)
   const { user, signOut } = useDashboard()
   const supabase = createClient()
+  const [customerPortalUrl, setCustomerPortalUrl] = useState('')
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false)
 
   // Fetch user profile including subscription plan
   useEffect(() => {
@@ -46,6 +49,36 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
     fetchUserProfile()
   }, [user, supabase])
 
+  useEffect(() => {
+    const getCustomerPortalUrl = async () => {
+      try {
+        // For subscribed users, direct them to Paddle's portal
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('subscription_plan')
+            .eq('id', user.id)
+            .single()
+            
+          // If user has a paid plan, they should have access to the Paddle portal
+          // If they're on free plan, we'll use our previous billing page
+          if (data?.subscription_plan && data.subscription_plan !== 'free') {
+            setCustomerPortalUrl('https://customer.paddle.com/login')
+          } else {
+            setCustomerPortalUrl('/dashboard/billing')
+          }
+        }
+      } catch (error) {
+        console.error('Error determining portal URL:', error)
+        setCustomerPortalUrl('/dashboard/billing')
+      }
+    }
+    
+    getCustomerPortalUrl()
+  }, [supabase])
+
   // Extract user initials for avatar fallback
   const getUserInitials = () => {
     if (!user || !user.email) return "U"
@@ -64,6 +97,26 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ') + " Plan"
   }
+
+  // In the navigation array, update to make Reports a tool instead of a direct link
+  const navigation = [
+    {
+      name: "Overview",
+      value: "overview",
+      icon: <Home className="h-5 w-5" />,
+    },
+    {
+      name: "Security Scan",
+      value: "lightscan",
+      icon: <Globe className="h-5 w-5" />,
+    },
+    {
+      name: "Reports",
+      value: "reports", // Now this is a tool value, not a direct link
+      icon: <FileText className="h-5 w-5" />,
+    },
+    // ... other navigation items ...
+  ]
 
   return (
     <>
@@ -165,7 +218,16 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
           </div>
           
           <div className="px-3 py-4 border-t border-border">
-            {/* Logout */}
+            {/* Billing Button - Added above Logout */}
+            <button 
+              className="w-full flex items-center px-3 py-2 text-sm rounded-md text-foreground hover:bg-secondary/10 mb-2"
+              onClick={() => setIsBillingModalOpen(true)}
+            >
+              <CreditCard className="w-5 h-5 mr-3" />
+              <span>Billing</span>
+            </button>
+            
+            {/* Logout - existing button */}
             <button 
               className="w-full flex items-center px-3 py-2 text-sm rounded-md text-destructive hover:bg-destructive/10"
               onClick={signOut}
@@ -182,6 +244,15 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
         <div 
           className="fixed inset-0 bg-background/80 backdrop-blur-sm z-20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {user && userProfile && (
+        <BillingModal
+          isOpen={isBillingModalOpen}
+          onClose={() => setIsBillingModalOpen(false)}
+          userId={user.id}
+          currentPlan={userProfile.subscription_plan || 'free'}
         />
       )}
     </>
