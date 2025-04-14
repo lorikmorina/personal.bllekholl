@@ -31,6 +31,7 @@ export default function SignupForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ token: turnstileToken }),
+        credentials: 'same-origin'
       })
       
       const verification = await verifyResponse.json()
@@ -47,6 +48,10 @@ export default function SignupForm() {
         provider: 'google',
         options: {
           redirectTo: `${redirectUrl}/api/auth/callback`,
+          queryParams: {
+            // Add a custom parameter that we can check in the callback
+            production_redirect: 'true'
+          }
         }
       })
       
