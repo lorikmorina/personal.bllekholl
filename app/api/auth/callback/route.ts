@@ -15,8 +15,14 @@ export async function GET(request: NextRequest) {
   }
   
   // Check if we're on a preview URL and need to redirect to production
-  if (productionRedirect && request.headers.get('host')?.includes('--securevibing.netlify.app')) {
-    const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.netlify.app'
+  const productionHost = 'securevibing.netlify.app'
+  const currentHost = request.headers.get('host') || ''
+  
+  // If we're not on the production host and either productionRedirect flag is set
+  // or we're on any Netlify preview URL (which always contains --)
+  if (currentHost !== productionHost && 
+      (productionRedirect || currentHost.includes('--'))) {
+    const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${productionHost}`
     return NextResponse.redirect(`${productionUrl}${redirectTo}`)
   }
 
