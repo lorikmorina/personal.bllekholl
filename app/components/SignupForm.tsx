@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import TurnstileWidget from "@/app/components/TurnstileWidget"
 
 export default function SignupForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -14,10 +13,43 @@ export default function SignupForm() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const supabase = createClient()
   
-  // Callback when Turnstile is successfully completed
-  const onTurnstileSuccess = (token: string) => {
-    setTurnstileToken(token)
-  }
+  // Initialize Turnstile only once after component mounts
+  useEffect(() => {
+    // Clear previous window callback to avoid duplicates
+    window.onloadTurnstileCallback = undefined;
+    
+    // Only initialize if element exists and turnstile is loaded
+    const initTurnstile = () => {
+      const container = document.getElementById('turnstile-container');
+      
+      // Clear any existing content to prevent duplicates
+      if (container) {
+        container.innerHTML = '';
+        
+        if (window.turnstile) {
+          window.turnstile.render(container, {
+            sitekey: process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || '',
+            callback: function(token) {
+              setTurnstileToken(token);
+            },
+          });
+        }
+      }
+    };
+    
+    // If turnstile is already available, initialize immediately
+    if (window.turnstile) {
+      initTurnstile();
+    } else {
+      // Otherwise set up callback for when script loads
+      window.onloadTurnstileCallback = initTurnstile;
+    }
+    
+    // Cleanup function
+    return () => {
+      window.onloadTurnstileCallback = undefined;
+    };
+  }, []);
   
   async function handleGoogleSignIn() {
     setIsSubmitting(true)
@@ -46,11 +78,11 @@ export default function SignupForm() {
         throw new Error("Security verification failed. Please try again.")
       }
       
-      // Proceed with Google sign-in
+      // Proceed with Google sign-in using the hardcoded ngrok URL
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: 'https://4d97-95-86-56-35.ngrok-free.app/api/auth/callback',
         }
       })
       
@@ -61,8 +93,6 @@ export default function SignupForm() {
       console.error("Sign in error:", err)
       setError(err instanceof Error ? err.message : "Failed to sign in. Please try again.")
       setIsSubmitting(false)
-      // We'll handle failed verification by refreshing the page
-      window.location.reload();
     }
   }
   
@@ -82,14 +112,8 @@ export default function SignupForm() {
         </Alert>
       ) : (
         <div className="space-y-6">
-          {/* Turnstile Widget */}
-          <div className="flex justify-center mb-4">
-            <TurnstileWidget
-              siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ''}
-              onSuccess={onTurnstileSuccess}
-              theme="auto"
-            />
-          </div>
+          {/* Container for Turnstile widget */}
+          <div id="turnstile-container" className="flex justify-center mb-4"></div>
           
           <Button 
             type="button" 
