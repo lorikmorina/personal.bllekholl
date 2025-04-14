@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import TurnstileWidget from "@/app/components/TurnstileWidget"
 
 export default function SignupForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const supabase = createClient()
   
   async function handleGoogleSignIn() {
@@ -17,6 +19,27 @@ export default function SignupForm() {
     setError(null)
     
     try {
+      // Validate Turnstile token first
+      if (!turnstileToken) {
+        throw new Error("Please complete the security check")
+      }
+      
+      // Verify the turnstile token server-side
+      const verifyResponse = await fetch('/api/verify-turnstile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: turnstileToken }),
+      })
+      
+      const verification = await verifyResponse.json()
+      
+      if (!verification.success) {
+        throw new Error("Security verification failed. Please try again.")
+      }
+      
+      // Proceed with Google sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -28,10 +51,16 @@ export default function SignupForm() {
       
       setSuccessMessage("Redirecting to Google for authentication...")
     } catch (err) {
-      console.error("Google sign in error:", err)
-      setError("Failed to sign in with Google. Please try again.")
+      console.error("Sign in error:", err)
+      setError(err instanceof Error ? err.message : "Failed to sign in. Please try again.")
       setIsSubmitting(false)
     }
+  }
+  
+  // Handle successful Turnstile verification
+  const handleTurnstileSuccess = (token: string) => {
+    setTurnstileToken(token)
+    setError(null) // Clear any previous errors
   }
   
   return (
@@ -50,12 +79,20 @@ export default function SignupForm() {
         </Alert>
       ) : (
         <div className="space-y-6">
+          {/* Turnstile Widget */}
+          <div className="w-full flex justify-center mb-4">
+            <TurnstileWidget
+              siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ''}
+              onSuccess={handleTurnstileSuccess}
+            />
+          </div>
+          
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2 h-11"
             onClick={handleGoogleSignIn}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !turnstileToken}
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
