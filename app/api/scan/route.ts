@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/client';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { createHash } from 'crypto';
 import { scanRateLimiter } from '../middleware';
 
 // Helper function to extract JS URLs from HTML
@@ -334,46 +335,53 @@ const calculateScore = (
   return score;
 };
 
+// Constants for rate limiting
+const FREE_SCAN_LIMIT = 2;
+
 export async function POST(request: Request) {
-  // Get the user session first
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  // If user is authenticated, check their subscription plan
-  let isUnlimitedUser = false;
-  
-  if (session?.user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_plan')
-      .eq('id', session.user.id)
-      .single();
-      
-    // Users with any plan other than 'free' have unlimited scans
-    if (profile && profile.subscription_plan !== 'free') {
-      isUnlimitedUser = true;
-    }
-  }
-  
-  // Only apply rate limiting for unauthenticated users or free plan users
-  if (!isUnlimitedUser) {
-    const rateLimitResponse = await scanRateLimiter(request);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-  }
-  
   try {
+    // Get the request body
     const body = await request.json();
     const { url } = body;
     
-    if (!url) {
-      return NextResponse.json(
-        { error: "URL is required" },
-        { status: 400 }
-      );
+    // Get the user session
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Extract IP address for anonymous users
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    
+    // Check if user has unlimited scans (paid plan)
+    let isUnlimitedUser = false;
+    
+    if (session?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_plan')
+        .eq('id', session.user.id)
+        .single();
+        
+      // Users with any plan other than 'free' have unlimited scans
+      if (profile && profile.subscription_plan !== 'free') {
+        isUnlimitedUser = true;
+      }
     }
     
+    // Apply rate limiting for non-unlimited users
+    if (!isUnlimitedUser) {
+      // Check and update scan usage
+      const result = await checkAndUpdateScanUsage(ip, session?.user?.id);
+      
+      if (result.limitExceeded) {
+        return NextResponse.json({
+          error: "no_scans_remaining",
+          message: "You've reached your scan limit. Please upgrade your plan for more scans.",
+          redirectTo: "/pricing"
+        }, { status: 429 });
+      }
+    }
+    
+    // Continue with the actual scan logic
     // Fetch the website content
     const response = await axios.get(url, {
       headers: {
@@ -456,7 +464,7 @@ export async function POST(request: Request) {
     score = Math.max(0, Math.min(100, score));
     
     // Return results
-    return NextResponse.json({
+    const scanResult = {
       url,
       headers: {
         present: headerCheck.present,
@@ -465,13 +473,88 @@ export async function POST(request: Request) {
       leaks: uniqueLeaks,
       jsFilesScanned: jsFilesToCheck.length,
       score
-    });
+    };
     
+    return NextResponse.json(scanResult);
   } catch (error) {
-    console.error('Scan error:', error);
-    return NextResponse.json(
-      { error: 'scan_failed', message: 'Failed to scan the website' },
-      { status: 500 }
-    );
+    console.error('Error in scan endpoint:', error);
+    return NextResponse.json({ 
+      error: "scan_failed", 
+      message: error instanceof Error ? error.message : "An unknown error occurred" 
+    }, { status: 500 });
   }
+}
+
+// Helper function to check and update scan usage
+async function checkAndUpdateScanUsage(ip: string, userId?: string) {
+  try {
+    // Create an admin Supabase client to bypass RLS policies
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+    
+    // Create a unique identifier (user ID or hashed IP)
+    const identifier = userId || hashIpAddress(ip);
+    const type = userId ? 'authenticated' : 'anonymous';
+    
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check current usage
+    const { data, error } = await supabase
+      .from('scan_usage')
+      .select('count')
+      .eq('identifier', identifier)
+      .eq('date', today)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking scan usage:', error);
+      return { limitExceeded: false }; // Let them scan if we can't check
+    }
+    
+    const currentCount = data?.count || 0;
+    
+    // Check if limit exceeded
+    if (currentCount >= FREE_SCAN_LIMIT) {
+      return { limitExceeded: true };
+    }
+    
+    // Update usage count - properly handle the upsert with onConflict
+    const { error: updateError } = await supabase
+      .from('scan_usage')
+      .upsert(
+        {
+          identifier,
+          type,
+          date: today,
+          count: currentCount + 1,
+          last_scan: new Date().toISOString()
+        },
+        {
+          onConflict: 'identifier,date',
+          update: { 
+            count: currentCount + 1,
+            last_scan: new Date().toISOString()
+          }
+        }
+      );
+    
+    if (updateError) {
+      console.error('Error updating scan usage:', updateError);
+    }
+    
+    console.log(`Scan count updated for ${identifier}: ${currentCount + 1}/${FREE_SCAN_LIMIT}`);
+    return { limitExceeded: false };
+  } catch (error) {
+    console.error('Unexpected error in scan rate limiting:', error);
+    return { limitExceeded: false }; // Let them scan if there's an error
+  }
+}
+
+// Helper to hash IP addresses for privacy
+function hashIpAddress(ip: string): string {
+  return createHash('sha256').update(ip + process.env.IP_SALT || 'secure-viber-salt').digest('hex');
 } 
