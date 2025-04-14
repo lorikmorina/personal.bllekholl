@@ -39,11 +39,14 @@ export default function SignupForm() {
         throw new Error("Security verification failed. Please try again.")
       }
       
+      // Use the production URL for redirect instead of window.location.origin
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.netlify.app'
+      
       // Proceed with Google sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: `${redirectUrl}/api/auth/callback`,
         }
       })
       
