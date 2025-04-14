@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
   const productionHost = 'securevibing.netlify.app'
   const currentHost = request.headers.get('host') || ''
   
-  // If we're not on the production host and either productionRedirect flag is set
-  // or we're on any Netlify preview URL (which always contains --)
-  if (currentHost !== productionHost && 
-      (productionRedirect || currentHost.includes('--'))) {
+  // Always redirect to production domain if we're on any kind of preview URL
+  if (currentHost !== productionHost) {
     const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${productionHost}`
-    return NextResponse.redirect(`${productionUrl}${redirectTo}`)
+    // Preserve the full query string when redirecting
+    const queryParams = requestUrl.search
+    return NextResponse.redirect(`${productionUrl}${redirectTo}${queryParams}`)
   }
 
   // Normal redirect to dashboard or specified redirect path
