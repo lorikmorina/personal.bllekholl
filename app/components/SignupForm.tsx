@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Loader2 } from "lucide-react"
@@ -10,79 +10,17 @@ export default function SignupForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const supabase = createClient()
-  
-  // Initialize Turnstile only once after component mounts
-  useEffect(() => {
-    // Clear previous window callback to avoid duplicates
-    window.onloadTurnstileCallback = undefined;
-    
-    // Only initialize if element exists and turnstile is loaded
-    const initTurnstile = () => {
-      const container = document.getElementById('turnstile-container');
-      
-      // Clear any existing content to prevent duplicates
-      if (container) {
-        container.innerHTML = '';
-        
-        if (window.turnstile) {
-          window.turnstile.render(container, {
-            sitekey: process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || '',
-            callback: function(token) {
-              setTurnstileToken(token);
-            },
-          });
-        }
-      }
-    };
-    
-    // If turnstile is already available, initialize immediately
-    if (window.turnstile) {
-      initTurnstile();
-    } else {
-      // Otherwise set up callback for when script loads
-      window.onloadTurnstileCallback = initTurnstile;
-    }
-    
-    // Cleanup function
-    return () => {
-      window.onloadTurnstileCallback = undefined;
-    };
-  }, []);
   
   async function handleGoogleSignIn() {
     setIsSubmitting(true)
     setError(null)
     
-    // Check if Turnstile was completed
-    if (!turnstileToken) {
-      setError("Please complete the security check before continuing")
-      setIsSubmitting(false)
-      return
-    }
-    
     try {
-      // Verify Turnstile token first
-      const verifyResponse = await fetch('/api/verify-turnstile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: turnstileToken }),
-      })
-      
-      const verifyData = await verifyResponse.json()
-      
-      if (!verifyData.success) {
-        throw new Error("Security verification failed. Please try again.")
-      }
-      
-      // Proceed with Google sign-in using the hardcoded ngrok URL
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'https://4d97-95-86-56-35.ngrok-free.app/api/auth/callback',
+          redirectTo: `${window.location.origin}/api/auth/callback`,
         }
       })
       
@@ -90,8 +28,8 @@ export default function SignupForm() {
       
       setSuccessMessage("Redirecting to Google for authentication...")
     } catch (err) {
-      console.error("Sign in error:", err)
-      setError(err instanceof Error ? err.message : "Failed to sign in. Please try again.")
+      console.error("Google sign in error:", err)
+      setError("Failed to sign in with Google. Please try again.")
       setIsSubmitting(false)
     }
   }
@@ -112,15 +50,12 @@ export default function SignupForm() {
         </Alert>
       ) : (
         <div className="space-y-6">
-          {/* Container for Turnstile widget */}
-          <div id="turnstile-container" className="flex justify-center mb-4"></div>
-          
           <Button 
             type="button" 
             variant="outline" 
             className="w-full flex items-center justify-center gap-2 h-11"
             onClick={handleGoogleSignIn}
-            disabled={isSubmitting || !turnstileToken}
+            disabled={isSubmitting}
           >
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
