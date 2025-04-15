@@ -79,7 +79,7 @@ export default function Hero() {
         
         // Check for no scans remaining error
         if (errorData.error === "no_scans_remaining") {
-          // Use the redirect URL if provided, otherwise default to /pricing
+          // Use the redirect URL if provided, otherwise default to /signup
           if (errorData.redirectTo) {
             router.push(errorData.redirectTo)
           } else {

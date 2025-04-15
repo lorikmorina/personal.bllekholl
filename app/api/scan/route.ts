@@ -393,7 +393,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           error: "no_scans_remaining",
           message: "You've reached your scan limit. Please upgrade your plan for more scans.",
-          redirectTo: "/pricing"
+          redirectTo: "/signup"
         }, { status: 429 });
       }
     } else {
