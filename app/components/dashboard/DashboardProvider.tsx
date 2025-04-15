@@ -53,7 +53,7 @@ export default function DashboardProvider({ children }: { children: React.ReactN
   }, [router, supabase])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'global' })
     router.push('/')
   }
 

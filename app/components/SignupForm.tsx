@@ -43,13 +43,17 @@ export default function SignupForm() {
       // Use the production URL for redirect instead of window.location.origin
       const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.com'
       
+      // Make sure the redirectTo URL is absolute with https://
+      const absoluteRedirectUrl = redirectUrl.startsWith('http') 
+        ? redirectUrl 
+        : `https://${redirectUrl}`
+      
       // Proceed with Google sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${redirectUrl}/api/auth/callback`,
+          redirectTo: `${absoluteRedirectUrl}/api/auth/callback`,
           queryParams: {
-            // Add a custom parameter that we can check in the callback
             production_redirect: 'true'
           }
         }
