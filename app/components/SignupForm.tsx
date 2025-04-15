@@ -41,7 +41,7 @@ export default function SignupForm() {
       }
       
       // Use the production URL for redirect instead of window.location.origin
-      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.netlify.app'
+      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.com'
       
       // Proceed with Google sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({

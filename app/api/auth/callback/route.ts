@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
   
   // Check if we're on a preview URL and need to redirect to production
-  const productionHost = 'securevibing.netlify.app'
+  const productionHost = 'securevibing.com'
   const currentHost = request.headers.get('host') || ''
   
   // Always redirect to production domain if we're on any kind of preview URL
