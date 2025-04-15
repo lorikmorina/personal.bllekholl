@@ -128,9 +128,9 @@ export default function SignupForm() {
           
           <p className="text-center text-xs text-muted-foreground">
             By continuing, you agree to our{" "}
-            <a href="#" className="underline underline-offset-4 hover:text-primary">Terms of Service</a>
+            <a href="terms" className="underline underline-offset-4 hover:text-primary">Terms of Service</a>
             {" "}and{" "}
-            <a href="#" className="underline underline-offset-4 hover:text-primary">Privacy Policy</a>.
+            <a href="privacy" className="underline underline-offset-4 hover:text-primary">Privacy Policy</a>.
           </p>
         </div>
       )}

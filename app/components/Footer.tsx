@@ -42,7 +42,7 @@ export default function Footer() {
         </div>
         
         <p className="mt-10 text-center text-sm leading-5 text-muted-foreground">
-          SecureVibing. 2025 Copyright PARADOX BLLEKHOLL L.L.C.
+          SecureVibing. 2025 Copyright PARADOX BLLEKHOLL SH.P.K.
         </p>
       </div>
     </footer>
