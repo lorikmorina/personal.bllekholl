@@ -6,30 +6,28 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const productionRedirect = requestUrl.searchParams.get('production_redirect') === 'true'
-  const redirectTo = requestUrl.searchParams.get('redirect') || '/dashboard'
+  // We get the intended final path from the 'redirect' query param from SignupForm
+  const finalRedirectPath = requestUrl.searchParams.get('redirect') || '/dashboard'
 
+  // Always exchange the code for a session regardless of domain
   if (code) {
     const supabase = createRouteHandlerClient({ cookies })
     await supabase.auth.exchangeCodeForSession(code)
   }
-  
-  // Check if we're on a preview URL and need to redirect to production
+
+  // Define production host and base URL explicitly
   const productionHost = 'securevibing.com'
+  const productionBaseUrl = 'https://securevibing.com'
   const currentHost = request.headers.get('host') || ''
-  
-  // Always redirect to production domain if we're on any kind of preview URL
+
+  // If we somehow landed on the callback via a non-production host,
+  // force redirect to the production dashboard (clean URL).
   if (currentHost !== productionHost) {
-    const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${productionHost}`
-    
-    // Add a state parameter to prevent circular redirects
-    const redirectPath = redirectTo || '/dashboard'
-    const finalUrl = `${productionUrl}${redirectPath}`
-    
-    // Redirect directly without preserving query params that might cause loops
-    return NextResponse.redirect(finalUrl)
+    // This case should be less likely now but acts as a safeguard
+    return NextResponse.redirect(`${productionBaseUrl}/dashboard`)
   }
 
-  // Normal redirect to dashboard or specified redirect path
-  return NextResponse.redirect(new URL(redirectTo, request.url))
+  // If we are on the production host, redirect to the intended path,
+  // ensuring we use the production base URL.
+  return NextResponse.redirect(`${productionBaseUrl}${finalRedirectPath}`)
 } 
