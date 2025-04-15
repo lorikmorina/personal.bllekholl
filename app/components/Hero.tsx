@@ -83,7 +83,7 @@ export default function Hero() {
           if (errorData.redirectTo) {
             router.push(errorData.redirectTo)
           } else {
-            router.push("/pricing")
+            router.push("/signup")
           }
           return
         }
