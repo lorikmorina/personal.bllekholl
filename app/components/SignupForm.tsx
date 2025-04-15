@@ -40,21 +40,19 @@ export default function SignupForm() {
         throw new Error("Security verification failed. Please try again.")
       }
       
-      // Use the production URL for redirect instead of window.location.origin
-      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://securevibing.com'
-      
-      // Make sure the redirectTo URL is absolute with https://
-      const absoluteRedirectUrl = redirectUrl.startsWith('http') 
-        ? redirectUrl 
-        : `https://${redirectUrl}`
+      // Always use the hardcoded production URL for the OAuth redirect
+      const absoluteRedirectUrl = 'https://securevibing.com'; // Hardcode the production domain
       
       // Proceed with Google sign-in
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+          // Ensure the redirectTo uses the hardcoded production URL
           redirectTo: `${absoluteRedirectUrl}/api/auth/callback`,
           queryParams: {
-            production_redirect: 'true'
+            // Simplify queryParams - the callback handler determines the final path
+            // Remove 'production_redirect' as it's no longer needed with a hardcoded URL
+            redirect: '/dashboard'
           }
         }
       })
