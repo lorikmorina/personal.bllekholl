@@ -4,6 +4,8 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import { scanRateLimiter } from '../middleware';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 // Helper function to extract JS URLs from HTML
 const extractJsUrls = (html: string, baseUrl: string): string[] => {
@@ -344,8 +346,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { url } = body;
     
-    // Get the user session
-    const supabase = createClient();
+    // Use the server-side client for auth context
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
+    // Get the user session correctly
     const { data: { session } } = await supabase.auth.getSession();
     
     // Extract IP address for anonymous users
@@ -355,30 +360,44 @@ export async function POST(request: Request) {
     let isUnlimitedUser = false;
     
     if (session?.user) {
-      const { data: profile } = await supabase
+      // Fetch profile using the same server-side client instance
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('subscription_plan')
         .eq('id', session.user.id)
         .single();
-        
-      // Users with any plan other than 'free' have unlimited scans
-      if (profile && profile.subscription_plan !== 'free') {
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        // Decide how to handle profile fetch error - maybe allow scan or return error?
+        // For now, let's assume they are not unlimited if profile fails
+      } else if (profile && profile.subscription_plan !== 'free') {
+        // Correctly identify users with non-free plans
         isUnlimitedUser = true;
+        console.log(`User ${session.user.id} identified as unlimited.`);
+      } else {
+        console.log(`User ${session.user.id} identified as free or profile issue.`);
       }
+    } else {
+      console.log("No active session found for rate limiting check.");
     }
     
     // Apply rate limiting for non-unlimited users
     if (!isUnlimitedUser) {
+      console.log(`Applying rate limit check for identifier: ${session?.user?.id || ip}`);
       // Check and update scan usage
       const result = await checkAndUpdateScanUsage(ip, session?.user?.id);
       
       if (result.limitExceeded) {
+        console.log(`Rate limit exceeded for identifier: ${session?.user?.id || ip}`);
         return NextResponse.json({
           error: "no_scans_remaining",
           message: "You've reached your scan limit. Please upgrade your plan for more scans.",
           redirectTo: "/pricing"
         }, { status: 429 });
       }
+    } else {
+      console.log(`Skipping rate limit check for unlimited user: ${session?.user?.id}`);
     }
     
     // Continue with the actual scan logic
