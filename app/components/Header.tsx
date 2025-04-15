@@ -51,8 +51,14 @@ export default function Header() {
   }, [supabase.auth])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+    // Clear all session data, including on all devices
+    await supabase.auth.signOut({ scope: 'global' })
+    
+    // Add a small delay before redirect to ensure auth state is cleared
+    setTimeout(() => {
+      // Force a hard refresh to clear any cached state
+      window.location.href = '/'
+    }, 100)
   }
 
   // Extract user initials for avatar fallback

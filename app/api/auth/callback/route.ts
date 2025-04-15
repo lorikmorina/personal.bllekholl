@@ -21,9 +21,13 @@ export async function GET(request: NextRequest) {
   // Always redirect to production domain if we're on any kind of preview URL
   if (currentHost !== productionHost) {
     const productionUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${productionHost}`
-    // Preserve the full query string when redirecting
-    const queryParams = requestUrl.search
-    return NextResponse.redirect(`${productionUrl}${redirectTo}${queryParams}`)
+    
+    // Add a state parameter to prevent circular redirects
+    const redirectPath = redirectTo || '/dashboard'
+    const finalUrl = `${productionUrl}${redirectPath}`
+    
+    // Redirect directly without preserving query params that might cause loops
+    return NextResponse.redirect(finalUrl)
   }
 
   // Normal redirect to dashboard or specified redirect path
