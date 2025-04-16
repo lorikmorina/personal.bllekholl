@@ -149,18 +149,12 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   <span>Unlimited website scans</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Deep vulnerability scanning</span>
-                </li>
+                
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   <span>API leak detection</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Email reports</span>
-                </li>
+               
               </ul>
             </div>
             
@@ -189,14 +183,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                   <span>Lifetime updates</span>
                 </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Priority support</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Future features included</span>
-                </li>
+                
               </ul>
             </div>
           </div>
