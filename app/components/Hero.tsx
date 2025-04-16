@@ -150,7 +150,7 @@ export default function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Scan your website for security issues to see if your website passes the security vibe check. Find leaked API keys, 
+              Ready to Launch? Wait, first Scan your website for security issues to see if your website passes the security vibe check. Find leaked API keys, 
               missing security headers, and other common vulnerabilities.
             </motion.p>
             
@@ -191,6 +191,10 @@ export default function Hero() {
                   )}
                 </Button>
               </form>
+              
+              <p className="mt-2 text-xs text-muted-foreground italic">
+                Disclaimer: The app may produce false positives and doesn't guarantee complete website security. It only checks for major flaws and may miss some vulnerabilities. You have 2 free scans.
+              </p>
               
               {error && (
                 <Alert variant="destructive" className="mt-6">

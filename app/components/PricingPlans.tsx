@@ -10,9 +10,10 @@ export default function PricingPlans() {
   const plans = [
     {
       name: "Yearly",
-      price: "$24",
+      price: "$2",
       description: "Perfect for individuals who need regular website scanning",
-      billingPeriod: "per year",
+      billingPeriod: "per month",
+      annualPrice: "$24 billed annually",
       features: [
         "1 year access to securevibing",
         "API key detection",
@@ -90,9 +91,16 @@ export default function PricingPlans() {
                         {plan.price}
                       </span>
                       <span className="ml-2 text-muted-foreground">
-                        {plan.name === "Yearly" ? "/year" : "one-time"}
+                        {plan.billingPeriod}
                       </span>
                     </div>
+                    {plan.annualPrice && (
+                      <div className="mt-1">
+                        <span className="text-sm text-muted-foreground">
+                          {plan.annualPrice}
+                        </span>
+                      </div>
+                    )}
                     {plan.normalPrice && (
                       <div className="mt-1">
                         <span className="text-sm text-muted-foreground line-through">
