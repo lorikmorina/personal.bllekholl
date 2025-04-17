@@ -11,6 +11,7 @@ export default function Footer() {
             { name: "Signup", href: "/signup" },
             { name: "Privacy", href: "/privacy" },
             { name: "Terms", href: "/terms" },
+            { name: "Refund Policy", href: "/refund" },
           ].map((item) => (
             <div key={item.name} className="pb-6">
               <Link
