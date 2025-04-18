@@ -22,7 +22,7 @@ export default function PrivacyPolicy() {
         
         <h2>1. Introduction</h2>
         <p>
-          Welcome to SecureVibing. We respect your privacy and are committed to protecting your personal data. 
+          Welcome to SecureVibing, a product of PARADOX BLLEKHOLL SH.P.K. We respect your privacy and are committed to protecting your personal data. 
           This privacy policy explains how we collect, use, and safeguard your information when you use our service.
         </p>
         

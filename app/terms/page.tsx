@@ -27,7 +27,7 @@ export default function TermsOfService() {
         
         <h2>2. Description of Service</h2>
         <p>
-          SecureVibing provides web security scanning services that analyze websites for security vulnerabilities, including but not limited to API key leaks and security header configurations.
+          SecureVibing is a product of PARADOX BLLEKHOLL SH.P.K. (SH.P.K. means L.L.C in Kosovo, where the business is located) that provides automatic web security scanning services that analyze websites for security vulnerabilities, including but not limited to API key leaks and security header configurations.
         </p>
         
         <h2>3. Account Registration</h2>

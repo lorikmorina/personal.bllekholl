@@ -5,7 +5,7 @@ export default function RefundPolicy() {
       
       <div className="prose dark:prose-invert">
         <p className="text-lg mb-6">
-          At SecureVibing, we aim to provide high-quality digital services to help you secure your websites.
+          At SecureVibing, a product of PARADOX BLLEKHOLL SH.P.K. we aim to provide high-quality digital services to help you secure your websites.
         </p>
         
         <h2 className="text-xl font-semibold mb-4 mt-8">No Refund Policy for Digital Products</h2>
