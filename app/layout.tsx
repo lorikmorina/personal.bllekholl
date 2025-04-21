@@ -22,19 +22,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Google Analytics */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-G85X90RSD8"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-G85X90RSD8"></script>
+        <script dangerouslySetInnerHTML={{
+          __html: `
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-G85X90RSD8');
-          `}
-        </Script>
+          `
+        }} />
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="afterInteractive"
