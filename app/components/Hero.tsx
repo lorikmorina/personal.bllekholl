@@ -54,6 +54,7 @@ export default function Hero() {
   const [url, setUrl] = useState("")
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [easterEggMessage, setEasterEggMessage] = useState<string | null>(null)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [expandedHeaders, setExpandedHeaders] = useState<string[]>([])
   const [expandedLeaks, setExpandedLeaks] = useState<number[]>([])
@@ -61,6 +62,14 @@ export default function Hero() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setEasterEggMessage(null)
+    
+    // Easter egg for scanning our own website
+    if (url.toLowerCase().includes("securevibing.com")) {
+      setEasterEggMessage("Really, you are wasting your scan on us, so generous of you but I will give your free scan back, use it wisely this time 😉")
+      return
+    }
+    
     setIsScanning(true)
     setError(null)
     setResult(null)
@@ -201,6 +210,14 @@ export default function Hero() {
                   <ShieldAlert className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {easterEggMessage && (
+                <Alert variant="default" className="mt-6 border-2 border-primary bg-primary/10">
+                  <User className="h-4 w-4 text-primary" />
+                  <AlertTitle className="text-primary">Hey there! 👋</AlertTitle>
+                  <AlertDescription className="text-primary/90">{easterEggMessage}</AlertDescription>
                 </Alert>
               )}
             </motion.div>
