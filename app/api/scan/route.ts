@@ -376,6 +376,103 @@ const calculateScore = (
 // Constants for rate limiting
 const FREE_SCAN_LIMIT = 2;
 
+// Function to identify auth pages and check for CAPTCHA presence
+const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<{
+  authPagesFound: string[];
+  captchaProtected: string[];
+  unprotectedPages: string[];
+}> => {
+  const $ = cheerio.load(html);
+  const authPagesFound: string[] = [];
+  const captchaProtected: string[] = [];
+  const unprotectedPages: string[] = [];
+  
+  // Find potential auth page links
+  const authPageKeywords = ['login', 'signin', 'signup', 'register', 'auth', 'account/create'];
+  
+  // Search for links matching auth keywords
+  $('a').each((_, element) => {
+    const href = $(element).attr('href');
+    const text = $(element).text().toLowerCase();
+    
+    if (!href) return;
+    
+    const isAuthLink = authPageKeywords.some(keyword => 
+      href.toLowerCase().includes(keyword) || text.includes(keyword)
+    );
+    
+    if (isAuthLink) {
+      // Resolve relative URLs
+      let fullUrl = href;
+      if (href.startsWith('/')) {
+        const url = new URL(baseUrl);
+        fullUrl = `${url.origin}${href}`;
+      } else if (!href.startsWith('http')) {
+        const url = new URL(baseUrl);
+        fullUrl = `${url.origin}/${href}`;
+      }
+      
+      // Avoid duplicates
+      if (!authPagesFound.includes(fullUrl)) {
+        authPagesFound.push(fullUrl);
+      }
+    }
+  });
+  
+  // Also check the current page for auth forms
+  const hasAuthForm = $('form').filter((_, element) => {
+    const action = $(element).attr('action') || '';
+    const formHtml = $(element).html().toLowerCase();
+    return action.includes('login') || action.includes('signin') || action.includes('signup') || 
+           formHtml.includes('password') || formHtml.includes('login') || 
+           formHtml.includes('signin') || formHtml.includes('signup');
+  }).length > 0;
+  
+  if (hasAuthForm && !authPagesFound.includes(baseUrl)) {
+    authPagesFound.push(baseUrl);
+  }
+  
+  // Check each auth page for CAPTCHA
+  for (const pageUrl of authPagesFound) {
+    try {
+      const response = await axios.get(pageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 SecureViber Security Scanner'
+        }
+      });
+      
+      const pageHtml = response.data;
+      const $page = cheerio.load(pageHtml);
+      
+      // Check for Google reCAPTCHA
+      const hasRecaptcha = $page('div.g-recaptcha').length > 0 || 
+                           pageHtml.includes('grecaptcha') || 
+                           pageHtml.includes('google.com/recaptcha');
+                           
+      // Check for Cloudflare Turnstile
+      const hasTurnstile = $page('div.cf-turnstile').length > 0 || 
+                           pageHtml.includes('turnstile.js') || 
+                           pageHtml.includes('challenges.cloudflare.com');
+      
+      if (hasRecaptcha || hasTurnstile) {
+        captchaProtected.push(pageUrl);
+      } else {
+        unprotectedPages.push(pageUrl);
+      }
+    } catch (error) {
+      console.error(`Failed to check auth page: ${pageUrl}`, error);
+      // Still count this as an auth page, but can't determine protection
+      unprotectedPages.push(pageUrl);
+    }
+  }
+  
+  return {
+    authPagesFound,
+    captchaProtected,
+    unprotectedPages
+  };
+};
+
 export async function POST(request: Request) {
   try {
     // Get the request body
@@ -530,6 +627,21 @@ export async function POST(request: Request) {
       }
     }
     
+    // Check for auth pages without CAPTCHA
+    const authPageCheck = await checkAuthPagesForCaptcha(url, html);
+    
+    // Add unprotected auth pages to the leaks list
+    if (authPageCheck.unprotectedPages.length > 0) {
+      // Create a leak entry for each unprotected auth page
+      for (const unprotectedPage of authPageCheck.unprotectedPages) {
+        uniqueLeaks.push({
+          type: 'Unprotected Auth Page',
+          preview: `Auth page without CAPTCHA: ${unprotectedPage.substring(0, 30)}...`,
+          details: `Authentication page found at ${unprotectedPage} does not appear to have CAPTCHA or Turnstile protection, making it vulnerable to credential stuffing and brute force attacks.`
+        });
+      }
+    }
+    
     // Calculate score
     let score = 100;
     
@@ -542,6 +654,12 @@ export async function POST(request: Request) {
     // Deduct more points if RLS is vulnerable (very critical)
     if (rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
       score -= 25; // Significant penalty for RLS vulnerability
+    }
+    
+    // Deduct points for unprotected auth pages
+    if (authPageCheck.unprotectedPages.length > 0) {
+      // Deduct 5 points per unprotected auth page, max 15 points
+      score -= Math.min(authPageCheck.unprotectedPages.length * 5, 15);
     }
     
     // Ensure score stays between 0-100
@@ -557,6 +675,11 @@ export async function POST(request: Request) {
       leaks: uniqueLeaks,
       jsFilesScanned: jsFilesToCheck.length,
       rlsVulnerability,
+      authPages: {
+        found: authPageCheck.authPagesFound,
+        protected: authPageCheck.captchaProtected,
+        unprotected: authPageCheck.unprotectedPages
+      },
       score
     };
     
