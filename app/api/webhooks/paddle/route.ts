@@ -1,14 +1,88 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createHmac } from 'crypto';
+
+// Function to verify webhook signature
+function verifyPaddleWebhook(rawBody: string, signature: string): boolean {
+  try {
+    // Get the webhook secret from environment variables
+    const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET_KEY;
+    
+    if (!webhookSecret) {
+      console.error('PADDLE_WEBHOOK_SECRET_KEY is not set in environment variables');
+      return false;
+    }
+    
+    // Parse the signature header
+    const parts = signature.split(';');
+    
+    if (parts.length < 2) {
+      console.error('Invalid signature format');
+      return false;
+    }
+    
+    // Extract timestamp and signature hash
+    const tsString = parts[0];
+    const h1String = parts[1];
+    
+    if (!tsString.startsWith('ts=') || !h1String.startsWith('h1=')) {
+      console.error('Invalid signature components');
+      return false;
+    }
+    
+    const timestamp = tsString.substring(3);
+    const receivedSignature = h1String.substring(3);
+    
+    // Build the signed payload (timestamp + ':' + rawBody)
+    const signedPayload = `${timestamp}:${rawBody}`;
+    
+    // Compute HMAC using SHA-256
+    const computedSignature = createHmac('sha256', webhookSecret)
+      .update(signedPayload)
+      .digest('hex');
+    
+    // Compare signatures
+    const isValid = computedSignature === receivedSignature;
+    
+    if (!isValid) {
+      console.error('Signature verification failed');
+      console.error('Received:', receivedSignature);
+      console.error('Computed:', computedSignature);
+    }
+    
+    return isValid;
+  } catch (error) {
+    console.error('Error verifying webhook signature:', error);
+    return false;
+  }
+}
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    // Clone the request to get the raw body as text for signature verification
+    const clonedRequest = request.clone();
+    const rawBody = await clonedRequest.text();
+    
+    // Get the Paddle-Signature header
+    const paddleSignature = request.headers.get('paddle-signature');
+    
+    if (!paddleSignature) {
+      console.error('No Paddle-Signature header present');
+      return NextResponse.json({ success: false, error: 'Missing signature header' }, { status: 401 });
+    }
+    
+    // Verify the webhook signature
+    const isValid = verifyPaddleWebhook(rawBody, paddleSignature);
+    
+    if (!isValid) {
+      console.error('Invalid webhook signature');
+      return NextResponse.json({ success: false, error: 'Invalid signature' }, { status: 401 });
+    }
+    
+    // Signature is valid, now parse the body as JSON
+    const payload = JSON.parse(rawBody);
     console.log('Received Paddle webhook:', payload);
 
-    // In production, you should verify the webhook signature
-    // For sandbox/development, we'll skip detailed verification
-    
     // Handle transaction completion events
     if (payload.event_type === 'transaction.completed') {
       // Create Supabase client with service role to bypass RLS
@@ -76,11 +150,9 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Webhook error:', error);
     
-    // Return 200 status even for errors to prevent Paddle from retrying
-    // But include error details in the response
     return NextResponse.json(
       { success: false, error: error.message || 'Webhook processing failed' },
-      { status: 200 }
+      { status: 500 }
     );
   }
 } 
