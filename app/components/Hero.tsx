@@ -193,7 +193,7 @@ export default function Hero() {
               </form>
               
               <p className="mt-2 text-xs text-muted-foreground italic">
-                Disclaimer: The app may produce false positives and doesn't guarantee complete website security. It only checks for major flaws and may miss some vulnerabilities. You have 2 free scans.
+                Disclaimer: The app is in beta and may produce false positives and doesn't guarantee complete website security. You have 2 free scans.
               </p>
               
               {error && (

@@ -154,8 +154,17 @@ const checkForApiKeys = (content: string): Array<{type: string, preview: string,
   
   // Special handling for Firebase config objects
   const firebaseConfigPattern = /(?:const|let|var)\s+(\w+)\s*=\s*\{[\s\S]{0,50}?apiKey\s*:\s*["']([a-zA-Z0-9_\-\.]{10,})["'][\s\S]{0,200}?(?:authDomain|databaseURL|projectId)/g;
-  const firebaseMatches = content.matchAll(firebaseConfigPattern);
-  for (const match of Array.from(firebaseMatches)) {
+
+  // Replace matchAll with a more compatible approach using exec in a loop
+  let firebaseMatches = [];
+  if (typeof content === 'string') {
+    let match;
+    while ((match = firebaseConfigPattern.exec(content)) !== null) {
+      firebaseMatches.push(match);
+    }
+  }
+
+  for (const match of firebaseMatches) {
     const fullMatch = match[0];
     const variableName = match[1];
     const apiKey = match[2];
@@ -282,6 +291,33 @@ const checkForApiKeys = (content: string): Array<{type: string, preview: string,
       }
     }
   });
+  
+  // Add a specific check for Supabase URL and key pairs
+  const findSupabaseCredentials = (content: string): {url: string, key: string} | null => {
+    // Look for Supabase URL pattern (something.supabase.co)
+    const urlMatch = content.match(/['"]https:\/\/([a-z0-9-]+)\.supabase\.co['"]/);
+    if (!urlMatch) return null;
+    
+    // Look for anon key nearby (typically starts with eyJ or sbp_)
+    const keyMatch = content.match(/['"](?:eyJ|sbp_)[a-zA-Z0-9._-]{40,}['"]/);
+    if (!keyMatch) return null;
+    
+    return {
+      url: urlMatch[0].replace(/['"]/g, ''),
+      key: keyMatch[0].replace(/['"]/g, '')
+    };
+  };
+  
+  // Check for Supabase credentials and add to findings
+  const supabaseCredentials = findSupabaseCredentials(content);
+  if (supabaseCredentials) {
+    findings.push({
+      type: 'Supabase Credentials',
+      preview: `URL: ${supabaseCredentials.url.substring(0, 15)}... Key: ${supabaseCredentials.key.substring(0, 8)}...`,
+      details: `Found Supabase URL and anon key - will test RLS configuration`,
+      supabaseCreds: supabaseCredentials
+    });
+  }
   
   return findings;
 };
@@ -470,6 +506,30 @@ export async function POST(request: Request) {
       index === self.findIndex(l => l.preview === leak.preview)
     );
     
+    // Check for Supabase credentials and test RLS if found
+    let rlsVulnerability = null;
+    for (const leak of uniqueLeaks) {
+      if (leak.type === 'Supabase Credentials' && leak.supabaseCreds) {
+        try {
+          // Call the RLS testing endpoint
+          const rlsTestResponse = await axios.post(`${request.nextUrl.origin}/api/testRLS`, {
+            supabaseUrl: leak.supabaseCreds.url,
+            supabaseKey: leak.supabaseCreds.key
+          });
+          
+          rlsVulnerability = rlsTestResponse.data;
+          
+          // Adjust the leak details to include RLS findings
+          leak.details += rlsVulnerability.isRlsVulnerable 
+            ? ` - CRITICAL: RLS appears to be misconfigured, found ${rlsVulnerability.vulnerableTables.length} accessible tables!` 
+            : ' - RLS appears to be configured correctly';
+        } catch (error) {
+          console.error('Error testing RLS:', error);
+        }
+        break; // Only test the first set of credentials we find
+      }
+    }
+    
     // Calculate score
     let score = 100;
     
@@ -479,10 +539,15 @@ export async function POST(request: Request) {
     // Deduct points for leaked API keys (more severe)
     score -= uniqueLeaks.length * 15;
     
+    // Deduct more points if RLS is vulnerable (very critical)
+    if (rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
+      score -= 25; // Significant penalty for RLS vulnerability
+    }
+    
     // Ensure score stays between 0-100
     score = Math.max(0, Math.min(100, score));
     
-    // Return results
+    // Return results with RLS information
     const scanResult = {
       url,
       headers: {
@@ -491,6 +556,7 @@ export async function POST(request: Request) {
       },
       leaks: uniqueLeaks,
       jsFilesScanned: jsFilesToCheck.length,
+      rlsVulnerability,
       score
     };
     
