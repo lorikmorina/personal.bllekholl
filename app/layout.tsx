@@ -39,8 +39,9 @@ export default function RootLayout({
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="afterInteractive"
         />
-{/* Hotjar Tracking Code */}
-<Script id="hotjar-tracking" strategy="afterInteractive">
+
+        {/* Hotjar Tracking Code */}
+        <Script id="hotjar-tracking" strategy="afterInteractive">
           {`
             (function(h,o,t,j,a,r){
                 h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
@@ -52,7 +53,7 @@ export default function RootLayout({
             })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
           `}
         </Script>
-
+        
         <meta name="apple-mobile-web-app-title" content="SecureVibing" />
         
         {/* Favicon tags */}
