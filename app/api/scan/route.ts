@@ -535,155 +535,179 @@ export async function POST(request: Request) {
     
     // Continue with the actual scan logic
     // Fetch the website content
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 SecureViber Security Scanner'
-      }
-    });
-    
-    const html = response.data;
-    
-    // Check security headers
-    const headerCheck = {
-      present: [],
-      missing: []
-    };
-    
-    const importantHeaders = [
-      'content-security-policy',
-      'strict-transport-security',
-      'x-frame-options',
-      'x-content-type-options',
-      'x-xss-protection',
-      'referrer-policy',
-      'permissions-policy'
-    ];
-    
-    for (const header of importantHeaders) {
-      if (response.headers[header]) {
-        headerCheck.present.push(header);
-      } else {
-        headerCheck.missing.push(header);
-      }
-    }
-    
-    // Look for security leaks in HTML itself
-    const htmlLeaks = checkForApiKeys(html);
-    
-    // Extract JS from the page (both inline and external)
-    const jsContent = extractJsContent(html, url);
-    
-    // Check inline scripts for leaks
-    let jsLeaks: Array<{type: string, preview: string, details: string}> = [];
-    jsContent.inlineCode.forEach(code => {
-      jsLeaks = [...jsLeaks, ...checkForApiKeys(code)];
-    });
-    
-    // Fetch and check external JS files
-    const jsFilesToCheck = jsContent.urls;
-    for (const jsUrl of jsFilesToCheck) {
-      try {
-        const jsResponse = await axios.get(jsUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 SecureViber Security Scanner'
-          }
-        });
-        const jsCode = jsResponse.data;
-        jsLeaks = [...jsLeaks, ...checkForApiKeys(jsCode)];
-      } catch (error) {
-        // Skip files that can't be accessed
-        console.error(`Failed to fetch JS file: ${jsUrl}`);
-      }
-    }
-    
-    // Consolidate all findings and deduplicate
-    const allLeaks = [...htmlLeaks, ...jsLeaks];
-    // Deduplicate by preview text
-    const uniqueLeaks = allLeaks.filter((leak, index, self) => 
-      index === self.findIndex(l => l.preview === leak.preview)
-    );
-    
-    // Check for Supabase credentials and test RLS if found
-    let rlsVulnerability = null;
-    for (const leak of uniqueLeaks) {
-      if (leak.type === 'Supabase Credentials' && leak.supabaseCreds) {
-        try {
-          // Call the RLS testing endpoint
-          const rlsTestResponse = await axios.post(`${request.nextUrl.origin}/api/testRLS`, {
-            supabaseUrl: leak.supabaseCreds.url,
-            supabaseKey: leak.supabaseCreds.key
-          });
-          
-          rlsVulnerability = rlsTestResponse.data;
-          
-          // Adjust the leak details to include RLS findings
-          leak.details += rlsVulnerability.isRlsVulnerable 
-            ? ` - CRITICAL: RLS appears to be misconfigured, found ${rlsVulnerability.vulnerableTables.length} accessible tables!` 
-            : ' - RLS appears to be configured correctly';
-        } catch (error) {
-          console.error('Error testing RLS:', error);
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 SecureViber Security Scanner'
         }
-        break; // Only test the first set of credentials we find
+      });
+      
+      const html = response.data;
+      
+      // Check security headers
+      const headerCheck = {
+        present: [],
+        missing: []
+      };
+      
+      const importantHeaders = [
+        'content-security-policy',
+        'strict-transport-security',
+        'x-frame-options',
+        'x-content-type-options',
+        'x-xss-protection',
+        'referrer-policy',
+        'permissions-policy'
+      ];
+      
+      for (const header of importantHeaders) {
+        if (response.headers[header]) {
+          headerCheck.present.push(header);
+        } else {
+          headerCheck.missing.push(header);
+        }
       }
-    }
-    
-    // Check for auth pages without CAPTCHA
-    const authPageCheck = await checkAuthPagesForCaptcha(url, html);
-    
-    // Add unprotected auth pages to the leaks list
-    if (authPageCheck.unprotectedPages.length > 0) {
-      // Create a leak entry for each unprotected auth page
-      for (const unprotectedPage of authPageCheck.unprotectedPages) {
-        uniqueLeaks.push({
-          type: 'Unprotected Auth Page',
-          preview: `Auth page without CAPTCHA: ${unprotectedPage.substring(0, 30)}...`,
-          details: `Authentication page found at ${unprotectedPage} does not appear to have CAPTCHA or Turnstile protection, making it vulnerable to credential stuffing and brute force attacks.`
-        });
+      
+      // Look for security leaks in HTML itself
+      const htmlLeaks = checkForApiKeys(html);
+      
+      // Extract JS from the page (both inline and external)
+      const jsContent = extractJsContent(html, url);
+      
+      // Check inline scripts for leaks
+      let jsLeaks: Array<{type: string, preview: string, details: string}> = [];
+      jsContent.inlineCode.forEach(code => {
+        jsLeaks = [...jsLeaks, ...checkForApiKeys(code)];
+      });
+      
+      // Fetch and check external JS files
+      const jsFilesToCheck = jsContent.urls;
+      for (const jsUrl of jsFilesToCheck) {
+        try {
+          const jsResponse = await axios.get(jsUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 SecureViber Security Scanner'
+            }
+          });
+          const jsCode = jsResponse.data;
+          jsLeaks = [...jsLeaks, ...checkForApiKeys(jsCode)];
+        } catch (error) {
+          // Skip files that can't be accessed
+          console.error(`Failed to fetch JS file: ${jsUrl}`);
+        }
       }
+      
+      // Consolidate all findings and deduplicate
+      const allLeaks = [...htmlLeaks, ...jsLeaks];
+      // Deduplicate by preview text
+      const uniqueLeaks = allLeaks.filter((leak, index, self) => 
+        index === self.findIndex(l => l.preview === leak.preview)
+      );
+      
+      // Check for Supabase credentials and test RLS if found
+      let rlsVulnerability = null;
+      for (const leak of uniqueLeaks) {
+        if (leak.type === 'Supabase Credentials' && leak.supabaseCreds) {
+          try {
+            // Call the RLS testing endpoint
+            const rlsTestResponse = await axios.post(`${request.nextUrl.origin}/api/testRLS`, {
+              supabaseUrl: leak.supabaseCreds.url,
+              supabaseKey: leak.supabaseCreds.key
+            });
+            
+            rlsVulnerability = rlsTestResponse.data;
+            
+            // Adjust the leak details to include RLS findings
+            leak.details += rlsVulnerability.isRlsVulnerable 
+              ? ` - CRITICAL: RLS appears to be misconfigured, found ${rlsVulnerability.vulnerableTables.length} accessible tables!` 
+              : ' - RLS appears to be configured correctly';
+          } catch (error) {
+            console.error('Error testing RLS:', error);
+          }
+          break; // Only test the first set of credentials we find
+        }
+      }
+      
+      // Check for auth pages without CAPTCHA
+      const authPageCheck = await checkAuthPagesForCaptcha(url, html);
+      
+      // Add unprotected auth pages to the leaks list
+      if (authPageCheck.unprotectedPages.length > 0) {
+        // Create a leak entry for each unprotected auth page
+        for (const unprotectedPage of authPageCheck.unprotectedPages) {
+          uniqueLeaks.push({
+            type: 'Unprotected Auth Page',
+            preview: `Auth page without CAPTCHA: ${unprotectedPage.substring(0, 30)}...`,
+            details: `Authentication page found at ${unprotectedPage} does not appear to have CAPTCHA or Turnstile protection, making it vulnerable to credential stuffing and brute force attacks.`
+          });
+        }
+      }
+      
+      // Calculate score
+      let score = 100;
+      
+      // Deduct points for missing security headers
+      score -= headerCheck.missing.length * 5;
+      
+      // Deduct points for leaked API keys (more severe)
+      score -= uniqueLeaks.length * 15;
+      
+      // Deduct more points if RLS is vulnerable (very critical)
+      if (rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
+        score -= 25; // Significant penalty for RLS vulnerability
+      }
+      
+      // Deduct points for unprotected auth pages
+      if (authPageCheck.unprotectedPages.length > 0) {
+        // Deduct 5 points per unprotected auth page, max 15 points
+        score -= Math.min(authPageCheck.unprotectedPages.length * 5, 15);
+      }
+      
+      // Ensure score stays between 0-100
+      score = Math.max(0, Math.min(100, score));
+      
+      // Return results with RLS information
+      const scanResult = {
+        url,
+        headers: {
+          present: headerCheck.present,
+          missing: headerCheck.missing
+        },
+        leaks: uniqueLeaks,
+        jsFilesScanned: jsFilesToCheck.length,
+        rlsVulnerability,
+        authPages: {
+          found: authPageCheck.authPagesFound,
+          protected: authPageCheck.captchaProtected,
+          unprotected: authPageCheck.unprotectedPages
+        },
+        score
+      };
+      
+      return NextResponse.json(scanResult);
+    } catch (error: any) {
+      console.error("Error scanning website:", error.message);
+      
+      // Check if this is a website blocking our scan
+      if (error.response) {
+        const status = error.response.status;
+        
+        // 403 Forbidden, 429 Too Many Requests, 401 Unauthorized, 500 in some cases - all could indicate blocking
+        if (status === 403 || status === 429 || status === 401) {
+          return NextResponse.json({
+            error: "blocked_by_website",
+            message: "This website has advanced security measures that prevent automated scanning.",
+            status: status
+          }, { status: 200 }); // Return 200 status but with error info
+        }
+      }
+      
+      // Handle other errors
+      return NextResponse.json({
+        error: "scan_failed",
+        message: error.message
+      }, { status: 500 });
     }
-    
-    // Calculate score
-    let score = 100;
-    
-    // Deduct points for missing security headers
-    score -= headerCheck.missing.length * 5;
-    
-    // Deduct points for leaked API keys (more severe)
-    score -= uniqueLeaks.length * 15;
-    
-    // Deduct more points if RLS is vulnerable (very critical)
-    if (rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
-      score -= 25; // Significant penalty for RLS vulnerability
-    }
-    
-    // Deduct points for unprotected auth pages
-    if (authPageCheck.unprotectedPages.length > 0) {
-      // Deduct 5 points per unprotected auth page, max 15 points
-      score -= Math.min(authPageCheck.unprotectedPages.length * 5, 15);
-    }
-    
-    // Ensure score stays between 0-100
-    score = Math.max(0, Math.min(100, score));
-    
-    // Return results with RLS information
-    const scanResult = {
-      url,
-      headers: {
-        present: headerCheck.present,
-        missing: headerCheck.missing
-      },
-      leaks: uniqueLeaks,
-      jsFilesScanned: jsFilesToCheck.length,
-      rlsVulnerability,
-      authPages: {
-        found: authPageCheck.authPagesFound,
-        protected: authPageCheck.captchaProtected,
-        unprotected: authPageCheck.unprotectedPages
-      },
-      score
-    };
-    
-    return NextResponse.json(scanResult);
   } catch (error) {
     console.error('Error in scan endpoint:', error);
     return NextResponse.json({ 

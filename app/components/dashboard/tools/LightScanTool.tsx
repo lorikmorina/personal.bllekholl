@@ -71,6 +71,7 @@ export default function LightScanTool() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isPaywallOpen, setIsPaywallOpen] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [securityBlocked, setSecurityBlocked] = useState<boolean>(false)
   const { user } = useDashboard()
   const supabase = createClient()
 
@@ -129,6 +130,7 @@ export default function LightScanTool() {
     setIsScanning(true)
     setError(null)
     setResult(null)
+    setSecurityBlocked(false)
 
     try {
       // Process URL to ensure it has https:// prefix
@@ -152,6 +154,14 @@ export default function LightScanTool() {
       }
 
       const data = await response.json()
+      
+      // Check if the site blocked our scan
+      if (data.error === "blocked_by_website") {
+        setSecurityBlocked(true)
+        setError(null)
+        return
+      }
+      
       setResult(data)
 
       // Save scan result to database if user is authenticated
@@ -305,6 +315,18 @@ export default function LightScanTool() {
             <Alert variant="destructive" className="mt-4">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {securityBlocked && (
+            <Alert className="mt-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <AlertTitle className="text-green-800 dark:text-green-400">Advanced Security Detected</AlertTitle>
+              <AlertDescription className="text-green-700 dark:text-green-300">
+                This website implements robust security measures that prevent automated scanning. 
+                While we can't provide a complete security report, the presence of these protective 
+                measures is generally a positive security indicator.
+              </AlertDescription>
             </Alert>
           )}
         </CardContent>

@@ -58,6 +58,7 @@ export default function Hero() {
   const [result, setResult] = useState<ScanResult | null>(null)
   const [expandedHeaders, setExpandedHeaders] = useState<string[]>([])
   const [expandedLeaks, setExpandedLeaks] = useState<number[]>([])
+  const [securityBlocked, setSecurityBlocked] = useState<boolean>(false)
   const router = useRouter()
 
   // Clean up URL by removing existing protocol, @ symbols, and whitespace
@@ -81,6 +82,7 @@ export default function Hero() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setEasterEggMessage(null)
+    setSecurityBlocked(false)
     
     // Process URL to ensure it has https:// prefix
     let processedUrl = url
@@ -125,6 +127,14 @@ export default function Hero() {
       }
 
       const data = await response.json()
+      
+      // Check if the site blocked our scan
+      if (data.error === "blocked_by_website") {
+        setSecurityBlocked(true)
+        setError(null)
+        return
+      }
+      
       setResult(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred")
@@ -239,6 +249,16 @@ export default function Hero() {
                   <ShieldAlert className="h-4 w-4" />
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {securityBlocked && (
+                <Alert variant="default" className="mt-6 border-2 border-green-600 bg-green-50 dark:bg-green-900/20 dark:border-green-800">
+                  <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <AlertTitle className="text-green-700 dark:text-green-400">Advanced Security Detected!</AlertTitle>
+                  <AlertDescription className="text-green-600 dark:text-green-300">
+                    This website has robust security measures that prevent automated scanning. While we can't provide a complete security report, the presence of these protective measures is generally a positive security indicator.
+                  </AlertDescription>
                 </Alert>
               )}
 
