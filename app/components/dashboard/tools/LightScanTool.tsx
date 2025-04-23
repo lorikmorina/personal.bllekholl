@@ -74,6 +74,24 @@ export default function LightScanTool() {
   const { user } = useDashboard()
   const supabase = createClient()
 
+  // Clean up URL by removing existing protocol, @ symbols, and whitespace
+  const cleanUrl = (input: string): string => {
+    let cleaned = input.trim();
+    
+    // Remove any leading @ symbol
+    if (cleaned.startsWith('@')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // Remove http:// or https:// since we're displaying https:// in the UI
+    cleaned = cleaned.replace(/^https?:\/\//i, '');
+    
+    // Remove any remaining leading/trailing whitespace
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
   // Fetch user profile to check subscription status
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -113,13 +131,19 @@ export default function LightScanTool() {
     setResult(null)
 
     try {
+      // Process URL to ensure it has https:// prefix
+      let processedUrl = url
+      if (!processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
+        processedUrl = `https://${processedUrl}`
+      }
+
       // Make a real API call to the scan endpoint
       const response = await fetch("/api/scan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: processedUrl }),
       })
 
       if (!response.ok) {
@@ -223,14 +247,19 @@ export default function LightScanTool() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-            <Input
-              type="url"
-              placeholder="https://example.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-              className="flex-1"
-            />
+            <div className="flex flex-1 rounded-md overflow-hidden border border-input">
+              <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
+                https://
+              </div>
+              <Input
+                type="text"
+                placeholder="example.com"
+                value={url}
+                onChange={(e) => setUrl(cleanUrl(e.target.value))}
+                required
+                className="flex-1 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </div>
             <Button 
               type="submit" 
               disabled={isScanning || isLoadingProfile}

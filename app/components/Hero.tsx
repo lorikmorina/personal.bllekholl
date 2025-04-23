@@ -60,12 +60,36 @@ export default function Hero() {
   const [expandedLeaks, setExpandedLeaks] = useState<number[]>([])
   const router = useRouter()
 
+  // Clean up URL by removing existing protocol, @ symbols, and whitespace
+  const cleanUrl = (input: string): string => {
+    let cleaned = input.trim();
+    
+    // Remove any leading @ symbol
+    if (cleaned.startsWith('@')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // Remove http:// or https:// since we're displaying https:// in the UI
+    cleaned = cleaned.replace(/^https?:\/\//i, '');
+    
+    // Remove any remaining leading/trailing whitespace
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setEasterEggMessage(null)
     
+    // Process URL to ensure it has https:// prefix
+    let processedUrl = url
+    if (!processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
+      processedUrl = `https://${processedUrl}`
+    }
+    
     // Easter egg for scanning our own website
-    if (url.toLowerCase().includes("securevibing.com")) {
+    if (processedUrl.toLowerCase().includes("securevibing.com")) {
       setEasterEggMessage("Really, you are wasting your scan on us, so generous of you but I will give your free scan back, use it wisely this time 😉")
       return
     }
@@ -80,7 +104,7 @@ export default function Hero() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: processedUrl }),
       })
 
       if (!response.ok) {
@@ -174,14 +198,19 @@ export default function Hero() {
                 onSubmit={handleSubmit}
                 className="flex flex-col sm:flex-row gap-4 mx-auto sm:mx-0"
               >
-                <Input
-                  type="url"
-                  placeholder="https://example.com"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  required
-                  className="flex-grow"
-                />
+                <div className="flex flex-grow rounded-md overflow-hidden border border-input">
+                  <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
+                    https://
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="example.com"
+                    value={url}
+                    onChange={(e) => setUrl(cleanUrl(e.target.value))}
+                    required
+                    className="flex-grow border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                </div>
                 <Button 
                   type="submit" 
                   disabled={isScanning || !url}
