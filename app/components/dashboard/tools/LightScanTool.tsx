@@ -262,6 +262,15 @@ export default function LightScanTool() {
         body: JSON.stringify({ url: processedUrl }),
       })
 
+      // Handle domain not found response from API
+      if (response.status === 404) {
+        const errorData = await response.json()
+        if (errorData.error === "domain_not_found") {
+          setError("This website doesn't seem to exist. Please check the URL and try again.")
+          return
+        }
+      }
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to scan website")
@@ -302,7 +311,16 @@ export default function LightScanTool() {
         }
       }
     } catch (error: any) {
-      setError(error.message || "Failed to scan website")
+      // Check for DNS lookup failures (ENOTFOUND errors)
+      if (error.message && (
+        error.message.includes('ENOTFOUND') || 
+        error.message.includes('getaddrinfo') ||
+        error.message.includes('DNS lookup failed')
+      )) {
+        setError("This website doesn't seem to exist. Please check the URL and try again.");
+      } else {
+        setError(error.message || "Failed to scan website");
+      }
     } finally {
       setIsScanning(false)
     }
@@ -445,9 +463,18 @@ export default function LightScanTool() {
           )}
           
           {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+            <Alert variant={error.includes("This website doesn't seem to exist") ? "default" : "destructive"} className={`mt-4 ${error.includes("This website doesn't seem to exist") ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800" : ""}`}>
+              <AlertTitle>{error.includes("This website doesn't seem to exist") ? "Website Not Found" : "Error"}</AlertTitle>
+              <AlertDescription>
+                {error}
+                {error.includes("This website doesn't seem to exist") && (
+                  <ul className="mt-2 list-disc pl-5 text-sm">
+                    <li>Check for spelling mistakes in the domain name</li>
+                    <li>Verify that the website is publicly accessible</li>
+                    <li>Try adding 'www.' before the domain name</li>
+                  </ul>
+                )}
+              </AlertDescription>
             </Alert>
           )}
           

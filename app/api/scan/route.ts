@@ -479,6 +479,34 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { url } = body;
     
+    if (!url) {
+      return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+    
+    // Check if the domain exists before proceeding with full scan
+    try {
+      await axios.head(url, { 
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+    } catch (error: any) {
+      // Handle DNS lookup failures specifically
+      if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN' || 
+          (error.message && (error.message.includes('getaddrinfo') || 
+                          error.message.includes('ENOTFOUND')))) {
+        return NextResponse.json({ 
+          error: "domain_not_found", 
+          message: "This website doesn't seem to exist. Please check the URL and try again." 
+        }, { status: 404 });
+      }
+      
+      // If it's another error but we can still proceed with the scan
+      console.log("Initial HEAD request failed, but continuing with full scan:", error.message);
+      // Continue with the scan, the domain might block HEAD requests
+    }
+    
     // Use the server-side client for auth context
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
