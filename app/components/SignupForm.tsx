@@ -50,8 +50,7 @@ export default function SignupForm() {
           // Ensure the redirectTo uses the hardcoded production URL
           redirectTo: `${absoluteRedirectUrl}/api/auth/callback`,
           queryParams: {
-            // Simplify queryParams - the callback handler determines the final path
-            // Remove 'production_redirect' as it's no longer needed with a hardcoded URL
+            // Pass the final destination as a query param
             redirect: '/dashboard'
           }
         }
