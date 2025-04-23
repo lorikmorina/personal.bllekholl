@@ -55,6 +55,11 @@ export default function RootLayout({
         </Script>
         
         <meta name="apple-mobile-web-app-title" content="SecureVibing" />
+        <meta property="og:title" content="Pass the Security Vibe Check" />
+        <meta property="og:description" content="Scan your website for leaked API keys, missing security headers, and more. Launch with confidence." />
+        <meta property="og:image" content="https://securevibing.com/banner.jpg" />
+        <meta property="og:url" content="https://securevibing.com" />
+        <meta property="og:type" content="website" />
         
         {/* Favicon tags */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
