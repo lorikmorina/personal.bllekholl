@@ -18,12 +18,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import BillingModal from "@/app/components/dashboard/BillingModal"
 
 export default function Header() {
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [userPlan, setUserPlan] = useState('free')
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false)
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const supabase = createClient()
@@ -36,6 +39,23 @@ export default function Header() {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user || null)
       setLoading(false)
+
+      // If user is logged in, fetch their subscription plan
+      if (session?.user) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('subscription_plan')
+            .eq('id', session.user.id)
+            .single()
+          
+          if (!error && data) {
+            setUserPlan(data.subscription_plan || 'free')
+          }
+        } catch (error) {
+          console.error('Error fetching user plan:', error)
+        }
+      }
     }
     
     getInitialSession()
@@ -66,6 +86,14 @@ export default function Header() {
     if (!user || !user.email) return "U"
     const email = user.email
     return email.substring(0, 2).toUpperCase()
+  }
+
+  const openBillingModal = () => {
+    setIsBillingModalOpen(true)
+  }
+
+  const closeBillingModal = () => {
+    setIsBillingModalOpen(false)
   }
 
   return (
@@ -169,8 +197,8 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard">Dashboard</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">Billing</Link>
+                <DropdownMenuItem onClick={openBillingModal}>
+                  Billing
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
@@ -242,6 +270,16 @@ export default function Header() {
                   
                   <button
                     onClick={() => {
+                      openBillingModal();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20 text-left w-full"
+                  >
+                    Billing
+                  </button>
+                  
+                  <button
+                    onClick={() => {
                       handleSignOut();
                       setMobileMenuOpen(false);
                     }}
@@ -278,6 +316,16 @@ export default function Header() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* BillingModal */}
+      {user && (
+        <BillingModal 
+          isOpen={isBillingModalOpen} 
+          onClose={closeBillingModal} 
+          userId={user.id} 
+          currentPlan={userPlan}
+        />
+      )}
     </motion.header>
   )
 }
