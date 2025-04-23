@@ -284,7 +284,7 @@ export default function Hero() {
               <div className="w-full max-w-lg mx-auto">
                 <img 
                   src="/design/hero-secureviber.png"
-                  alt="SecureViber Scanner"
+                  alt="SecureVibing Scanner"
                   className="w-full h-auto rounded-2xl shadow-lg"
                 />
               </div>
