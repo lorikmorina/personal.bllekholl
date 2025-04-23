@@ -72,6 +72,7 @@ export default function LightScanTool() {
   const [isPaywallOpen, setIsPaywallOpen] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [securityBlocked, setSecurityBlocked] = useState<boolean>(false)
+  const [urlValidation, setUrlValidation] = useState<{valid: boolean; message?: string} | null>(null)
   const { user } = useDashboard()
   const supabase = createClient()
 
@@ -87,10 +88,88 @@ export default function LightScanTool() {
     // Remove http:// or https:// since we're displaying https:// in the UI
     cleaned = cleaned.replace(/^https?:\/\//i, '');
     
+    // If the user pasted a URL with a path, extract just the domain
+    // e.g., "example.com/path/to/resource" -> "example.com"
+    if (cleaned.includes('/')) {
+      cleaned = cleaned.split('/')[0];
+    }
+    
     // Remove any remaining leading/trailing whitespace
     cleaned = cleaned.trim();
     
     return cleaned;
+  };
+
+  // Validate and format URL to ensure it's properly formatted for scanning
+  const validateAndFormatUrl = (input: string): { valid: boolean; formattedUrl: string; errorMessage?: string } => {
+    // If empty, return invalid state
+    if (!input || input.trim() === '') {
+      return { valid: false, formattedUrl: '', errorMessage: 'Please enter a website URL' };
+    }
+
+    let url = input.trim();
+    
+    // Remove any trailing slashes or paths for validation
+    const urlForValidation = url.split('/')[0];
+    
+    // Check if URL has a valid domain format (at least something.something)
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/;
+    
+    // If it doesn't match the domain format, it might be incomplete
+    if (!domainRegex.test(urlForValidation)) {
+      // Case 1: Single word without TLD - likely needs .com or similar
+      if (/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$/.test(urlForValidation)) {
+        // Append .com as it's likely they intended a .com domain
+        const suggestedUrl = `${url}.com`;
+        return { 
+          valid: true, 
+          formattedUrl: suggestedUrl,
+          errorMessage: `Did you mean ${suggestedUrl}?` 
+        };
+      } 
+      // Case 2: Contains dots but in wrong format (like "example.") 
+      else if (urlForValidation.includes('.')) {
+        const parts = urlForValidation.split('.');
+        // If it ends with a dot
+        if (urlForValidation.endsWith('.')) {
+          const suggestedUrl = `${url}com`;
+          return { 
+            valid: true, 
+            formattedUrl: suggestedUrl,
+            errorMessage: `Did you mean ${suggestedUrl}?` 
+          };
+        }
+        // If there's a subdomain but TLD is missing
+        else if (parts.length >= 2 && parts[parts.length - 1].length < 2) {
+          const suggestedUrl = `${url}com`;
+          return { 
+            valid: true, 
+            formattedUrl: suggestedUrl,
+            errorMessage: `Did you mean ${suggestedUrl}?` 
+          };
+        }
+      }
+      
+      // If we can't auto-correct, let the user know it might not be a valid URL
+      return { 
+        valid: false, 
+        formattedUrl: url,
+        errorMessage: 'Please enter a valid website domain (e.g., example.com)' 
+      };
+    }
+    
+    // Handle URLs with www. prefix explicitly
+    if (url.startsWith('www.')) {
+      return { valid: true, formattedUrl: url };
+    }
+    
+    // If it's a valid domain but would benefit from www. prefix
+    if (domainRegex.test(url) && !url.includes('www.') && url.split('.').length === 2) {
+      // Don't force this, just return the valid URL as is
+      return { valid: true, formattedUrl: url };
+    }
+
+    return { valid: true, formattedUrl: url };
   };
 
   // Fetch user profile to check subscription status
@@ -118,6 +197,33 @@ export default function LightScanTool() {
     fetchUserProfile()
   }, [user, supabase])
 
+  // Validate URL as user types
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const cleanedUrl = cleanUrl(e.target.value);
+    setUrl(cleanedUrl);
+    
+    // Clear validation state when emptying the field
+    if (!cleanedUrl) {
+      setUrlValidation(null);
+      return;
+    }
+    
+    // Provide real-time validation feedback
+    const { valid, formattedUrl, errorMessage } = validateAndFormatUrl(cleanedUrl);
+    
+    if (!valid) {
+      setUrlValidation({ valid: false, message: errorMessage });
+    } else if (formattedUrl !== cleanedUrl) {
+      // If we had to modify the URL to make it valid, show helpful message
+      setUrlValidation({ 
+        valid: true, 
+        message: `Will scan as: ${formattedUrl}` 
+      });
+    } else {
+      setUrlValidation({ valid: true });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -127,6 +233,14 @@ export default function LightScanTool() {
       return
     }
     
+    // Validate the URL first
+    const { valid, formattedUrl, errorMessage } = validateAndFormatUrl(url);
+    
+    if (!valid) {
+      setError(errorMessage || "Invalid URL format");
+      return;
+    }
+    
     setIsScanning(true)
     setError(null)
     setResult(null)
@@ -134,7 +248,7 @@ export default function LightScanTool() {
 
     try {
       // Process URL to ensure it has https:// prefix
-      let processedUrl = url
+      let processedUrl = formattedUrl
       if (!processedUrl.startsWith('http://') && !processedUrl.startsWith('https://')) {
         processedUrl = `https://${processedUrl}`
       }
@@ -257,22 +371,41 @@ export default function LightScanTool() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-            <div className="flex flex-1 rounded-md overflow-hidden border border-input">
-              <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
-                https://
+            <div className="flex flex-col flex-1">
+              <div className={`flex flex-1 rounded-md overflow-hidden border ${
+                urlValidation?.valid === false 
+                  ? 'border-red-400 dark:border-red-700' 
+                  : urlValidation?.valid === true 
+                    ? 'border-green-400 dark:border-green-700' 
+                    : 'border-input'
+              }`}>
+                <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
+                  https://
+                </div>
+                <Input
+                  type="text"
+                  placeholder="example.com"
+                  value={url}
+                  onChange={handleUrlChange}
+                  required
+                  className="flex-1 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
               </div>
-              <Input
-                type="text"
-                placeholder="example.com"
-                value={url}
-                onChange={(e) => setUrl(cleanUrl(e.target.value))}
-                required
-                className="flex-1 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
+              
+              {urlValidation && (
+                <div className={`text-xs mt-1 ${
+                  urlValidation.valid 
+                    ? 'text-green-600 dark:text-green-400' 
+                    : 'text-red-600 dark:text-red-400'
+                }`}>
+                  {urlValidation.message}
+                </div>
+              )}
             </div>
+            
             <Button 
               type="submit" 
-              disabled={isScanning || isLoadingProfile}
+              disabled={isScanning || isLoadingProfile || urlValidation?.valid === false}
               className="sm:w-auto w-full"
             >
               {isScanning ? (
