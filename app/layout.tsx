@@ -9,7 +9,7 @@ import Script from "next/script"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Secure Viber - Website Security Scanner",
+  title: "Secure Vibing - Website Security Scanner",
   description: "Scan your website for security vulnerabilities, exposed API keys, and missing security headers",
   generator: 'v0.dev'
 }

@@ -25,6 +25,9 @@ type ScanResult = {
   }>
   jsFilesScanned: number
   score: number
+  is_blocked?: boolean
+  status?: number
+  scan_message?: string
 }
 
 // This matches the header info structure from the Hero component
@@ -282,6 +285,32 @@ export default function LightScanTool() {
       if (data.error === "blocked_by_website") {
         setSecurityBlocked(true)
         setError(null)
+        
+        // Save blocked scan result to database if user is authenticated
+        if (user) {
+          try {
+            const { error: saveError } = await supabase
+              .from('scan_reports')
+              .insert({
+                user_id: user.id,
+                url: processedUrl,
+                is_blocked: true,
+                status: data.status || 403,
+                score: 100, // Give a perfect score for sites with advanced security
+                headers: { present: [], missing: [] },
+                leaks: [],
+                js_files_scanned: 0,
+                scan_message: "Advanced Security Detected: This website implements robust security measures that prevent automated scanning."
+              });
+            
+            if (saveError) {
+              console.error('Error saving blocked scan report:', saveError);
+            }
+          } catch (saveError) {
+            console.error('Error saving blocked scan report:', saveError);
+          }
+        }
+        
         return
       }
       
@@ -298,7 +327,10 @@ export default function LightScanTool() {
               score: data.score,
               headers: data.headers,
               leaks: data.leaks,
-              js_files_scanned: data.jsFilesScanned
+              js_files_scanned: data.jsFilesScanned,
+              is_blocked: false,
+              status: 200,
+              scan_message: null
             });
           
           if (saveError) {
