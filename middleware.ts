@@ -18,9 +18,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Redirect logged-in users away from signup/login pages to dashboard
+  if ((req.nextUrl.pathname === '/signup' || req.nextUrl.pathname === '/login') && session) {
+    const redirectUrl = req.nextUrl.clone()
+    redirectUrl.pathname = '/dashboard'
+    return NextResponse.redirect(redirectUrl)
+  }
+
   return res
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*']
+  matcher: ['/dashboard/:path*', '/signup', '/login']
 } 
