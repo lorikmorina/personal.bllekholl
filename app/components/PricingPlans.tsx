@@ -9,14 +9,15 @@ import Link from "next/link"
 export default function PricingPlans() {
   const plans = [
     {
-      name: "Yearly",
-      price: "$2",
+      name: "Monthly",
+      price: "$9",
       description: "Perfect for individuals who need regular website scanning",
       billingPeriod: "per month",
-      annualPrice: "$24 billed annually",
+      annualPrice: "or $99 annually",
       features: [
-        "1 year access to securevibing",
+        "1 month access to securevibing",
         "API key detection",
+        "RLS Configuration Detection",
         "Security header analysis",
         "Fast Processing",
       ],
@@ -25,12 +26,13 @@ export default function PricingPlans() {
     },
     {
       name: "Lifetime",
-      price: "$49",
+      price: "$199",
       description: "Best value for long term developers",
       billingPeriod: "one-time payment",
       features: [
         "Unlimited website scans",
         "API key detection",
+        "RLS Configuration Detection",
         "Security header analysis",
         "Priority support",
       ],

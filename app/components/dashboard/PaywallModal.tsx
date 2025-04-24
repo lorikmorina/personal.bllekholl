@@ -203,12 +203,12 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
               onClick={() => setSelectedPlan('yearly')}
             >
               <div className="flex justify-between items-start mb-3">
-                <h3 className="font-bold text-lg">Yearly</h3>
+                <h3 className="font-bold text-lg">Monthly</h3>
                 <Badge variant="secondary">Most Popular</Badge>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-bold">$24</span>
-                <span className="text-muted-foreground">/year</span>
+                <span className="text-3xl font-bold">$9</span>
+                <span className="text-muted-foreground">/month</span>
               </div>
               
               <ul className="space-y-2 mb-6">
@@ -237,7 +237,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
                 <Badge variant="outline">Best Value</Badge>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-bold">$49</span>
+                <span className="text-3xl font-bold">$199</span>
                 <span className="text-muted-foreground"> one-time</span>
               </div>
               
