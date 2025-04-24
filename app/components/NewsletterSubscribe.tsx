@@ -80,7 +80,7 @@ export default function CreateAccountCTA() {
                     size="lg"
                     className="w-full rounded-full"
                   >
-                    Create Free Account
+                    Start 7 day free trial
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -88,7 +88,7 @@ export default function CreateAccountCTA() {
             </div>
             {!session && (
               <p className="text-sm text-center text-muted-foreground">
-                No credit card required. Upgrade anytime.
+                $0.00 due today, cancel anytime
               </p>
             )}
           </div>

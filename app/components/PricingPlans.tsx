@@ -21,7 +21,7 @@ export default function PricingPlans() {
         "Security header analysis",
         "Fast Processing",
       ],
-      cta: "Get SecureVibing",
+      cta: "Start 7 day free trial",
       mostPopular: false,
     },
     {
@@ -36,7 +36,7 @@ export default function PricingPlans() {
         "Security header analysis",
         "Priority support",
       ],
-      cta: "Get SecureVibing",
+      cta: "Get Full SecureVibing",
       mostPopular: true,
     },
   ]
