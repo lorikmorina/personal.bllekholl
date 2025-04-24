@@ -124,11 +124,17 @@ export async function POST(request: Request) {
         console.warn(`Plan mismatch: selected=${selectedPlan}, price=${planType}`);
       }
       
-      // Update the user's subscription plan in the database
+      // Extract the subscription ID (if available)
+      const subscriptionId = payload.data.subscription_id || null;
+      console.log(`Extracted subscription ID: ${subscriptionId} for user ${userId}`);
+      
+      // Update the user's subscription plan and Paddle ID in the database
       const { error, data } = await supabase
         .from('profiles')
         .update({ 
           subscription_plan: planType,
+          paddle_subscription_id: subscriptionId,
+          subscription_status: 'active',
           updated_at: new Date().toISOString()
         })
         .eq('id', userId)

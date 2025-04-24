@@ -48,61 +48,44 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
           
           // Check if checkout was completed AND initiated by this modal instance
           if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
-            console.log("Checkout completed event received for this modal", eventData);
-            setIsLoading(true); // Show loading state during processing
+            console.log("Checkout completed event received for this modal (Client-Side)", eventData);
             
             try {
-              // Extract relevant data from the event payload
-              // IMPORTANT: Verify this path from console logs!
-              const subscriptionId = eventData.data?.subscription?.id || eventData.data?.id || null; 
-              const userId = eventData.data?.custom_data?.userId || userRef.current?.id;
+              // Extract plan from custom data for UI feedback
               const plan = eventData.data?.custom_data?.plan || selectedPlan; // Fallback to state
 
-              if (!userId) {
-                throw new Error("Could not determine User ID from event data or ref.");
-              }
               if (!plan) {
-                throw new Error("Could not determine Plan from event data or state.");
+                console.warn("Could not determine Plan from event data or state for UI feedback.");
+                // Proceed anyway, webhook is source of truth
               }
 
-              // Update user's subscription in Supabase
-              const { error } = await supabase
-                .from('profiles')
-                .update({ 
-                  subscription_plan: plan,
-                  paddle_subscription_id: subscriptionId, 
-                  subscription_status: 'active',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', userId);
-              
-              if (error) throw error;
+              // --- REMOVED SUPABASE UPDATE LOGIC --- 
+              // The webhook handler (app/api/webhooks/paddle/route.ts) is now responsible 
+              // for updating the database with plan, subscription ID, and status.
               
               // Show success toast
               toast({
-                title: "Subscription Upgraded Successfully!",
-                description: `You've been upgraded to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.`,
+                title: "Payment Successful!",
+                description: `Your upgrade to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan is processing. You'll see the changes shortly.`,
                 duration: 5000,
               });
               
-              // Call parent callbacks
+              // Call parent callbacks for UI updates
               await onUpgrade(plan);
-              onClose();
 
             } catch (error) {
-              console.error("Error processing checkout.completed event:", error);
+              // This catch block now mainly handles errors in UI updates/callbacks
+              console.error("Error processing checkout.completed event on client-side:", error);
               toast({
-                title: "Error Updating Subscription",
-                description: "Your payment was successful, but we had trouble updating your account. Please refresh or contact support.",
-                variant: "destructive",
+                title: "Payment Processed",
+                description: "Your payment went through, but there was a client-side issue updating the view. Please refresh the page.",
+                variant: "destructive", // Use a less severe tone? Maybe just default.
                 duration: 5000,
               });
-              // Optionally, still close the modal or keep it open for user awareness
-              // onClose(); 
             } finally {
               checkoutInitiated.current = false; // Reset tracker
               userRef.current = null; // Clear user ref
-              setIsLoading(false); // Hide loading state
+              setIsLoading(false); // Stop the main button loading indicator
             }
           }
         }
@@ -145,6 +128,9 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
       userRef.current = user; // Store user info for the event callback
       checkoutInitiated.current = true; // Mark that checkout is initiated by this modal
       
+      // Close the modal immediately before opening Paddle
+      onClose();
+
       // Open Paddle checkout - REMOVED the success callback here
       window.Paddle.Checkout.open({
         items: [
