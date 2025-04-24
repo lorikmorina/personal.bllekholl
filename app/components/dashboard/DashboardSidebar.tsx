@@ -91,11 +91,10 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
     if (isLoading) return "Loading..."
     if (!userProfile) return "Free Plan" // Fallback
     
-    // Capitalize first letter of each word
     const plan = userProfile.subscription_plan || "free"
-    return plan.split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ') + " Plan"
+    
+    // Return "Free Plan" if the plan is free, otherwise return "Premium Plan"
+    return plan === 'free' ? "Free Plan" : "Premium Plan"
   }
 
   // In the navigation array, update to make Reports a tool instead of a direct link
