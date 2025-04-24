@@ -97,7 +97,7 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
               <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 rounded-md flex items-start gap-2 text-sm">
                 <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  Cancelling will stop future billing but you'll lose access when your current period ends.
+                  Cancelling will stop future billing and you'll lose scanning access, consider cancelling at the end of your billing period.
                 </div>
               </div>
             </div>
