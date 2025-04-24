@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Script from "next/script"
+import { useToast } from "@/hooks/use-toast"
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
   const [isLoading, setIsLoading] = useState(false)
   const [paddleLoaded, setPaddleLoaded] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
   
   // Initialize Paddle when the script loads
   useEffect(() => {
@@ -83,7 +85,43 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
         success: {
           callback: async (data: any) => {
             console.log("Payment successful", data);
-            await onUpgrade(selectedPlan);
+            
+            try {
+              // Extract subscription info from Paddle V2 response (Check console log if this path is incorrect)
+              const subscriptionId = data?.data?.id || null; // Assuming Paddle V2 structure
+              
+              // Update user's subscription in Supabase with subscription ID and status
+              const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                  subscription_plan: selectedPlan,
+                  paddle_subscription_id: subscriptionId, // Use the correct column name
+                  subscription_status: 'active', // You might want to manage status via webhooks too
+                  updated_at: new Date().toISOString() // Good practice to add updated_at
+                })
+                .eq('id', user.id);
+              
+              if (error) throw error;
+              
+              // Show success toast notification
+              toast({
+                title: "Subscription Upgraded Successfully!",
+                description: `You've been upgraded to the ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} plan.`,
+                duration: 5000,
+              });
+              
+              // Call the onUpgrade callback to update parent component state
+              await onUpgrade(selectedPlan);
+              
+            } catch (error) {
+              console.error("Error updating subscription:", error);
+              toast({
+                title: "Error Updating Subscription",
+                description: "Your payment was successful, but we had trouble updating your account. Please refresh the page.",
+                variant: "destructive",
+                duration: 5000,
+              });
+            }
           }
         },
         closeCallback: () => {
@@ -93,6 +131,13 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
     } catch (error) {
       console.error("Error processing payment:", error);
       setIsLoading(false);
+      
+      toast({
+        title: "Payment Error",
+        description: "There was a problem with the payment process. Please try again.",
+        variant: "destructive",
+        duration: 5000,
+      });
     }
   };
   
