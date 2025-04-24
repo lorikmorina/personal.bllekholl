@@ -64,9 +64,6 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
         throw new Error("User not authenticated");
       }
       
-      // Close the PaywallModal before opening Paddle checkout
-      onClose();
-      
       // Open Paddle checkout with v2 API
       window.Paddle.Checkout.open({
         items: [
@@ -112,6 +109,9 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
               
               // Call the onUpgrade callback to update parent component state
               await onUpgrade(selectedPlan);
+              
+              // Close the modal only after successful processing
+              onClose();
               
             } catch (error) {
               console.error("Error updating subscription:", error);
