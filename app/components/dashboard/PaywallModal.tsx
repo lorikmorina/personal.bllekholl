@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -28,7 +28,11 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
   const supabase = createClient()
   const { toast } = useToast()
   
-  // Initialize Paddle when the script loads
+  // State to track if this modal initiated the checkout
+  const checkoutInitiated = useRef(false);
+  const userRef = useRef<any>(null); // Ref to hold user object for the callback
+  
+  // Initialize Paddle and set up event listener
   useEffect(() => {
     if (window.Paddle && !paddleLoaded) {
       // Set environment if in sandbox mode
@@ -36,14 +40,85 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
         window.Paddle.Environment.set("sandbox");
       }
       
-      // Initialize Paddle with client-side token
+      // Initialize Paddle with client-side token AND event callback
       window.Paddle.Initialize({ 
-        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+        eventCallback: async (eventData: any) => {
+          console.log('Paddle Event: ', eventData);
+          
+          // Check if checkout was completed AND initiated by this modal instance
+          if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
+            console.log("Checkout completed event received for this modal", eventData);
+            setIsLoading(true); // Show loading state during processing
+            
+            try {
+              // Extract relevant data from the event payload
+              // IMPORTANT: Verify this path from console logs!
+              const subscriptionId = eventData.data?.subscription?.id || eventData.data?.id || null; 
+              const userId = eventData.data?.custom_data?.userId || userRef.current?.id;
+              const plan = eventData.data?.custom_data?.plan || selectedPlan; // Fallback to state
+
+              if (!userId) {
+                throw new Error("Could not determine User ID from event data or ref.");
+              }
+              if (!plan) {
+                throw new Error("Could not determine Plan from event data or state.");
+              }
+
+              // Update user's subscription in Supabase
+              const { error } = await supabase
+                .from('profiles')
+                .update({ 
+                  subscription_plan: plan,
+                  paddle_subscription_id: subscriptionId, 
+                  subscription_status: 'active',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', userId);
+              
+              if (error) throw error;
+              
+              // Show success toast
+              toast({
+                title: "Subscription Upgraded Successfully!",
+                description: `You've been upgraded to the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.`,
+                duration: 5000,
+              });
+              
+              // Call parent callbacks
+              await onUpgrade(plan);
+              onClose();
+
+            } catch (error) {
+              console.error("Error processing checkout.completed event:", error);
+              toast({
+                title: "Error Updating Subscription",
+                description: "Your payment was successful, but we had trouble updating your account. Please refresh or contact support.",
+                variant: "destructive",
+                duration: 5000,
+              });
+              // Optionally, still close the modal or keep it open for user awareness
+              // onClose(); 
+            } finally {
+              checkoutInitiated.current = false; // Reset tracker
+              userRef.current = null; // Clear user ref
+              setIsLoading(false); // Hide loading state
+            }
+          }
+        }
       });
       
       setPaddleLoaded(true);
     }
-  }, [paddleLoaded]);
+
+    // Cleanup function (optional but good practice)
+    return () => {
+      // Potentially remove event listeners if Paddle.js provides a way
+      // Reset state if component unmounts during checkout
+      checkoutInitiated.current = false;
+      userRef.current = null;
+    };
+  }, [paddleLoaded, supabase, toast, onUpgrade, onClose, selectedPlan]); // Add dependencies used in callback
   
   const getPriceId = () => {
     return selectedPlan === 'yearly' 
@@ -55,16 +130,22 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
     if (!selectedPlan || !paddleLoaded) return;
     
     setIsLoading(true);
+    checkoutInitiated.current = false; // Ensure clean state before starting
+    userRef.current = null;
     
     try {
       // Get the currently authenticated user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
+        setIsLoading(false); // Stop loading if no user
         throw new Error("User not authenticated");
       }
       
-      // Open Paddle checkout with v2 API
+      userRef.current = user; // Store user info for the event callback
+      checkoutInitiated.current = true; // Mark that checkout is initiated by this modal
+      
+      // Open Paddle checkout - REMOVED the success callback here
       window.Paddle.Checkout.open({
         items: [
           {
@@ -76,91 +157,46 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
           email: user.email
         },
         customData: {
+          // Keep sending custom data - might be useful for webhooks/backup
           userId: user.id,
           plan: selectedPlan
         },
-        success: {
-          callback: async (data: any) => {
-            console.log("Payment successful", data);
-            
-            try {
-              // Extract subscription info from Paddle V2 response (Check console log if this path is incorrect)
-              const subscriptionId = data?.data?.id || null; // Assuming Paddle V2 structure
-              
-              // Update user's subscription in Supabase with subscription ID and status
-              const { error } = await supabase
-                .from('profiles')
-                .update({ 
-                  subscription_plan: selectedPlan,
-                  paddle_subscription_id: subscriptionId, // Use the correct column name
-                  subscription_status: 'active', // You might want to manage status via webhooks too
-                  updated_at: new Date().toISOString() // Good practice to add updated_at
-                })
-                .eq('id', user.id);
-              
-              if (error) throw error;
-              
-              // Show success toast notification
-              toast({
-                title: "Subscription Upgraded Successfully!",
-                description: `You've been upgraded to the ${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} plan.`,
-                duration: 5000,
-              });
-              
-              // Call the onUpgrade callback to update parent component state
-              await onUpgrade(selectedPlan);
-              
-              // Close the modal only after successful processing
-              onClose();
-              
-            } catch (error) {
-              console.error("Error updating subscription:", error);
-              toast({
-                title: "Error Updating Subscription",
-                description: "Your payment was successful, but we had trouble updating your account. Please refresh the page.",
-                variant: "destructive",
-                duration: 5000,
-              });
-            }
-          }
-        },
+        // REMOVED success callback
         closeCallback: () => {
-          setIsLoading(false);
+          // If checkout is closed manually *before* completion, reset state
+          if (checkoutInitiated.current) { 
+            console.log("Paddle checkout closed manually before completion.");
+            checkoutInitiated.current = false;
+            userRef.current = null;
+            setIsLoading(false); // Stop loading indicator
+          }
         }
       });
     } catch (error) {
-      console.error("Error processing payment:", error);
+      console.error("Error initiating payment:", error);
+      checkoutInitiated.current = false; // Reset on error
+      userRef.current = null;
       setIsLoading(false);
       
       toast({
         title: "Payment Error",
-        description: "There was a problem with the payment process. Please try again.",
+        description: "There was a problem initiating the payment process. Please try again.",
         variant: "destructive",
         duration: 5000,
       });
     }
+    // Note: setIsLoading(false) is handled by the eventCallback or closeCallback now
   };
   
   return (
     <>
-      {/* Load Paddle JS SDK (v2) */}
+      {/* Load Paddle JS SDK (v2) - Keep this */}
       <Script
         src="https://cdn.paddle.com/paddle/v2/paddle.js"
         onLoad={() => {
-          if (window.Paddle) {
-            // Set environment if in sandbox mode
-            if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
-              window.Paddle.Environment.set("sandbox");
-            }
-            
-            // Initialize Paddle with client-side token
-            window.Paddle.Initialize({ 
-              token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
-            });
-            
-            setPaddleLoaded(true);
-          }
+          // Initialization logic moved to useEffect
         }}
+        strategy="lazyOnload" // Ensures it loads after main content
       />
       
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -240,7 +276,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
             </Button>
             <Button 
               onClick={handleUpgrade} 
-              disabled={isLoading}
+              disabled={isLoading || !paddleLoaded} // Disable if Paddle not loaded
               className="min-w-[120px]"
             >
               {isLoading ? 'Processing...' : 'Upgrade Now'}
