@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Shield, ShieldAlert, ShieldCheck, Globe, Zap, Lock, Info, Lightbulb, AlertTriangle } from "lucide-react"
+import { Loader2, Shield, ShieldAlert, ShieldCheck, Globe, Zap, Lock, Info, Lightbulb, AlertTriangle, AlertCircle, User } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useDashboard } from "../DashboardProvider"
 import { createClient } from "@/lib/supabase/client"
@@ -64,6 +64,168 @@ const securityHeadersInfo: {[key: string]: {name: string, importance: string, de
     description: "Controls which browser features can be used by the page."
   }
 }
+
+// Loading Scanner Component
+const ScannerLoading = () => {
+  const [progressWidth, setProgressWidth] = useState(0);
+  const [scanningState, setScanningState] = useState("Initializing scan...");
+  const [currentStep, setCurrentStep] = useState(0);
+  
+  useEffect(() => {
+    // Simulate the scanning process with multiple steps
+    const states = [
+      { message: "Initializing scan...", progress: 10 },
+      { message: "Fetching website content...", progress: 25 },
+      { message: "Analyzing security headers...", progress: 40 },
+      { message: "Scanning JavaScript files...", progress: 60 },
+      { message: "Checking for API keys...", progress: 75 },
+      { message: "Testing database configuration...", progress: 85 },
+      { message: "Identifying authentication pages...", progress: 90 },
+      { message: "Calculating security score...", progress: 95 }
+    ];
+    
+    // Start with a small delay
+    const initialDelay = setTimeout(() => {
+      setProgressWidth(states[0].progress);
+      setScanningState(states[0].message);
+      setCurrentStep(0);
+    }, 300);
+    
+    // Transition between states
+    let currentIndex = 0;
+    const interval = setInterval(() => {
+      if (currentIndex < states.length - 1) {
+        currentIndex++;
+        setCurrentStep(currentIndex);
+        setScanningState(states[currentIndex].message);
+        
+        // Animate progress smoothly
+        const targetProgress = states[currentIndex].progress;
+        const startProgress = progressWidth;
+        const duration = 700; // ms
+        const startTime = Date.now();
+        
+        const progressInterval = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          if (elapsed >= duration) {
+            setProgressWidth(targetProgress);
+            clearInterval(progressInterval);
+          } else {
+            const progress = startProgress + ((targetProgress - startProgress) * elapsed / duration);
+            setProgressWidth(progress);
+          }
+        }, 16);
+      } else {
+        // At the last step, complete to 99% (not 100% to maintain loading feel)
+        setProgressWidth(99);
+        clearInterval(interval);
+      }
+    }, 1200); // Slightly longer interval for a more realistic feel
+    
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(interval);
+    };
+  }, []);
+  
+  return (
+    <div className="w-full max-w-lg mx-auto bg-card rounded-xl shadow-lg overflow-hidden border border-border">
+      <div className="p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center">
+          <Shield className="mr-2 h-5 w-5 text-primary" />
+          Security Scan in Progress
+        </h3>
+        
+        <div className="mb-6">
+          <div className="flex justify-between mb-2">
+            <span className="text-sm text-muted-foreground">{scanningState}</span>
+            <span className="text-sm font-medium">{Math.round(progressWidth)}%</span>
+          </div>
+          <div className="h-3 w-full bg-secondary rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-gradient-to-r from-blue-400 via-primary to-blue-600 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${progressWidth}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center py-4 mb-2">
+          <motion.div
+            animate={{ 
+              scale: [1, 1.05, 1],
+              rotate: [0, 5, 0, -5, 0],
+              opacity: [0.8, 1, 0.8]
+            }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 2,
+              ease: "easeInOut"
+            }}
+            className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 relative"
+          >
+            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            
+            {/* Animated scanning effect */}
+            <motion.div 
+              className="absolute inset-0 rounded-full border-2 border-primary"
+              animate={{
+                opacity: [0, 0.8, 0],
+                scale: [0.8, 1.2, 1.4],
+              }}
+              transition={{
+                repeat: Infinity,
+                duration: 2,
+                ease: "easeOut",
+              }}
+            />
+          </motion.div>
+          
+          <p className="text-muted-foreground text-sm text-center max-w-md">
+            We're thoroughly analyzing your website's security. This may take a moment as we check for various vulnerabilities.
+          </p>
+        </div>
+      </div>
+      
+      <div className="px-6 pb-6">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { icon: <Shield className="w-3 h-3" />, label: "Headers", step: 2 },
+            { icon: <Lock className="w-3 h-3" />, label: "API Keys", step: 4 },
+            { icon: <AlertCircle className="w-3 h-3" />, label: "Database", step: 5 },
+            { icon: <User className="w-3 h-3" />, label: "Auth Pages", step: 6 }
+          ].map((item, index) => (
+            <div 
+              key={item.label} 
+              className={`flex flex-col items-center text-xs px-2 py-1.5 rounded-md transition-colors duration-300 ${
+                currentStep >= item.step 
+                  ? "bg-primary/10 text-primary" 
+                  : "bg-secondary/50 text-muted-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-1 mb-1">
+                {item.icon}
+                <span>{item.label}</span>
+              </div>
+              <div className="w-full h-1 bg-secondary/50 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ 
+                    width: currentStep >= item.step ? "100%" : 
+                           currentStep + 1 === item.step ? "20%" : "0%"
+                  }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function LightScanTool() {
   const [url, setUrl] = useState("")
@@ -533,6 +695,17 @@ export default function LightScanTool() {
           )}
         </CardContent>
       </Card>
+
+      {/* Show scanner loading animation when scanning */}
+      {isScanning && !result && !error && !securityBlocked && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <ScannerLoading />
+        </motion.div>
+      )}
 
       {/* Scan results */}
       {result && (

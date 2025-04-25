@@ -361,10 +361,12 @@ const calculateScore = (
   // Base score is 100
   let score = 100;
   
-  // Deduct points for missing headers (up to 40 points)
-  const headerWeight = 40;
+  // Deduct points for missing headers (only up to 10 points total)
+  const headerWeight = 10; // Reduced from 40 to 10
   const totalHeaders = headerPresent + headerMissing;
-  const missingHeaderPenalty = (headerMissing / totalHeaders) * headerWeight;
+  const missingHeaderPenalty = totalHeaders > 0 
+    ? (headerMissing / totalHeaders) * headerWeight
+    : 0;
   
   // Deduct points for potential leaks (15 points each, up to 60 points)
   const leakPenalty = Math.min(leaks * 15, 60);
@@ -674,21 +676,48 @@ export async function POST(request: Request) {
       // Calculate score
       let score = 100;
       
-      // Deduct points for missing security headers
-      score -= headerCheck.missing.length * 5;
+      // Deduct points for missing security headers (maximum 10 points)
+      const headerPenalty = headerCheck.missing.length > 0
+        ? Math.min(10, Math.floor((headerCheck.missing.length / (headerCheck.present.length + headerCheck.missing.length)) * 10))
+        : 0;
+      score -= headerPenalty;
       
-      // Deduct points for leaked API keys (more severe)
-      score -= uniqueLeaks.length * 15;
+      // Categorize leaks by severity and deduct points accordingly
+      let criticalLeaksCount = 0;
+      let highRiskLeaksCount = 0;
+      let mediumRiskLeaksCount = 0;
+      let lowRiskLeaksCount = 0;
+      
+      // Count leaks by severity
+      uniqueLeaks.forEach(leak => {
+        // Skip Supabase leaks if RLS is properly configured
+        if (leak.type.includes('Supabase') && rlsVulnerability && !rlsVulnerability.isRlsVulnerable) {
+          return;
+        }
+        
+        // Determine severity based on type or explicit severity
+        if (leak.type.includes('API Key') && !leak.type.toLowerCase().includes('captcha')) {
+          criticalLeaksCount++;
+        } else if (leak.type.includes('Supabase') && rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
+          highRiskLeaksCount++;
+        } else if (leak.type.includes('Unprotected Auth Page')) {
+          mediumRiskLeaksCount++;
+        } else if (leak.type.toLowerCase().includes('captcha')) {
+          lowRiskLeaksCount++;
+        } else {
+          mediumRiskLeaksCount++; // Default to medium risk
+        }
+      });
+      
+      // Deduct points based on risk levels
+      score -= criticalLeaksCount * 20; // Critical: 20 points each
+      score -= highRiskLeaksCount * 15;  // High: 15 points each
+      score -= mediumRiskLeaksCount * 10; // Medium: 10 points each
+      score -= lowRiskLeaksCount * 5;    // Low: 5 points each
       
       // Deduct more points if RLS is vulnerable (very critical)
       if (rlsVulnerability && rlsVulnerability.isRlsVulnerable) {
         score -= 25; // Significant penalty for RLS vulnerability
-      }
-      
-      // Deduct points for unprotected auth pages
-      if (authPageCheck.unprotectedPages.length > 0) {
-        // Deduct 5 points per unprotected auth page, max 15 points
-        score -= Math.min(authPageCheck.unprotectedPages.length * 5, 15);
       }
       
       // Ensure score stays between 0-100
@@ -701,7 +730,29 @@ export async function POST(request: Request) {
           present: headerCheck.present,
           missing: headerCheck.missing
         },
-        leaks: uniqueLeaks,
+        leaks: uniqueLeaks.map(leak => {
+          // Assign severity level to each leak
+          let severity: 'critical' | 'high' | 'medium' | 'low' | 'secure' = 'medium';
+          
+          // Skip Supabase leaks if RLS is properly configured
+          if (leak.type.includes('Supabase')) {
+            severity = rlsVulnerability && rlsVulnerability.isRlsVulnerable ? 'high' : 'secure';
+          }
+          // API keys (except CAPTCHA keys) are critical
+          else if (leak.type.includes('API Key') && !leak.type.toLowerCase().includes('captcha')) {
+            severity = 'critical';
+          }
+          // Auth pages without protection are medium risk
+          else if (leak.type.includes('Unprotected Auth Page')) {
+            severity = 'medium';
+          }
+          // CAPTCHA related issues are low risk
+          else if (leak.type.toLowerCase().includes('captcha')) {
+            severity = 'low';
+          }
+          
+          return { ...leak, severity };
+        }),
         jsFilesScanned: jsFilesToCheck.length,
         rlsVulnerability,
         authPages: {
