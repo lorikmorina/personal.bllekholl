@@ -227,6 +227,46 @@ const ScannerLoading = () => {
   );
 };
 
+// Speedometer Component for Security Score (simplified to just show score)
+const SecuritySpeedometer = ({ score }: { score: number }) => {
+  // Text to display based on score
+  const getRiskText = () => {
+    if (score >= 80) return "Low Risk";
+    if (score >= 60) return "Moderate Risk";
+    if (score >= 40) return "High Risk";
+    return "Critical Risk";
+  };
+
+  return (
+    <div className={`px-5 py-3 rounded-lg flex flex-col items-center ${ 
+      score >= 70
+        ? 'bg-green-100 dark:bg-green-900/20'
+        : score >= 40
+        ? 'bg-amber-100 dark:bg-amber-900/20'
+        : 'bg-red-100 dark:bg-red-900/20'
+    }`}>
+      <div className={`text-4xl font-bold ${ 
+        score >= 70
+          ? 'text-green-800 dark:text-green-300'
+          : score >= 40
+          ? 'text-amber-800 dark:text-amber-300'
+          : 'text-red-800 dark:text-red-300'
+      }`}>                 
+        {score}
+      </div>
+      <div className={`text-sm font-medium ${ 
+        score >= 70
+          ? 'text-green-700 dark:text-green-400'
+          : score >= 40
+          ? 'text-amber-700 dark:text-amber-400'
+          : 'text-red-700 dark:text-red-400'
+      }`}>
+        {getRiskText()}
+      </div>
+    </div>
+  );
+};
+
 export default function LightScanTool() {
   const [url, setUrl] = useState("")
   const [isScanning, setIsScanning] = useState(false)
@@ -582,6 +622,184 @@ export default function LightScanTool() {
     }
   }
 
+  // Helper function to categorize leaks by severity
+  const categorizeLeaks = (leaks: ScanResult['leaks']) => {
+    const critical: typeof leaks = [];
+    const high: typeof leaks = [];
+    const medium: typeof leaks = [];
+    const low: typeof leaks = [];
+    
+    // Add missing security headers as low risk items
+    const missingHeaders = result?.headers?.missing || [];
+    if (missingHeaders.length > 0) {
+      missingHeaders.forEach(header => {
+        const headerInfo = securityHeadersInfo[header] || {
+          name: header.replace(/-/g, ' '),
+          importance: 'medium',
+          description: 'Security header'
+        };
+        
+        low.push({
+          type: 'Missing Security Header',
+          preview: headerInfo.name,
+          details: `The ${headerInfo.name} security header is missing. ${headerInfo.description}`,
+          severity: 'info'
+        });
+      });
+    }
+    
+    // Filter out database keys with properly configured security
+    const filteredLeaks = leaks.filter(leak => 
+      !(leak.type.includes('Supabase') && leak.severity === 'secure')
+    );
+    
+    filteredLeaks.forEach(leak => {
+      // Skip missing security headers (we've already added them above)
+      if (leak.type.includes('Missing Security Header')) {
+        return;
+      }
+      
+      // Categorize by severity (with default fallbacks)
+      switch(leak.severity) {
+        case 'critical':
+          critical.push(leak);
+          break;
+        case 'warning':
+          high.push(leak);
+          break;
+        case 'info':
+          medium.push(leak);
+          break;
+        case 'secure':
+          low.push(leak);
+          break;
+        default:
+          // Default categorization based on leak type
+          if (leak.type.includes('API Key') && !leak.type.toLowerCase().includes('captcha')) {
+            critical.push({...leak, severity: 'critical'});
+          } else if (leak.type.includes('Supabase') && leak.details?.includes('RLS')) {
+            high.push({...leak, severity: 'warning'});
+          } else if (leak.type.includes('Unprotected Auth Page')) {
+            medium.push({...leak, severity: 'info'});
+          } else if (leak.type.toLowerCase().includes('captcha')) {
+            low.push({...leak, severity: 'info'});
+          } else {
+            medium.push({...leak, severity: 'info'});
+          }
+      }
+    });
+    
+    return { critical, high, medium, low };
+  };
+
+  // Helper to render a risk category section
+  const renderRiskCategory = (
+    title: string, 
+    icon: JSX.Element, 
+    leaks: ScanResult['leaks'], 
+    isExpanded: boolean, 
+    setExpanded: React.Dispatch<React.SetStateAction<boolean>>,
+    bgColor: string,
+    textColor: string,
+    expandedLeaks: number[],
+    toggleLeakExpanded: (index: number) => void
+  ) => {
+    if (leaks.length === 0) return null;
+    
+    return (
+      <div className="mb-6">
+        <h4 className="text-lg font-semibold mb-3 flex items-center">
+          {icon}
+          {title} <span className="ml-2 text-sm font-normal">({leaks.length})</span>
+        </h4>
+        <button 
+          onClick={() => setExpanded(!isExpanded)}
+          className={`w-full flex items-center justify-between text-left p-3 rounded-md ${bgColor} mb-2`}
+        >
+          <div className="flex items-center">
+            {icon}
+            <span className={`font-medium ${textColor}`}>{leaks.length} {title}</span>
+          </div>
+          <span className={`transform transition-transform duration-200 ${textColor} ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+        </button>
+        {isExpanded && (
+          <ul className="space-y-3 pl-1">
+            {leaks.map((leak, idx) => {
+              // We need a unique key for each leak item that doesn't conflict with other categories
+              const uniqueKey = `${title.toLowerCase().replace(/\s+/g, '-')}-${idx}`;
+              const isItemExpanded = expandedLeaks.includes(idx);
+              
+              // Get appropriate fix text based on leak type
+              const getFixText = () => {
+                if (leak.type.toLowerCase().includes('api key')) {
+                  return "Remove the API key from your frontend code. Access the API through a backend proxy or serverless function to protect the key.";
+                } 
+                
+                if (leak.type.toLowerCase().includes('supabase')) {
+                  if (leak.severity === 'warning') {
+                    return "Supabase key found with accessible tables! Immediately review and enforce Row Level Security (RLS) policies on all publicly exposed tables in your Supabase project.";
+                  }
+                  return "Ensure Row Level Security (RLS) is enabled and properly configured for all tables accessed by the anonymous key.";
+                }
+                
+                if (leak.type.toLowerCase().includes('auth page')) {
+                  return "Add CAPTCHA or Turnstile protection to your authentication forms to prevent brute force attacks.";
+                }
+                
+                if (leak.type.toLowerCase().includes('security header')) {
+                  return "Configure this security header in your web server (e.g., Nginx, Apache) or CDN settings. This can typically be done through configuration files or through your hosting provider's security settings.";
+                }
+                
+                return "Remove sensitive information from frontend code. Use environment variables on the backend and access data via secure API endpoints.";
+              };
+              
+              return (
+                <li key={uniqueKey} className={`border rounded-md overflow-hidden ${bgColor}`}>
+                  <button
+                    onClick={() => toggleLeakExpanded(idx)}
+                    className={`w-full text-left p-3 flex items-center justify-between hover:bg-opacity-80 dark:hover:bg-opacity-80`}
+                  >
+                    <div className="flex items-start">
+                      {icon}
+                      <span className={`${textColor}`}>
+                        {leak.type}: <code className="text-xs bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded">{leak.preview}</code>
+                      </span>
+                    </div>
+                    <span className={`transform transition-transform duration-200 ${isItemExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  </button>
+                  
+                  {isItemExpanded && (
+                    <div className="p-3 bg-background/50 border-t border-border/50">
+                      <p className="text-sm font-semibold mb-1 text-foreground">Details:</p>
+                      <div className="font-mono text-xs overflow-x-auto p-2 bg-muted rounded mb-3">
+                        <code>{leak.details}</code>
+                      </div>
+                      
+                      <p className="text-sm mb-3 text-muted-foreground">
+                        <span className="font-semibold text-foreground">Potential Risk:</span> {
+                          leak.type.toLowerCase().includes('security header')
+                            ? "Missing security headers can make your site more vulnerable to various types of attacks."
+                            : `Exposing ${leak.type.toLowerCase()} could allow unauthorized access to services or sensitive data.`
+                        }
+                      </p>
+
+                      <div className="mt-2 pt-2 border-t border-dashed border-border/30">
+                        <p className="text-xs font-semibold mb-1 text-foreground">How to Fix:</p>
+                        <p className="text-xs text-muted-foreground">
+                          {getFixText()}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -716,244 +934,44 @@ export default function LightScanTool() {
         >
           <Card>
             <CardContent className="p-0">
-              <div className="flex flex-col md:flex-row items-center justify-between p-6 border-b border-border">
-                <div className="flex items-center mb-4 md:mb-0">
-                  <Globe className="h-5 w-5 mr-2 text-muted-foreground" />
-                  <span className="font-medium">{result.url}</span>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-muted-foreground" />
-                    <span>{result.jsFilesScanned} files scanned</span>
-                  </div>
-                  
-                  <div className={`px-3 py-1 rounded-full flex items-center text-sm font-semibold ${ 
-                    result.score >= 70
-                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300' // Good score
-                      : result.score >= 40
-                      ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300' // Moderate score
-                      : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300'         // Poor score
-                  }`}>
-                    Score: {result.score}/100
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6 p-6 border-b border-border">
+              <div className="p-6 flex flex-col sm:flex-row items-center justify-between border-b border-border gap-4">
                 <div>
-                  <h4 className="text-lg font-semibold mb-3">
-                    <ShieldCheck className="inline-block w-5 h-5 mr-2 text-green-500" />
-                    Present Security Headers
-                  </h4>
-                  {result.headers.present.length > 0 ? (
-                    <div>
-                      <button 
-                        onClick={() => setIsPresentHeadersExpanded(!isPresentHeadersExpanded)}
-                        className="w-full flex items-center justify-between text-left p-3 rounded-md bg-green-50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 mb-2"
-                      >
-                        <div className="flex items-center">
-                          <span className="text-green-500 mr-2">✓</span>
-                          <span className="font-medium text-green-700 dark:text-green-300">{result.headers.present.length} Present Security Header{result.headers.present.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        <span className={`transform transition-transform duration-200 text-green-600 dark:text-green-400 ${isPresentHeadersExpanded ? 'rotate-90' : ''}`}>▶</span>
-                      </button>
-                      {isPresentHeadersExpanded && (
-                        <ul className="space-y-2 pl-2 border-l-2 border-green-200 dark:border-green-800 ml-2">
-                          {result.headers.present.map((header) => {
-                            const headerInfo = securityHeadersInfo[header] || {
-                              name: header.replace(/-/g, ' '),
-                              importance: 'medium',
-                              description: 'Security header'
-                            };
-                            
-                            return (
-                              <li key={header} className="text-sm text-green-700 dark:text-green-300 flex items-center">
-                                <span className="text-green-500 mr-1.5">-</span>
-                                <span className="capitalize font-medium">{headerInfo.name}</span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No present security headers found.</p>
-                  )}
+                  <h3 className="text-2xl font-bold">Security Report</h3>
+                  <p className="text-muted-foreground">URL: {result.url}</p>
                 </div>
-                
-                <div>
-                  <h4 className="text-lg font-semibold mb-3 flex items-center">
-                    <Lightbulb className="w-5 h-5 mr-2 text-blue-500" />
-                    Recommended Security Headers
-                  </h4>
-                  {result.headers.missing.length > 0 ? (
-                    <div>
-                      <button 
-                        onClick={() => setIsRecommendedHeadersExpanded(!isRecommendedHeadersExpanded)}
-                        className="w-full flex items-center justify-between text-left p-3 rounded-md bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20 mb-2"
-                      >
-                        <div className="flex items-center">
-                          <Info size={16} className="mr-2 text-blue-500 flex-shrink-0" />
-                          <span className="font-medium text-blue-700 dark:text-blue-300">{result.headers.missing.length} Recommended Security Header{result.headers.missing.length !== 1 ? 's' : ''}</span>
-                        </div>
-                        <span className={`transform transition-transform duration-200 text-blue-600 dark:text-blue-400 ${isRecommendedHeadersExpanded ? 'rotate-90' : ''}`}>▶</span>
-                      </button>
-                      {isRecommendedHeadersExpanded && (
-                        <ul className="space-y-2 pl-1"> 
-                          {sortHeadersByImportance(result.headers.missing).map((header) => {
-                            const headerInfo = securityHeadersInfo[header] || {
-                              name: header.replace(/-/g, ' '),
-                              importance: 'medium',
-                              description: 'A useful security header.'
-                            };
-                            // This expanded state is for the *individual* header item, not the group
-                            const isItemExpanded = expandedHeaders.includes(header); 
-                            
-                            return (
-                              <li key={header} className="border rounded-md overflow-hidden bg-secondary/30 dark:bg-secondary/10">
-                                <button
-                                  onClick={() => toggleHeaderExpanded(header)} // Use the existing toggle for individual items
-                                  className="w-full text-left p-3 flex items-center justify-between hover:bg-secondary/50 dark:hover:bg-secondary/20"
-                                >
-                                  <div className="flex items-start">
-                                    <Info size={16} className="mr-2 mt-0.5 text-blue-500 flex-shrink-0" />
-                                    <span className="capitalize font-medium">{headerInfo.name}</span>
-                                    <Badge variant="outline" className="ml-2 text-xs">{headerInfo.importance}</Badge>
-                                  </div>
-                                  {/* Use isItemExpanded for the individual item arrow */}
-                                  <span className={`transform transition-transform duration-200 ${isItemExpanded ? 'rotate-90' : ''}`}>▶</span>
-                                </button>
-                                
-                                {/* Use isItemExpanded to show/hide details */}
-                                {isItemExpanded && (
-                                  <div className="p-3 bg-background/50 border-t border-border/50">
-                                    <p className="text-sm text-muted-foreground mb-2">{headerInfo.description}</p>
-                                    <div className="mt-2 pt-2 border-t border-dashed border-border/30">
-                                      <p className="text-xs font-semibold mb-1 text-foreground">How to Fix:</p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Configure this header in your web server (e.g., Nginx, Apache) or CDN settings. Refer to documentation for specific instructions.
-                                      </p>
-                                    </div>
-                                  </div>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-green-600 dark:text-green-400 flex items-center">
-                      <ShieldCheck size={16} className="mr-1.5"/> 
-                      All recommended security headers are present!
-                    </p>
-                  )}
-                </div>
+                <SecuritySpeedometer score={result.score} />
               </div>
 
-              <div className="p-6 border-t border-border">
+              <div className="p-6 border-b border-border">
                 <h4 className="text-lg font-semibold mb-3 flex items-center">
-                  <AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
-                  Potential Information Exposure
+                  <ShieldCheck className="mr-2 h-5 w-5 text-green-500" />
+                  Present Security Headers
                 </h4>
-                {result.leaks.length > 0 ? (
+                {result.headers.present.length > 0 ? (
                   <div>
                     <button 
-                      onClick={() => setIsLeaksExpanded(!isLeaksExpanded)}
-                      className="w-full flex items-center justify-between text-left p-3 rounded-md bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20 mb-2"
+                      onClick={() => setIsPresentHeadersExpanded(!isPresentHeadersExpanded)}
+                      className="w-full flex items-center justify-between text-left p-3 rounded-md bg-green-50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 mb-2"
                     >
                       <div className="flex items-center">
-                        <AlertTriangle size={16} className="mr-2 text-amber-500 flex-shrink-0" />
-                        <span className="font-medium text-amber-700 dark:text-amber-300">{result.leaks.length} Potential Information Exposure{result.leaks.length !== 1 ? 's' : ''}</span>
+                        <span className="text-green-500 mr-2">✓</span>
+                        <span className="font-medium text-green-700 dark:text-green-300">{result.headers.present.length} Present Security Header{result.headers.present.length !== 1 ? 's' : ''}</span>
                       </div>
-                      <span className={`transform transition-transform duration-200 text-amber-600 dark:text-amber-400 ${isLeaksExpanded ? 'rotate-90' : ''}`}>▶</span>
+                      <span className={`transform transition-transform duration-200 text-green-600 dark:text-green-400 ${isPresentHeadersExpanded ? 'rotate-90' : ''}`}>▶</span>
                     </button>
-                    {isLeaksExpanded && (
-                      <ul className="space-y-3 pl-1">
-                        {result.leaks.map((leak, index) => {
-                          // isExpanded is for the *individual* leak item
-                          const isExpanded = expandedLeaks.includes(index); 
+                    {isPresentHeadersExpanded && (
+                      <ul className="space-y-2 pl-2 border-l-2 border-green-200 dark:border-green-800 ml-2">
+                        {result.headers.present.map((header) => {
+                          const headerInfo = securityHeadersInfo[header] || {
+                            name: header.replace(/-/g, ' '),
+                            importance: 'medium',
+                            description: 'Security header'
+                          };
                           
-                          // Determine severity styling (defaulting to 'warning')
-                          // TODO: Update this logic when backend provides leak.severity
-                          const severity = leak.severity || 'warning'; 
-                          let IconComponent = AlertTriangle;
-                          let iconColor = 'text-amber-500';
-                          let bgColor = 'bg-amber-50 dark:bg-amber-900/10';
-                          let textColor = 'text-amber-700 dark:text-amber-300';
-                          
-                          if (severity === 'critical') {
-                            IconComponent = ShieldAlert;
-                            iconColor = 'text-red-500';
-                            bgColor = 'bg-red-50 dark:bg-red-900/10';
-                            textColor = 'text-red-700 dark:text-red-300';
-                          } else if (severity === 'secure') {
-                            IconComponent = ShieldCheck;
-                            iconColor = 'text-green-500';
-                            bgColor = 'bg-green-50 dark:bg-green-900/10';
-                            textColor = 'text-green-700 dark:text-green-300';
-                          } else if (severity === 'info') {
-                            IconComponent = Info;
-                            iconColor = 'text-blue-500';
-                            bgColor = 'bg-blue-50 dark:bg-blue-900/10';
-                            textColor = 'text-blue-700 dark:text-blue-300';
-                          }
-
-                          // Determine "How to Fix" text based on leak type (basic examples)
-                          let fixText = "Remove sensitive information from frontend code. Use environment variables on the backend and access data via secure API endpoints.";
-                          if (leak.type.toLowerCase().includes('api key')) {
-                            fixText = "Remove the API key from your frontend code. Access the API through a backend proxy or serverless function to protect the key."
-                          } else if (leak.type.toLowerCase().includes('supabase')) {
-                              // TODO: Refine this based on backend providing RLS status
-                              if (severity === 'secure') {
-                                fixText = "Supabase public URL and anonymous key detected. RLS appears to be properly configured for security based on our checks. No immediate action needed regarding this key, but ensure RLS policies remain strict."
-                              } else if (severity === 'critical') {
-                                fixText = "Supabase key found with potentially accessible tables! Immediately review and enforce Row Level Security (RLS) policies on all publicly exposed tables in your Supabase project. Consider rotating the key if compromise is suspected."
-                              } else { // Default 'warning' for Supabase
-                                fixText = "Supabase URL or key detected. Ensure Row Level Security (RLS) is enabled and properly configured for all tables accessed by the anonymous key. Verify that only intended data is publicly accessible."
-                              }
-                          }
-
                           return (
-                            <li key={index} className={`border rounded-md overflow-hidden ${bgColor}`}>
-                              <button
-                                onClick={() => toggleLeakExpanded(index)}
-                                className={`w-full text-left p-3 flex items-center justify-between hover:bg-opacity-80 dark:hover:bg-opacity-80 ${bgColor.replace('bg-', 'hover:bg-')}`}
-                              >
-                                <div className="flex items-start">
-                                  <IconComponent size={16} className={`mr-2 mt-0.5 ${iconColor} flex-shrink-0`} />
-                                  <span className={`${textColor}`}>Potential {leak.type} found: <code className="text-xs bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded">{leak.preview}</code></span>
-                                </div>
-                                <span className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
-                              </button>
-                              
-                              {isExpanded && (
-                                <div className="p-3 bg-background/50 border-t border-border/50">
-                                  <p className="text-sm font-semibold mb-1 text-foreground">Details:</p>
-                                  <div className="font-mono text-xs overflow-x-auto p-2 bg-muted rounded mb-3">
-                                    <code>{leak.details}</code>
-                                  </div>
-                                  
-                                  {severity !== 'secure' && (
-                                    <p className="text-sm mb-3 text-muted-foreground">
-                                      <span className="font-semibold text-foreground">Potential Risk:</span> Exposing {leak.type.toLowerCase()} could allow unauthorized access to services or sensitive data.
-                                    </p>
-                                  )}
-                                  {severity === 'secure' && (
-                                    <p className="text-sm mb-3 text-muted-foreground">
-                                      <span className="font-semibold text-foreground">Note:</span> While this {leak.type.toLowerCase()} is exposed, our checks indicate it's currently configured securely (e.g., RLS enabled for Supabase). Regularly review security configurations.
-                                    </p>
-                                  )}
-
-                                  <div className="mt-2 pt-2 border-t border-dashed border-border/30">
-                                    <p className="text-xs font-semibold mb-1 text-foreground">How to Fix:</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {fixText}
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
+                            <li key={header} className="text-sm text-green-700 dark:text-green-300 flex items-center">
+                              <span className="text-green-500 mr-1.5">-</span>
+                              <span className="capitalize font-medium">{headerInfo.name}</span>
                             </li>
                           );
                         })}
@@ -961,11 +979,108 @@ export default function LightScanTool() {
                     )}
                   </div>
                 ) : (
-                  <p className="text-sm text-green-600 dark:text-green-400 flex items-center">
-                     <ShieldCheck size={16} className="mr-1.5"/> 
-                     No potential information exposure found in the scanned files! 🎉
-                  </p>
+                  <p className="text-sm text-muted-foreground">No present security headers found.</p>
                 )}
+              </div>
+
+              <div className="px-6 pb-6">
+                {/* Risk Categories */}
+                {result.leaks.length > 0 && (
+                  <div>
+                    <h3 className="text-xl font-bold mb-4">Security Findings by Risk Level</h3>
+                    
+                    {/* Group leaks by severity */}
+                    {(() => {
+                      const { critical, high, medium, low } = categorizeLeaks(result.leaks);
+                      
+                      return (
+                        <>
+                          {renderRiskCategory(
+                            "Critical Risk Issues", 
+                            <ShieldAlert className="w-5 h-5 mr-2 text-red-500 flex-shrink-0" />, 
+                            critical, 
+                            isLeaksExpanded, 
+                            setIsLeaksExpanded,
+                            "bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20",
+                            "text-red-700 dark:text-red-300",
+                            expandedLeaks,
+                            toggleLeakExpanded
+                          )}
+                          
+                          {renderRiskCategory(
+                            "High Risk Issues", 
+                            <AlertCircle className="w-5 h-5 mr-2 text-orange-500 flex-shrink-0" />, 
+                            high, 
+                            isLeaksExpanded, 
+                            setIsLeaksExpanded,
+                            "bg-orange-50 dark:bg-orange-900/10 hover:bg-orange-100 dark:hover:bg-orange-900/20",
+                            "text-orange-700 dark:text-orange-300",
+                            expandedLeaks,
+                            toggleLeakExpanded
+                          )}
+                          
+                          {renderRiskCategory(
+                            "Medium Risk Issues", 
+                            <AlertTriangle className="w-5 h-5 mr-2 text-amber-500 flex-shrink-0" />, 
+                            medium, 
+                            isLeaksExpanded, 
+                            setIsLeaksExpanded,
+                            "bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20",
+                            "text-amber-700 dark:text-amber-300",
+                            expandedLeaks,
+                            toggleLeakExpanded
+                          )}
+                          
+                          {renderRiskCategory(
+                            "Low Risk & Recommendations", 
+                            <Info className="w-5 h-5 mr-2 text-blue-500 flex-shrink-0" />, 
+                            low, 
+                            isLeaksExpanded, 
+                            setIsLeaksExpanded,
+                            "bg-blue-50 dark:bg-blue-900/10 hover:bg-blue-100 dark:hover:bg-blue-900/20",
+                            "text-blue-700 dark:text-blue-300",
+                            expandedLeaks,
+                            toggleLeakExpanded
+                          )}
+                        </>
+                      );
+                    })()}
+                    
+                    {/* If RLS is properly configured, show note about Supabase being checked */}
+                    {result.leaks.some(leak => 
+                        leak.type.includes('Supabase') && 
+                        leak.severity === 'secure' && 
+                        leak.details?.includes('RLS appears to be properly configured')
+                    ) && (
+                      <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800">
+                        <div className="flex items-center mb-1">
+                          <ShieldCheck className="w-4 h-4 mr-2 text-green-500" />
+                          <span className="font-medium">Database Security Check Passed</span>
+                        </div>
+                        <p className="text-sm ml-6">
+                          Database connection details were detected, but Row Level Security (RLS) appears to be properly configured. No tables were accessible without proper authentication.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* If no security issues found */}
+                {result.leaks.length === 0 && (
+                  <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-md mt-4 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center mb-2">
+                      <ShieldCheck className="w-5 h-5 mr-2 text-green-500" />
+                      <span className="font-semibold text-green-700 dark:text-green-300">No Security Issues Detected</span>
+                    </div>
+                    <p className="text-sm text-green-600 dark:text-green-400 pl-7">
+                      Great job! We didn't find any potential security issues in the {result.jsFilesScanned} JavaScript files scanned.
+                    </p>
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground mt-4">
+                  Scanned {result.jsFilesScanned} JavaScript files for potential API keys and sensitive information.
+                </p>
               </div>
             </CardContent>
           </Card>
