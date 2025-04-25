@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar } from "@/components/ui/avatar"
@@ -45,6 +45,11 @@ export default function ReportsList() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [reportToDelete, setReportToDelete] = useState<string | null>(null)
   const [selectedUrlForTrend, setSelectedUrlForTrend] = useState<string | null>(null)
+  const [visibleReports, setVisibleReports] = useState(10) // Number of reports to display
+
+  // Add reference to the trend section for scrolling
+  const trendSectionRef = useRef<HTMLDivElement>(null)
+  
   const { user } = useDashboard()
   const supabase = createClient()
 
@@ -101,6 +106,26 @@ export default function ReportsList() {
     setDeleteConfirmOpen(true)
   }
 
+  // Handle viewing trend and scrolling
+  const handleViewTrend = (url: string) => {
+    setSelectedUrlForTrend(url)
+    
+    // Use setTimeout to scroll after the component has rendered
+    setTimeout(() => {
+      if (trendSectionRef.current) {
+        trendSectionRef.current.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+  }
+
+  // Load more reports
+  const loadMoreReports = () => {
+    setVisibleReports(prev => prev + 10);
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -120,6 +145,10 @@ export default function ReportsList() {
       </div>
     )
   }
+
+  // Get reports to display based on pagination
+  const displayedReports = reports.slice(0, visibleReports);
+  const hasMoreReports = reports.length > visibleReports;
 
   return (
     <div className="space-y-6">
@@ -141,7 +170,7 @@ export default function ReportsList() {
             </div>
           ) : (
             <div className="space-y-4">
-              {reports.map((report) => (
+              {displayedReports.map((report) => (
                 <div key={report.id} className="border rounded-lg overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center justify-between p-4 gap-4">
                     <div className="flex items-center">
@@ -189,7 +218,7 @@ export default function ReportsList() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelectedUrlForTrend(report.url)}
+                          onClick={() => handleViewTrend(report.url)}
                           className="text-primary"
                         >
                           <TrendingUp className="h-4 w-4 mr-1" />
@@ -271,13 +300,27 @@ export default function ReportsList() {
                   )}
                 </div>
               ))}
+
+              {/* Load More button */}
+              {hasMoreReports && (
+                <div className="flex justify-center pt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={loadMoreReports}
+                    className="w-full max-w-xs"
+                  >
+                    Load More Reports
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Add ref to trend section for scrolling */}
       {selectedUrlForTrend && (
-        <div className="mt-6">
+        <div className="mt-6" ref={trendSectionRef}>
           <SecurityScoreTrend urlToAnalyze={selectedUrlForTrend} />
         </div>
       )}
