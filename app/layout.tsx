@@ -74,6 +74,13 @@ export default function RootLayout({
           <main>{children}</main>
           <Footer />
         </ThemeProvider>
+        {/* Datafa.st Script */}
+        <Script 
+          strategy="afterInteractive" 
+          data-website-id="680bacd74af86c80870875e8"
+          data-domain="securevibing.com"
+          src="https://datafa.st/js/script.js"
+        />
       </body>
     </html>
   )
