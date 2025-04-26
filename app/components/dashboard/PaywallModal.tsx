@@ -226,7 +226,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
                 <Badge variant="secondary">Most Popular</Badge>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-bold">$9</span>
+                <span className="text-3xl font-bold">$14</span>
                 <span className="text-muted-foreground">/month</span>
                 <p className="text-sm text-green-600 dark:text-green-400 mt-1">Includes a 7-day free trial</p>
               </div>

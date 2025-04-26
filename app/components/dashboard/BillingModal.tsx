@@ -78,7 +78,7 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
             <div className="font-medium mb-1">Current Plan: {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</div>
             <div className="text-sm text-muted-foreground">
               {currentPlan === 'monthly' 
-                ? 'You are on the monthly subscription plan ($9/month).'
+                ? 'You are on the monthly subscription plan ($14/month).'
                 : currentPlan === 'yearly'
                 ? 'You are on the yearly subscription plan ($99/year).'
                 : 'You are on the free plan.'}
@@ -89,9 +89,7 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
                 <h3 className="font-medium">Cancel Subscription</h3>
-                <p className="text-sm text-muted-foreground">
-                  If you cancel, you'll still have access until the end of your current billing period.
-                </p>
+                
               </div>
               
               <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 rounded-md flex items-start gap-2 text-sm">

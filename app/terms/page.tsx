@@ -39,24 +39,16 @@ export default function TermsOfService() {
         <p>We offer the following subscription plans:</p>
         <ul>
           <li><strong>Free Plan:</strong> Limited scanning capabilities with basic features.</li>
-          <li><strong>Yearly Plan ($24/year):</strong> Full access to all features, billed annually.</li>
-          <li><strong>Lifetime Plan ($49):</strong> One-time payment for extended access to all features.</li>
+          <li><strong>Monthly Plan ($14/month):</strong> Full access to all features, billed monthly.</li>
+          <li><strong>Yearly Plan ($99/year):</strong> Full access to all features, billed annually with better value compared to the monthly plan.</li>
         </ul>
         
-        <h2>5. Lifetime Access Definition</h2>
+        <h2>5. Free Trial Period</h2>
         <p>
-          The "Lifetime" subscription provides access to SecureVibing for a maximum of seven (7) years from the date of purchase, or until the service is discontinued, whichever comes first. "Lifetime" does not mean an infinite period, but rather the lifetime of the product as determined by SecureVibing.
+          Both our Monthly and Yearly subscription plans come with a 7-day free trial period. During this period, you can access all features of the respective plan without being charged. You can cancel your subscription at any time during the trial period without incurring any fees.
         </p>
         <p>
-          We reserve the right to:
-        </p>
-        <ul>
-          <li>Modify the features available in the Lifetime plan</li>
-          <li>Transfer Lifetime users to a comparable plan if the service undergoes significant changes</li>
-          <li>Discontinue the service with 90 days' notice to Lifetime subscribers</li>
-        </ul>
-        <p>
-          In the event that SecureVibing ceases operations before the seven-year period has elapsed, we are not obligated to provide refunds for Lifetime subscriptions.
+          After the trial period ends, your selected payment method will be automatically charged according to the plan you chose (monthly or yearly). You can cancel your subscription at any time to prevent future billing cycles.
         </p>
         
         <h2>6. Payment Terms</h2>

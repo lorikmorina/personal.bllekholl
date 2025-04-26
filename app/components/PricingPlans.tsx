@@ -10,10 +10,10 @@ export default function PricingPlans() {
   const plans = [
     {
       name: "Monthly",
-      price: "$9",
+      price: "$14",
       description: "Perfect for individuals who need regular website scanning",
       billingPeriod: "per month",
-      annualPrice: "or $99 annually",
+      annualPrice: "",
       features: [
         "1 month access to securevibing",
         "API key detection",
@@ -25,18 +25,18 @@ export default function PricingPlans() {
       mostPopular: false,
     },
     {
-      name: "Lifetime",
-      price: "$199",
-      description: "Best value for long term developers",
-      billingPeriod: "one-time payment",
+      name: "Yearly",
+      price: "$99",
+      description: "Best value for dedicated developers",
+      billingPeriod: "per year",
       features: [
-        "Unlimited website scans",
+        "12 months access to securevibing",
         "API key detection",
         "RLS Configuration Detection",
         "Security header analysis",
         "Priority support",
       ],
-      cta: "Get Full SecureVibing",
+      cta: "Start 7 day free trial",
       mostPopular: true,
     },
   ]
@@ -103,13 +103,6 @@ export default function PricingPlans() {
                         </span>
                       </div>
                     )}
-                    {plan.normalPrice && (
-                      <div className="mt-1">
-                        <span className="text-sm text-muted-foreground line-through">
-                          {plan.normalPrice} value
-                        </span>
-                      </div>
-                    )}
                   </div>
 
                   <ul className="space-y-3">
@@ -121,7 +114,7 @@ export default function PricingPlans() {
                     ))}
                   </ul>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col items-stretch">
                   <Button 
                     asChild 
                     className="w-full" 
@@ -131,6 +124,9 @@ export default function PricingPlans() {
                       {plan.cta}
                     </Link>
                   </Button>
+                  <p className="text-center text-sm text-muted-foreground mt-2">
+                    $0 now, cancel anytime
+                  </p>
                 </CardFooter>
               </Card>
             </motion.div>
