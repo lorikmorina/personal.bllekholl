@@ -66,16 +66,16 @@ export async function POST(request: Request) {
       );
     }
     
-    // 2. Check if user has a yearly subscription and a Paddle ID
-    if (userProfile.subscription_plan !== 'yearly') {
+    // 2. Check if user has a subscription and a Paddle ID
+    if (userProfile.subscription_plan !== 'yearly' && userProfile.subscription_plan !== 'monthly') {
       return NextResponse.json(
-        { success: false, message: 'No active yearly subscription found to cancel' },
+        { success: false, message: 'No active subscription found to cancel' },
         { status: 400 }
       );
     }
     
     if (!userProfile.paddle_subscription_id) {
-      console.warn(`User ${userId} has yearly plan but no paddle_subscription_id.`);
+      console.warn(`User ${userId} has a paid plan but no paddle_subscription_id.`);
       // Decide how to handle this: error out, or just update DB?
       // For now, let's error out as cancellation requires the ID.
       return NextResponse.json(
