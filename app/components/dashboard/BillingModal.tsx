@@ -77,15 +77,15 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
           <div className="mb-6 p-4 rounded-lg bg-muted">
             <div className="font-medium mb-1">Current Plan: {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</div>
             <div className="text-sm text-muted-foreground">
-              {currentPlan === 'yearly' 
-                ? 'You are on the yearly subscription plan ($24/year).'
-                : currentPlan === 'lifetime'
-                ? 'You have lifetime access to all features.'
+              {currentPlan === 'monthly' 
+                ? 'You are on the monthly subscription plan ($9/month).'
+                : currentPlan === 'yearly'
+                ? 'You are on the yearly subscription plan ($199/year).'
                 : 'You are on the free plan.'}
             </div>
           </div>
           
-          {currentPlan === 'yearly' && (
+          {(currentPlan === 'monthly' || currentPlan === 'yearly') && (
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
                 <h3 className="font-medium">Cancel Subscription</h3>
@@ -102,15 +102,6 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
               </div>
             </div>
           )}
-          
-          {currentPlan === 'lifetime' && (
-            <div className="bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 p-3 rounded-md flex items-start gap-2 text-sm">
-              <CreditCard className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <div>
-                You have lifetime access to all features with no recurring payments.
-              </div>
-            </div>
-          )}
         </div>
         
         <DialogFooter className="flex gap-2 sm:gap-0">
@@ -119,7 +110,7 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
             Close
           </Button>
           
-          {currentPlan === 'yearly' && (
+          {(currentPlan === 'monthly' || currentPlan === 'yearly') && (
             <Button 
               variant="destructive" 
               onClick={handleCancelSubscription}

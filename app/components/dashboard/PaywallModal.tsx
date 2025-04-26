@@ -22,7 +22,7 @@ interface PaywallModalProps {
 }
 
 export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModalProps) {
-  const [selectedPlan, setSelectedPlan] = useState<string>('lifetime') // Default to lifetime
+  const [selectedPlan, setSelectedPlan] = useState<string>('yearly') // Default to yearly (previously lifetime)
   const [isLoading, setIsLoading] = useState(false)
   const [paddleLoaded, setPaddleLoaded] = useState(false)
   const supabase = createClient()
@@ -104,9 +104,9 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
   }, [paddleLoaded, supabase, toast, onUpgrade, onClose, selectedPlan]); // Add dependencies used in callback
   
   const getPriceId = () => {
-    return selectedPlan === 'yearly' 
-      ? process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID 
-      : process.env.NEXT_PUBLIC_PADDLE_LIFETIME_PRICE_ID;
+    return selectedPlan === 'monthly' 
+      ? process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID  // This env var now points to monthly price
+      : process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID; // This env var now points to yearly price
   };
   
   const handleUpgrade = async () => {
@@ -195,12 +195,12 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
           </DialogHeader>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-            {/* Yearly Plan */}
+            {/* Monthly Plan */}
             <div 
               className={`border rounded-lg p-5 cursor-pointer hover:border-primary/80 transition-all ${
-                selectedPlan === 'yearly' ? 'border-primary ring-2 ring-primary/20' : ''
+                selectedPlan === 'monthly' ? 'border-primary ring-2 ring-primary/20' : ''
               }`}
-              onClick={() => setSelectedPlan('yearly')}
+              onClick={() => setSelectedPlan('monthly')}
             >
               <div className="flex justify-between items-start mb-3">
                 <h3 className="font-bold text-lg">Monthly</h3>
@@ -226,30 +226,30 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
               </ul>
             </div>
             
-            {/* Lifetime Plan */}
+            {/* Yearly Plan */}
             <div 
               className={`border rounded-lg p-5 cursor-pointer hover:border-primary/80 transition-all ${
-                selectedPlan === 'lifetime' ? 'border-primary ring-2 ring-primary/20' : ''
+                selectedPlan === 'yearly' ? 'border-primary ring-2 ring-primary/20' : ''
               }`}
-              onClick={() => setSelectedPlan('lifetime')}
+              onClick={() => setSelectedPlan('yearly')}
             >
               <div className="flex justify-between items-start mb-3">
-                <h3 className="font-bold text-lg">Lifetime</h3>
+                <h3 className="font-bold text-lg">Yearly</h3>
                 <Badge variant="outline">Best Value</Badge>
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold">$199</span>
-                <span className="text-muted-foreground"> one-time</span>
+                <span className="text-muted-foreground"> per year</span>
               </div>
               
               <ul className="space-y-2 mb-6">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Everything in Yearly plan</span>
+                  <span>Everything in Monthly plan</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span>Lifetime updates</span>
+                  <span>Save with annual billing</span>
                 </li>
                 
               </ul>
