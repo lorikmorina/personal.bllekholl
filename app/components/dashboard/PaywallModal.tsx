@@ -238,7 +238,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
                 <Badge variant="outline">Best Value</Badge>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-bold">$199</span>
+                <span className="text-3xl font-bold">$99</span>
                 <span className="text-muted-foreground"> per year</span>
               </div>
               

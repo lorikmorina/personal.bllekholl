@@ -80,7 +80,7 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
               {currentPlan === 'monthly' 
                 ? 'You are on the monthly subscription plan ($9/month).'
                 : currentPlan === 'yearly'
-                ? 'You are on the yearly subscription plan ($199/year).'
+                ? 'You are on the yearly subscription plan ($99/year).'
                 : 'You are on the free plan.'}
             </div>
           </div>
