@@ -112,9 +112,9 @@ export async function POST(request: Request) {
       
       // Determine the correct plan based on the price ID
       if (priceId === process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID) {
-        planType = 'monthly';
-      } else if (priceId === process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID) {
         planType = 'yearly';
+      } else if (priceId === process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID) {
+        planType = 'monthly';
       } else {
         throw new Error(`Unknown price ID: ${priceId}`);
       }
