@@ -10,7 +10,6 @@ import {
   Globe, Zap, Lock, Info, Lightbulb, AlertTriangle,
   AlertCircle, Gauge
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 
 type ScanResult = {
@@ -504,89 +503,17 @@ export default function Hero() {
           {title} <span className="ml-2 text-sm font-normal">({leaks.length})</span>
         </h4>
         <button 
-          onClick={() => setExpanded(!isExpanded)}
           className={`w-full flex items-center justify-between text-left p-3 rounded-md ${bgColor} mb-2`}
         >
           <div className="flex items-center">
             {icon}
-            <span className={`font-medium ${textColor}`}>{leaks.length} {title}</span>
+            <span className={`font-medium ${textColor}`}>
+              {leaks.length} {title}
+              {title.includes("Recommendations") && " found"} 
+            </span>
           </div>
-          <span className={`transform transition-transform duration-200 ${textColor} ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
+          
         </button>
-        {isExpanded && (
-          <ul className="space-y-3 pl-1">
-            {leaks.map((leak, idx) => {
-              // We need a unique key for each leak item that doesn't conflict with other categories
-              const uniqueKey = `${title.toLowerCase().replace(/\s+/g, '-')}-${idx}`;
-              const isItemExpanded = expandedLeaks.includes(idx);
-              
-              // Get appropriate fix text based on leak type
-              const getFixText = () => {
-                if (leak.type.toLowerCase().includes('api key')) {
-                  return "Remove the API key from your frontend code. Access the API through a backend proxy or serverless function to protect the key.";
-                } 
-                
-                if (leak.type.toLowerCase().includes('supabase')) {
-                  if (leak.severity === 'high' || (result?.rlsVulnerability?.isRlsVulnerable)) {
-                    return "Supabase key found with accessible tables! Immediately review and enforce Row Level Security (RLS) policies on all publicly exposed tables in your Supabase project.";
-                  }
-                  return "Ensure Row Level Security (RLS) is enabled and properly configured for all tables accessed by the anonymous key.";
-                }
-                
-                if (leak.type.toLowerCase().includes('auth page')) {
-                  return "Add CAPTCHA or Turnstile protection to your authentication forms to prevent brute force attacks.";
-                }
-                
-                if (leak.type.toLowerCase().includes('security header')) {
-                  return "Configure this security header in your web server (e.g., Nginx, Apache) or CDN settings. This can typically be done through configuration files or through your hosting provider's security settings.";
-                }
-                
-                return "Remove sensitive information from frontend code. Use environment variables on the backend and access data via secure API endpoints.";
-              };
-              
-              return (
-                <li key={uniqueKey} className={`border rounded-md overflow-hidden ${bgColor}`}>
-                  <button
-                    onClick={() => toggleLeakExpanded(idx)}
-                    className={`w-full text-left p-3 flex items-center justify-between hover:bg-opacity-80 dark:hover:bg-opacity-80`}
-                  >
-                    <div className="flex items-start">
-                      {icon}
-                      <span className={`${textColor}`}>
-                        {leak.type}: <code className="text-xs bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded">{leak.preview}</code>
-                      </span>
-                    </div>
-                    <span className={`transform transition-transform duration-200 ${isItemExpanded ? 'rotate-90' : ''}`}>▶</span>
-                  </button>
-                  
-                  {isItemExpanded && (
-                    <div className="p-3 bg-background/50 border-t border-border/50">
-                      <p className="text-sm font-semibold mb-1 text-foreground">Details:</p>
-                      <div className="font-mono text-xs overflow-x-auto p-2 bg-muted rounded mb-3">
-                        <code>{leak.details}</code>
-                      </div>
-                      
-                      <p className="text-sm mb-3 text-muted-foreground">
-                        <span className="font-semibold text-foreground">Potential Risk:</span> {
-                          leak.type.toLowerCase().includes('security header')
-                            ? "Missing security headers can make your site more vulnerable to various types of attacks."
-                            : `Exposing ${leak.type.toLowerCase()} could allow unauthorized access to services or sensitive data.`
-                        }
-                      </p>
-
-                      <div className="mt-2 pt-2 border-t border-dashed border-border/30">
-                        <p className="text-xs font-semibold mb-1 text-foreground">How to Fix:</p>
-                        <p className="text-xs text-muted-foreground">
-                          {getFixText()}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
     );
   };
@@ -738,33 +665,14 @@ export default function Hero() {
                   {result.headers.present.length > 0 ? (
                     <div>
                       <button 
-                        onClick={() => setIsPresentHeadersExpanded(!isPresentHeadersExpanded)}
                         className="w-full flex items-center justify-between text-left p-3 rounded-md bg-green-50 dark:bg-green-900/10 hover:bg-green-100 dark:hover:bg-green-900/20 mb-2"
                       >
                         <div className="flex items-center">
                           <span className="text-green-500 mr-2">✓</span>
                           <span className="font-medium text-green-700 dark:text-green-300">{result.headers.present.length} Present Security Header{result.headers.present.length !== 1 ? 's' : ''}</span>
                         </div>
-                        <span className={`transform transition-transform duration-200 text-green-600 dark:text-green-400 ${isPresentHeadersExpanded ? 'rotate-90' : ''}`}>▶</span>
+                        
                       </button>
-                      {isPresentHeadersExpanded && (
-                        <ul className="space-y-2 pl-2 border-l-2 border-green-200 dark:border-green-800 ml-2">
-                          {result.headers.present.map((header) => {
-                            const headerInfo = securityHeadersInfo[header] || {
-                              name: header.replace(/-/g, ' '),
-                              importance: 'medium',
-                              description: 'Security header'
-                            };
-                            
-                            return (
-                              <li key={header} className="text-sm text-green-700 dark:text-green-300 flex items-center">
-                                <span className="text-green-500 mr-1.5">-</span>
-                                <span className="capitalize font-medium">{headerInfo.name}</span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No present security headers found.</p>
@@ -837,13 +745,13 @@ export default function Hero() {
                       {/* If RLS is properly configured, show note about Supabase being checked */}
                       {result.rlsVulnerability && !result.rlsVulnerability.isRlsVulnerable && (
                         <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800">
-                          <div className="flex items-center mb-1">
-                            <ShieldCheck className="w-4 h-4 mr-2 text-green-500" />
-                            <span className="font-medium">Supabase Security Check Passed</span>
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center">
+                              <ShieldCheck className="w-4 h-4 mr-2 text-green-500" />
+                              <span className="font-medium">Supabase Security Check</span>
+                            </div>
+                            
                           </div>
-                          <p className="text-sm ml-6">
-                            Supabase connection details were detected, but Row Level Security (RLS) appears to be properly configured. No tables were accessible without proper authentication.
-                          </p>
                         </div>
                       )}
                     </div>
@@ -852,13 +760,13 @@ export default function Hero() {
                   {/* If no security issues found */}
                   {result.leaks.length === 0 && (
                     <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-md mt-4 border border-green-200 dark:border-green-800">
-                      <div className="flex items-center mb-2">
-                        <ShieldCheck className="w-5 h-5 mr-2 text-green-500" />
-                        <span className="font-semibold text-green-700 dark:text-green-300">No Security Issues Detected</span>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <ShieldCheck className="w-5 h-5 mr-2 text-green-500" />
+                          <span className="font-semibold text-green-700 dark:text-green-300">No Security Issues Detected</span>
+                        </div>
+                        
                       </div>
-                      <p className="text-sm text-green-600 dark:text-green-400 pl-7">
-                        Great job! We didn't find any potential security issues in the {result.jsFilesScanned} JavaScript files scanned.
-                      </p>
                     </div>
                   )}
                   
@@ -869,17 +777,17 @@ export default function Hero() {
                   {/* CTA Button */}
                   <div className="mt-6 border-t border-border pt-6">
                     <div className="flex flex-col items-center text-center">
-                      <h4 className="font-semibold text-lg mb-2">Ready to strengthen your website security?</h4>
+                      <h4 className="font-semibold text-lg mb-2">Unlock the full security report with solutions</h4>
                       <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                        Get step-by-step guidance to fix the detected vulnerabilities and improve your site's security posture.
+                        See exactly what's at risk and get step-by-step instructions to fix each vulnerability we found on your site.
                       </p>
                       <Button 
                         size="lg" 
                         className="bg-gradient-to-r from-primary to-primary/80 hover:to-primary text-white font-medium"
                         onClick={() => router.push('/signup')}
                       >
-                        <Zap className="mr-2 h-4 w-4" />
-                        Take executable steps to improve your site's security
+                        <Shield className="mr-2 h-4 w-4" />
+                        Start 7-day free trial
                       </Button>
                       
                     </div>
