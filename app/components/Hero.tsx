@@ -664,7 +664,7 @@ export default function Hero() {
               </form>
               
               <p className="mt-2 text-xs text-muted-foreground italic">
-                Disclaimer: The app is in beta and may produce false positives and doesn't guarantee complete website security. You have 2 free scans.
+                Disclaimer: The app is in beta and may produce false positives. You have 2 free scans.
               </p>
               
               {error && (
@@ -865,6 +865,25 @@ export default function Hero() {
                   <p className="text-xs text-muted-foreground mt-4">
                     Scanned {result.jsFilesScanned} JavaScript files for potential API keys and sensitive information.
                   </p>
+                  
+                  {/* CTA Button */}
+                  <div className="mt-6 border-t border-border pt-6">
+                    <div className="flex flex-col items-center text-center">
+                      <h4 className="font-semibold text-lg mb-2">Ready to strengthen your website security?</h4>
+                      <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                        Get step-by-step guidance to fix the detected vulnerabilities and improve your site's security posture.
+                      </p>
+                      <Button 
+                        size="lg" 
+                        className="bg-gradient-to-r from-primary to-primary/80 hover:to-primary text-white font-medium"
+                        onClick={() => router.push('/signup')}
+                      >
+                        <Zap className="mr-2 h-4 w-4" />
+                        Take executable steps to improve your site's security
+                      </Button>
+                      
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}
