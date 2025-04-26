@@ -32,6 +32,16 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
   const checkoutInitiated = useRef(false);
   const userRef = useRef<any>(null); // Ref to hold user object for the callback
   
+  // Reset loading state when modal opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset loading state when modal is closed
+      setIsLoading(false);
+      checkoutInitiated.current = false;
+      userRef.current = null;
+    }
+  }, [isOpen]);
+  
   // Initialize Paddle and set up event listener
   useEffect(() => {
     if (window.Paddle && !paddleLoaded) {
@@ -105,8 +115,8 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
   
   const getPriceId = () => {
     return selectedPlan === 'monthly' 
-      ? process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID  // This env var now points to monthly price
-      : process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID; // This env var now points to yearly price
+      ? process.env.NEXT_PUBLIC_PADDLE_MONTHLY_PRICE_ID  // Monthly plan should use the monthly price ID
+      : process.env.NEXT_PUBLIC_PADDLE_YEARLY_PRICE_ID;  // Yearly plan should use the yearly price ID
   };
   
   const handleUpgrade = async () => {
@@ -129,7 +139,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
       checkoutInitiated.current = true; // Mark that checkout is initiated by this modal
       
       // Close the modal immediately before opening Paddle
-      onClose();
+      handleClose();
 
       // Open Paddle checkout - REMOVED the success callback here
       window.Paddle.Checkout.open({
@@ -174,6 +184,15 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
     // Note: setIsLoading(false) is handled by the eventCallback or closeCallback now
   };
   
+  // Handle modal closing
+  const handleClose = () => {
+    // Make sure loading state is reset when modal is closed
+    setIsLoading(false);
+    checkoutInitiated.current = false;
+    userRef.current = null;
+    onClose();
+  };
+  
   return (
     <>
       {/* Load Paddle JS SDK (v2) - Keep this */}
@@ -185,7 +204,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
         strategy="lazyOnload" // Ensures it loads after main content
       />
       
-      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">Upgrade Your Plan</DialogTitle>
@@ -261,7 +280,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={handleClose}>
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
