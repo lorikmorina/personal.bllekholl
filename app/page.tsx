@@ -4,6 +4,7 @@ import SecurityEducation from "./components/SecurityEducation"
 //import Timeline from "./components/Timeline"
 import Marquee from "./components/Marquee"
 import NewsletterSubscribe from "./components/NewsletterSubscribe"
+import Timeline from "./components/Timeline"
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
       {/* <Timeline /> */}
       <Marquee />
       {/* <ContactForm /> */}
+      <Timeline/>
       <NewsletterSubscribe />
     </>
   )

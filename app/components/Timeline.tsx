@@ -5,46 +5,46 @@ import { motion, useScroll, useTransform, useSpring, useInView } from "framer-mo
 
 const timelineEvents = [
   {
-    year: 2018,
-    title: "Flowers & Saints Founded",
-    description: "Our journey began with a passion for minimal design and floral artistry.",
+    year: "Step 1",
+    title: "Load your website content and data",
+    description: "We begin by crawling your website to gather all accessible pages and assets.",
     details:
-      "Founded by Jane Doe and John Smith, Flowers & Saints started as a small studio in Sydney's Surry Hills, combining their love for minimalist design and botanical beauty.",
+      "Our advanced web crawlers navigate through your entire website, capturing HTML, JavaScript, CSS, and API endpoints. This comprehensive data collection phase builds a complete map of your web application's structure and content, allowing us to conduct thorough security analysis in subsequent steps.",
   },
   {
-    year: 2019,
-    title: "First Major Exhibition",
-    description: "Showcased our unique blend of digital art and floral arrangements at the Sydney Design Festival.",
+    year: "Step 2",
+    title: "Scan for major API leaks",
+    description: "We analyze your codebase to identify exposed API keys, tokens, and credentials.",
     details:
-      "Our exhibition 'Digital Bloom' attracted over 10,000 visitors and received critical acclaim for its innovative approach to merging technology with natural elements.",
+      "Using pattern recognition and contextual analysis, our scanner detects API keys, access tokens, and credentials that may be inadvertently exposed in your frontend code. This critical step identifies high-risk security vulnerabilities that could allow attackers to access your third-party services and sensitive data.",
   },
   {
-    year: 2020,
-    title: "Launch of Online Store",
-    description: "Expanded our reach by bringing our creations to the digital world.",
+    year: "Step 3",
+    title: "Scan for missing security headers",
+    description: "We evaluate your HTTP response headers to detect missing security configurations.",
     details:
-      "In response to global changes, we pivoted to e-commerce, offering our unique designs and virtual floral workshops to a worldwide audience.",
+      "Our system checks for essential security headers including Content-Security-Policy, X-XSS-Protection, X-Frame-Options, and more. Proper implementation of these headers is crucial for protecting against common web vulnerabilities such as cross-site scripting (XSS), clickjacking, and other injection attacks.",
   },
   {
-    year: 2021,
-    title: "Collaboration with Top Brands",
-    description: "Partnered with leading lifestyle brands to create exclusive collections.",
+    year: "Step 4",
+    title: "Scan for public databases",
+    description: "We search for exposed database instances and unprotected data storage.",
     details:
-      "Our collaborations included limited edition prints with Australian fashion label Zimmermann and a bespoke fragrance line with Aesop.",
+      "Our scanner identifies any publicly accessible database connections, storage buckets, or data endpoints that lack proper access controls. This step is essential for preventing data breaches, as exposed databases are among the most common sources of large-scale information leaks and security incidents.",
   },
   {
-    year: 2022,
-    title: "International Recognition",
-    description: "Received the prestigious International Floral Design Award.",
+    year: "Step 5",
+    title: "Test database configurations",
+    description: "We analyze database setups to identify security misconfigurations and vulnerabilities.",
     details:
-      "Our 'Ethereal Echoes' installation, which combined holographic projections with live flowers, won the gold medal at the Chelsea Flower Show.",
+      "Our system checks your database configurations for common security issues such as default credentials, excessive permissions, unencrypted connections, and outdated database versions with known vulnerabilities. This detailed analysis helps prevent unauthorized access to your most valuable asset—your data.",
   },
   {
-    year: 2023,
-    title: "Expansion to Physical Stores",
-    description: "Opened our first flagship store in the heart of Sydney.",
+    year: "Step 6",
+    title: "Calculate an overall score",
+    description: "We compile findings into a comprehensive security score with actionable insights.",
     details:
-      "Our Bondi Beach location features an immersive retail experience, blending digital installations with a curated selection of floral arrangements and lifestyle products.",
+      "Using a weighted scoring algorithm, we evaluate the severity and impact of discovered vulnerabilities to generate your overall security rating. The final report includes prioritized recommendations for remediation, clear explanations of risks, and specific code examples to help your development team quickly address identified issues.",
   },
 ]
 
@@ -92,8 +92,8 @@ export default function Timeline() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="text-3xl font-bold text-foreground sm:text-4xl">Our Journey</h2>
-          <p className="mt-4 text-lg text-muted-foreground">The evolution of Flowers & Saints through the years</p>
+          <h2 className="text-3xl font-bold text-foreground sm:text-4xl">Our Scanning Process</h2>
+          <p className="mt-4 text-lg text-muted-foreground">How our dynamic scanning works and why it matters.</p>
         </motion.div>
 
         <div className="relative">
