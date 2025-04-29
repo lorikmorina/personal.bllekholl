@@ -310,6 +310,17 @@ const TwitterPostMarquee = () => {
       },
       content: "Thanks, @lorikmor! Now I can sleep at night knowing my website isn't secretly a bug hotel. 🐞🏨",
       date: "1d"
+    },
+    {
+      id: 3,
+      author: {
+        name: "laod",
+        handle: "@laoddev",
+        avatar: "/Xprofiles/laoddev.jpg",
+        verified: false
+      },
+      content: "thanks to @SecureVibing I was able to make my app @waitlaunch much more secure.",
+      date: "1d"
     }
   ];
 
