@@ -184,6 +184,20 @@ export async function GET(
             transform: rotate(360deg);
           }
         }
+        
+        .supacheck-debug-info {
+          background: #f1f5f9;
+          border-radius: 4px;
+          padding: 8px;
+          margin-top: 16px;
+          font-size: 12px;
+          font-family: monospace;
+          color: #334155;
+          white-space: pre-wrap;
+          max-height: 150px;
+          overflow-y: auto;
+          display: none;
+        }
       \`;
       document.head.appendChild(styles);
       
@@ -212,6 +226,7 @@ export async function GET(
             </div>
           </div>
           <div id="supacheck-results-container"></div>
+          <div id="supacheck-debug-info" class="supacheck-debug-info"></div>
         </div>
       \`;
       document.body.appendChild(widget);
@@ -271,6 +286,13 @@ export async function GET(
         resultsContainer.appendChild(itemDiv);
       };
       
+      // Helper function to add debug information
+      const addDebugInfo = (title, info) => {
+        const debugContainer = document.getElementById('supacheck-debug-info');
+        debugContainer.style.display = 'block';
+        debugContainer.innerHTML += \`<div><strong>\${title}:</strong> \${info}</div>\`;
+      };
+      
       // Function to detect Supabase usage
       const detectSupabase = () => {
         // Open the widget on initialization
@@ -279,11 +301,14 @@ export async function GET(
         // Update status to scanning
         updateStatus('scanning', 'Scanning for Supabase configuration...');
         
+        // Debug toggle
+        const enableDebug = true; // Set to false in production
+        
         // Look for Supabase references in global scope
         setTimeout(() => {
           let supabaseFound = false;
           let insecureAnonymousKeyFound = false;
-          let rlsIssuesFound = false;
+          let foundDetails = {};
           
           // Check if the SupabaseClient is available in the window object
           const findSupabaseInWindow = () => {
@@ -294,9 +319,8 @@ export async function GET(
                 if (obj && 
                     typeof obj === 'object' && 
                     obj.constructor && 
-                    obj.constructor.name && 
                     (
-                      obj.constructor.name === 'SupabaseClient' || 
+                      (obj.constructor.name && obj.constructor.name.includes('Supabase')) || 
                       (typeof obj.auth === 'function' && typeof obj.from === 'function')
                     )) {
                   supabaseFound = true;
@@ -305,18 +329,23 @@ export async function GET(
                     const supabaseKey = obj.supabaseKey || '';
                     const supabaseUrl = obj.restUrl || obj.url || '';
                     
-                    // Check if it's likely an anonymous key (starts with eyJ or anon)
+                    // Check if it's likely an anonymous key (starts with eyJ or contains anon)
                     if (supabaseKey && (supabaseKey.startsWith('eyJ') || supabaseKey.includes('anon'))) {
                       insecureAnonymousKeyFound = true;
+                    }
+                    
+                    if (enableDebug) {
+                      addDebugInfo('Window Object Found', \`Key: \${key}, URL: \${supabaseUrl.substring(0, 20)}...\`);
                     }
                     
                     return {
                       found: true,
                       key: supabaseKey,
-                      url: supabaseUrl
+                      url: supabaseUrl,
+                      source: 'window_object'
                     };
                   }
-                  return { found: true };
+                  return { found: true, source: 'window_object' };
                 }
               } catch (e) {
                 // Ignore errors when accessing properties
@@ -325,47 +354,200 @@ export async function GET(
             return { found: false };
           };
           
-          // Look for Supabase URLs or keys in script tags
-          const findSupabaseInScripts = () => {
+          // Look for Supabase URLs or keys in DOM (scripts, attributes, etc.)
+          const findSupabaseInDOM = () => {
+            // 1. Check for supabase in all script tags
             const scripts = document.querySelectorAll('script');
             for (const script of scripts) {
               const content = script.textContent || '';
+              const src = script.getAttribute('src') || '';
               
-              // Check for Supabase URL patterns
-              if (content.includes('supabase.co') || content.includes('supabaseUrl')) {
+              // Check for Supabase URL patterns - including <hash>.supabase.co
+              const supabaseUrlPattern = /[a-zA-Z0-9-_]+\.supabase\.co/;
+              const supabaseTerms = ['supabase', 'createClient', 'SUPABASE_URL', 'SUPABASE_KEY'];
+              
+              const hasSupabaseUrl = supabaseUrlPattern.test(content) || supabaseUrlPattern.test(src);
+              const hasSupabaseTerms = supabaseTerms.some(term => content.includes(term) || src.includes(term));
+              
+              if (hasSupabaseUrl || hasSupabaseTerms) {
                 supabaseFound = true;
                 
-                // Look for potential API keys
-                const keyMatch = content.match(/(['\`"])([a-zA-Z0-9_.-]{20,})(\\1)/g);
-                if (keyMatch) {
-                  return { found: true, possibleKeys: keyMatch.length };
+                // Look for potential API keys - including anon-anon-key pattern
+                const keyPatterns = [
+                  /(['"\`])([a-zA-Z0-9_.-]{20,})(\\1)/g, // Standard long API keys
+                  /(['"\`])(anon[^'"\`]{2,})(\\1)/g,     // anon keys
+                  /(['"\`])(eyJ[^'"\`]{2,})(\\1)/g,      // JWT format keys
+                  /(['"\`])([a-zA-Z0-9_-]+\.?anon-?[a-zA-Z0-9_-]*\.?[a-zA-Z0-9_-]*)(\\1)/g // anon-anon-key pattern
+                ];
+                
+                for (const pattern of keyPatterns) {
+                  const matches = content.match(pattern);
+                  if (matches && matches.length > 0) {
+                    insecureAnonymousKeyFound = true;
+                    
+                    if (enableDebug) {
+                      addDebugInfo('Script Content Key Found', \`Pattern: \${pattern}, First match: \${matches[0].substring(0, 15)}...\`);
+                    }
+                    
+                    return { 
+                      found: true, 
+                      possibleKeys: matches.length,
+                      source: 'script_content'
+                    };
+                  }
                 }
                 
-                return { found: true };
+                // Capture the URL if found
+                const urlMatch = content.match(supabaseUrlPattern);
+                if (urlMatch && urlMatch[0]) {
+                  if (enableDebug) {
+                    addDebugInfo('Supabase URL Found', urlMatch[0]);
+                  }
+                  
+                  return {
+                    found: true,
+                    url: urlMatch[0],
+                    source: 'script_url_pattern'
+                  };
+                }
+                
+                return { found: true, source: 'script_general' };
               }
             }
+            
+            // 2. Look for Supabase in other DOM elements (data attributes, etc.)
+            const allElements = document.querySelectorAll('*[data-supabase], *[data-sb], *[data-supa]');
+            if (allElements.length > 0) {
+              supabaseFound = true;
+              
+              if (enableDebug) {
+                addDebugInfo('Supabase Data Attributes Found', \`Count: \${allElements.length}\`);
+              }
+              
+              return { found: true, source: 'dom_attributes' };
+            }
+            
+            // 3. Check network requests for Supabase URLs
+            if (window.performance && window.performance.getEntries) {
+              const resources = window.performance.getEntries();
+              for (const resource of resources) {
+                if (resource.name && 
+                    (resource.name.includes('supabase.co') || 
+                     /[a-zA-Z0-9-_]+\.supabase\.co/.test(resource.name))) {
+                  supabaseFound = true;
+                  
+                  if (enableDebug) {
+                    addDebugInfo('Network Request Found', resource.name);
+                  }
+                  
+                  return { found: true, url: resource.name, source: 'network_request' };
+                }
+              }
+            }
+            
             return { found: false };
           };
           
-          // Look for Supabase in environment variables or .env patterns
+          // Look for Supabase in environment variables or globals
           const findSupabaseInEnv = () => {
+            // Check for common Supabase-related globals
+            const supabaseVarPatterns = [
+              'SUPABASE', 'supa', 'supabase', 
+              'NEXT_PUBLIC_SUPABASE', 'VITE_SUPABASE', 'REACT_APP_SUPABASE'
+            ];
+            
             for (const key in window) {
-              if (typeof key === 'string' && 
-                 (key.includes('SUPABASE') || key.includes('NEXT_PUBLIC_SUPABASE'))) {
-                supabaseFound = true;
-                return { found: true };
+              if (typeof key === 'string') {
+                for (const pattern of supabaseVarPatterns) {
+                  if (key.includes(pattern)) {
+                    supabaseFound = true;
+                    
+                    if (enableDebug) {
+                      addDebugInfo('Global Variable Found', key);
+                    }
+                    
+                    return { found: true, key: key, source: 'global_variable' };
+                  }
+                }
+              }
+              
+              // Check if the value is a string containing Supabase URL
+              try {
+                const val = window[key];
+                if (typeof val === 'string' && 
+                    (/[a-zA-Z0-9-_]+\.supabase\.co/.test(val) || val.includes('anon-'))) {
+                  supabaseFound = true;
+                  
+                  if (enableDebug) {
+                    addDebugInfo('Global Value Found', \`Key: \${key}, Value: \${val.substring(0, 30)}...\`);
+                  }
+                  
+                  if (val.includes('anon-')) {
+                    insecureAnonymousKeyFound = true;
+                  }
+                  
+                  return { found: true, key: key, value: val, source: 'global_value' };
+                }
+              } catch (e) {
+                // Ignore errors when accessing properties
               }
             }
+            
+            // Check localStorage for Supabase
+            try {
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('supabase')) {
+                  supabaseFound = true;
+                  
+                  if (enableDebug) {
+                    addDebugInfo('LocalStorage Key Found', key);
+                  }
+                  
+                  return { found: true, source: 'localstorage' };
+                }
+                
+                try {
+                  const value = localStorage.getItem(key);
+                  if (value && 
+                      (value.includes('supabase.co') || 
+                       value.includes('anon-') || 
+                       /[a-zA-Z0-9-_]+\.supabase\.co/.test(value))) {
+                    supabaseFound = true;
+                    
+                    if (enableDebug) {
+                      addDebugInfo('LocalStorage Value Found', \`Key: \${key}, Value contains Supabase reference\`);
+                    }
+                    
+                    if (value.includes('anon-')) {
+                      insecureAnonymousKeyFound = true;
+                    }
+                    
+                    return { found: true, source: 'localstorage_value' };
+                  }
+                } catch (e) {
+                  // Ignore errors when parsing localStorage
+                }
+              }
+            } catch (e) {
+              // Ignore localStorage errors
+            }
+            
             return { found: false };
           };
           
           // Execute the detection functions
           const windowResult = findSupabaseInWindow();
-          const scriptsResult = !windowResult.found ? findSupabaseInScripts() : { found: false };
-          const envResult = !windowResult.found && !scriptsResult.found ? findSupabaseInEnv() : { found: false };
+          const domResult = !windowResult.found ? findSupabaseInDOM() : { found: false };
+          const envResult = !windowResult.found && !domResult.found ? findSupabaseInEnv() : { found: false };
+          
+          // Combine the detection results
+          foundDetails = windowResult.found ? windowResult : 
+                        domResult.found ? domResult : 
+                        envResult.found ? envResult : { found: false };
           
           // Summary of findings
-          const supabaseDetected = windowResult.found || scriptsResult.found || envResult.found;
+          const supabaseDetected = windowResult.found || domResult.found || envResult.found;
           
           // Update widget with results
           if (supabaseDetected) {
@@ -376,6 +558,44 @@ export async function GET(
               'Your website is using Supabase for backend functionality.',
               'success'
             );
+            
+            // Add details about how Supabase was detected
+            if (foundDetails.source) {
+              let detectionMethod = '';
+              switch(foundDetails.source) {
+                case 'window_object':
+                  detectionMethod = 'Supabase client found in global scope';
+                  break;
+                case 'script_content':
+                  detectionMethod = 'Supabase references found in script content';
+                  break;
+                case 'script_url_pattern':
+                  detectionMethod = 'Supabase URL pattern detected in script';
+                  break;
+                case 'dom_attributes':
+                  detectionMethod = 'Supabase data attributes found in DOM';
+                  break;
+                case 'network_request':
+                  detectionMethod = 'Network requests to Supabase detected';
+                  break;
+                case 'global_variable':
+                case 'global_value':
+                  detectionMethod = 'Supabase references found in global variables';
+                  break;
+                case 'localstorage':
+                case 'localstorage_value':
+                  detectionMethod = 'Supabase data found in localStorage';
+                  break;
+                default:
+                  detectionMethod = 'Detected through multiple indicators';
+              }
+              
+              addResultItem(
+                'Detection Method', 
+                detectionMethod,
+                'success'
+              );
+            }
             
             // Check for insecure practices
             if (insecureAnonymousKeyFound) {
@@ -419,6 +639,20 @@ export async function GET(
               'Could not detect Supabase in your website. If you are using Supabase and this is incorrect, please contact support.',
               'warning'
             );
+            
+            // Add debug toggle button in case detection failed incorrectly
+            const resultsContainer = document.getElementById('supacheck-results-container');
+            const debugButton = document.createElement('button');
+            debugButton.className = 'supacheck-btn';
+            debugButton.style.backgroundColor = '#64748b';
+            debugButton.style.marginTop = '16px';
+            debugButton.textContent = 'Show Technical Details';
+            debugButton.onclick = () => {
+              const debugInfo = document.getElementById('supacheck-debug-info');
+              debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+              debugButton.textContent = debugInfo.style.display === 'none' ? 'Show Technical Details' : 'Hide Technical Details';
+            };
+            resultsContainer.appendChild(debugButton);
           }
         }, 1500); // Add a slight delay to allow for page load
       };
