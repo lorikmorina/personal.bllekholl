@@ -5,8 +5,3 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-  [[redirects]]
-  from = "/*"
-  to = "/maintenance.html"
-  status = 200
-  conditions = { Host = "securevibing.com" }
