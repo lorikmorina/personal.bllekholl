@@ -73,6 +73,9 @@
   // Keep track of Supabase credentials globally
   window._supabaseAnonKey = null;
 
+  // Store original requests to extract headers directly
+  const originalRequests = new Map();
+
   // Store captured auth tokens from requests
   const capturedAuthTokens = new Map();
 
@@ -1055,17 +1058,54 @@
       
       // Extract auth token from request headers if available
       if (init && init.headers) {
+        // Store original headers for this URL if it's a table request
+        const tableName = extractTableNameFromUrl(url);
+        if (tableName) {
+          originalRequests.set(tableName, {...init});
+        }
+        
         // Handle different header formats
         if (init.headers instanceof Headers) {
           const authHeader = init.headers.get('Authorization');
-          if (authHeader) extractedAuthToken = authHeader;
+          if (authHeader) {
+            // Extract token from Authorization header
+            if (authHeader.startsWith('Bearer ')) {
+              extractedAuthToken = authHeader.substring(7);
+            } else {
+              extractedAuthToken = authHeader;
+            }
+            
+            // Verify it looks like a JWT token
+            if (!looksLikeJWT(extractedAuthToken)) {
+              console.warn("Captured Authorization header doesn't look like a JWT token:", 
+                          extractedAuthToken.length > 50 ? 
+                          extractedAuthToken.substring(0, 10) + '...' : 
+                          extractedAuthToken);
+            }
+          }
           
           // Also capture the apikey if present
           const apiKey = init.headers.get('apikey');
           if (apiKey) window._supabaseAnonKey = apiKey;
         } else if (typeof init.headers === 'object') {
           // Could be in either format: 'Authorization' or lowercase
-          extractedAuthToken = init.headers.Authorization || init.headers.authorization;
+          const authHeader = init.headers.Authorization || init.headers.authorization;
+          if (authHeader) {
+            // Extract token from Authorization header
+            if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+              extractedAuthToken = authHeader.substring(7);
+            } else {
+              extractedAuthToken = authHeader;
+            }
+            
+            // Verify it looks like a JWT token
+            if (!looksLikeJWT(extractedAuthToken)) {
+              console.warn("Captured Authorization header doesn't look like a JWT token:", 
+                          typeof extractedAuthToken === 'string' && extractedAuthToken.length > 50 ? 
+                          extractedAuthToken.substring(0, 10) + '...' : 
+                          extractedAuthToken);
+            }
+          }
           
           // Also capture the apikey if present
           const apiKey = init.headers.apikey || init.headers.ApiKey || init.headers.APIKEY;
@@ -1082,8 +1122,11 @@
           extractedTableName = extractTableNameFromUrl(url);
           if (extractedTableName) {
             capturedAuthTokens.set(extractedTableName, extractedAuthToken);
+            // Log the token length to verify we have the complete token while still keeping it secure
             console.log(`Captured auth token for table '${extractedTableName}'`, {
-              token: extractedAuthToken.substring(0, 5) + '...' 
+              tokenLength: extractedAuthToken.length,
+              tokenPreview: extractedAuthToken.substring(0, 5) + '...' + extractedAuthToken.substring(extractedAuthToken.length - 5),
+              message: "Full token captured (showing only beginning/end for security)"
             });
           }
         }
@@ -1198,6 +1241,11 @@
         // If we have a table name, store the token for that table
         if (this._supaTableName) {
           capturedAuthTokens.set(this._supaTableName, authToken);
+          console.log(`XHR: Captured auth token for table '${this._supaTableName}'`, {
+            tokenLength: authToken.length,
+            tokenPreview: authToken.substring(0, 5) + '...' + authToken.substring(authToken.length - 5),
+            message: "Full token captured (showing only beginning/end for security)"
+          });
         }
       }
       
@@ -1345,63 +1393,151 @@
       
       console.log(`Fetching complete data for '${tableName}' using:`, {
         url: queryUrl,
-        apikey: supabaseKey ? (supabaseKey.length > 10 ? supabaseKey.substring(0, 5) + '...' : supabaseKey) : 'not found',
-        token: formattedToken ? (formattedToken.length > 10 ? formattedToken.substring(0, 5) + '...' : formattedToken) : 'not found'
+        headers: {
+          apikey: supabaseKey ? 
+            `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (length: ${supabaseKey.length})` : 
+            'not found',
+          token: formattedToken ? 
+            `${formattedToken.substring(0, 5)}...${formattedToken.substring(formattedToken.length - 5)} (length: ${formattedToken.length})` : 
+            'not found'
+        },
+        message: "Using full credentials (showing only beginning/end for security)"
       });
       
       // Try the two different ways of authentication to maximize chances of success
       
       // First try: Using just the apikey in both headers
       try {
+        const headers1 = {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        };
+        
+        console.log(`First attempt (${tableName}): Using apikey in both headers`, {
+          method: "GET",
+          url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : ''),
+          headers: {
+            apikey: `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (${supabaseKey.length} chars)`,
+          }
+        });
+        
         const response1 = await fetch(queryUrl, {
           method: 'GET',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
-          }
+          headers: headers1
         });
         
         if (response1.ok) {
           const data = await response1.json();
-          console.log(`Successfully fetched table '${tableName}' using apikey method`);
+          console.log(`✅ SUCCESS: Fetched table '${tableName}' using apikey method (${data.length} rows)`);
           addCompleteTableDataEntry(queryUrl, data, tableName);
           return { url: queryUrl, data, tableName };
+        } else {
+          console.log(`❌ FAILED: First attempt (Status ${response1.status})`);
         }
       } catch (err) {
-        console.error('First attempt failed:', err);
+        console.error('❌ FAILED: First attempt with error:', err);
       }
       
       // Second try: Using the captured token
       try {
+        const headers2 = {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${formattedToken}`,
+          'Content-Type': 'application/json'
+        };
+        
+        console.log(`Second attempt (${tableName}): Using captured token`, {
+          method: "GET",
+          url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : ''),
+          headers: {
+            apikey: `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (${supabaseKey.length} chars)`,
+            token: `${formattedToken.substring(0, 5)}...${formattedToken.substring(formattedToken.length - 5)} (${formattedToken.length} chars)`
+          }
+        });
+        
         const response2 = await fetch(queryUrl, {
           method: 'GET',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${formattedToken}`,
-            'Content-Type': 'application/json'
-          }
+          headers: headers2
         });
         
         if (response2.ok) {
           const data = await response2.json();
-          console.log(`Successfully fetched table '${tableName}' using token method`);
+          console.log(`✅ SUCCESS: Fetched table '${tableName}' using token method (${data.length} rows)`);
+          addCompleteTableDataEntry(queryUrl, data, tableName);
+          return { url: queryUrl, data, tableName };
+        }
+      } catch (error) {
+        console.error('❌ FAILED: Second attempt with error:', error);
+      }
+      
+      // Third try: Using the original request headers if we have them
+      try {
+        // Check if we have the original request saved
+        const originalRequest = originalRequests.get(tableName);
+        if (originalRequest && originalRequest.headers) {
+          console.log(`Third attempt (${tableName}): Using original request headers`, {
+            method: "GET",
+            url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : '')
+          });
+          
+          // Create headers using original request format
+          let headers3;
+          if (originalRequest.headers instanceof Headers) {
+            headers3 = new Headers(originalRequest.headers);
+          } else {
+            headers3 = {...originalRequest.headers};
+          }
+          
+          const response3 = await fetch(queryUrl, {
+            method: 'GET',
+            headers: headers3,
+            credentials: originalRequest.credentials || 'same-origin'
+          });
+          
+          if (response3.ok) {
+            const data = await response3.json();
+            console.log(`✅ SUCCESS: Fetched table '${tableName}' using original headers (${data.length} rows)`);
+            addCompleteTableDataEntry(queryUrl, data, tableName);
+            return { url: queryUrl, data, tableName };
+          } else {
+            console.error(`❌ FAILED: Third attempt (Status ${response3.status})`);
+          }
+        } else {
+          console.log(`Third attempt (${tableName}): Skipped - no original headers available`);
+        }
+      } catch (error) {
+        console.error('❌ FAILED: Third attempt with error:', error);
+      }
+      
+      // If all attempts failed, try a fourth approach with just the API key
+      try {
+        // Just try with the API key alone
+        const response4 = await fetch(queryUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseKey
+          }
+        });
+        
+        if (response4.ok) {
+          const data = await response4.json();
+          console.log(`✅ SUCCESS: Fetched table '${tableName}' using apikey-only method (${data.length} rows)`);
           addCompleteTableDataEntry(queryUrl, data, tableName);
           return { url: queryUrl, data, tableName };
         } else {
-          console.error(`Error fetching table '${tableName}': Status ${response2.status}`);
-          addCompleteTableDataEntry(queryUrl, { 
-            error: `Failed to load data (Status ${response2.status})`,
-            hint: "Check that your RLS policies allow access to this table"
-          }, tableName);
+          console.error(`❌ FAILED: Fourth attempt (Status ${response4.status})`);
         }
       } catch (error) {
-        console.error('Second attempt failed:', error);
-        addCompleteTableDataEntry(queryUrl, { 
-          error: `Exception: ${error.message}`,
-          hint: "Check network console for more details"
-        }, tableName);
+        console.error('❌ FAILED: Fourth attempt with error:', error);
       }
+      
+      // If all attempts failed, show an error
+      console.error(`All attempts failed for table '${tableName}'`);
+      addCompleteTableDataEntry(queryUrl, { 
+        error: `Failed to load data after multiple attempts`,
+        hint: "Check that your RLS policies allow access to this table and your auth tokens are valid"
+      }, tableName);
       
       return null;
     } catch (error) {
@@ -1446,6 +1582,12 @@
     return '';
   }
   
+  // Helper function to determine if a string looks like a JWT token
+  function looksLikeJWT(str) {
+    // Check if string matches JWT format (three base64 sections separated by dots)
+    return typeof str === 'string' && /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*$/.test(str);
+  }
+
   // Add an entry to the complete table data section
   function addCompleteTableDataEntry(url, data, tableName) {
     const tableDataContainer = document.getElementById('supabase-complete-data');
