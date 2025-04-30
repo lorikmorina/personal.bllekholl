@@ -443,7 +443,7 @@ export default function SupabaseCheckTool() {
                 </AlertDescription>
               </Alert>
               
-              {/* Display actual scan results */}
+              {/* In a real implementation, this would show actual scan results */}
               <Card>
                 <CardHeader>
                   <CardTitle>Supabase Security Results</CardTitle>
@@ -452,157 +452,16 @@ export default function SupabaseCheckTool() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {verificationResults ? (
-                    <div className="space-y-6">
-                      {/* Supabase Detection Result */}
-                      <div className="p-4 rounded-lg border bg-card">
-                        <h3 className="text-lg font-semibold mb-2 flex items-center">
-                          <Database className="h-5 w-5 mr-2 text-primary" />
-                          Detection Results
-                        </h3>
-                        
-                        <div className="space-y-3">
-                          <div className="flex items-center text-sm">
-                            <div className={`h-2 w-2 rounded-full mr-2 ${
-                              verificationResults.supabaseDetected ? 'bg-green-500' : 'bg-amber-500'
-                            }`} />
-                            <span className="font-medium">
-                              {verificationResults.supabaseDetected 
-                                ? 'Supabase configuration detected' 
-                                : 'No Supabase configuration automatically detected'}
-                            </span>
-                          </div>
-                          
-                          {verificationResults.matchedUrls && verificationResults.matchedUrls.length > 0 && (
-                            <div className="mt-2 border-t pt-2">
-                              <p className="text-sm font-medium mb-1">Detected Supabase URLs:</p>
-                              <ul className="list-disc pl-5 text-sm space-y-1 text-muted-foreground">
-                                {verificationResults.matchedUrls.map((url: string, index: number) => (
-                                  <li key={index}>{url}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {/* Manual Confirmation Section */}
-                          {!verificationResults.supabaseDetected && (
-                            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800">
-                              <h4 className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-1">
-                                Manual Confirmation Required
-                              </h4>
-                              <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
-                                You mentioned Supabase is used on this page but our automatic detection couldn't find it. This could be because:
-                              </p>
-                              <ul className="list-disc pl-4 text-xs space-y-1 text-amber-700 dark:text-amber-400">
-                                <li>The Supabase client is initialized in a way we couldn't detect</li>
-                                <li>The Supabase URL is dynamically loaded or obfuscated</li>
-                                <li>The Supabase connection happens only on the server side</li>
-                              </ul>
-                              
-                              <div className="mt-3">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
-                                  onClick={() => {
-                                    // Update the results to manually confirm Supabase usage
-                                    setVerificationResults({
-                                      ...verificationResults,
-                                      supabaseDetected: true,
-                                      manuallyConfirmed: true
-                                    });
-                                  }}
-                                >
-                                  Confirm Supabase Usage
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Security Recommendations */}
-                      {(verificationResults.supabaseDetected || verificationResults.manuallyConfirmed) && (
-                        <div className="p-4 rounded-lg border bg-card">
-                          <h3 className="text-lg font-semibold mb-2 flex items-center">
-                            <Shield className="h-5 w-5 mr-2 text-primary" />
-                            Security Recommendations
-                          </h3>
-                          
-                          <div className="space-y-4">
-                            {/* RLS Recommendation */}
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-md">
-                              <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 flex items-center">
-                                <ShieldCheck className="h-4 w-4 mr-1.5 text-blue-500" />
-                                Enable Row Level Security (RLS)
-                              </h4>
-                              <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                                Ensure Row Level Security is enabled for all tables accessed through client-side code. 
-                                RLS is Supabase's primary security mechanism for controlling data access.
-                              </p>
-                            </div>
-                            
-                            {/* Anonymous Key Recommendation */}
-                            <div className="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-md">
-                              <h4 className="text-sm font-medium text-amber-800 dark:text-amber-300 flex items-center">
-                                <Key className="h-4 w-4 mr-1.5 text-amber-500" />
-                                Protect API Keys
-                              </h4>
-                              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                                While anonymous keys are designed for client-side use, ensure they only have the 
-                                minimum permissions needed. Never expose service role keys in frontend code.
-                              </p>
-                            </div>
-                            
-                            {/* Additional Resources */}
-                            <div className="mt-2">
-                              <h4 className="text-sm font-medium mb-2">Additional Resources:</h4>
-                              <ul className="list-disc pl-5 text-xs space-y-1.5 text-muted-foreground">
-                                <li>
-                                  <a 
-                                    href="https://supabase.com/docs/guides/auth/row-level-security" 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline flex items-center"
-                                  >
-                                    Supabase RLS Documentation
-                                    <ExternalLink className="h-3 w-3 ml-1" />
-                                  </a>
-                                </li>
-                                <li>
-                                  <a 
-                                    href="https://supabase.com/docs/guides/auth/auth-helpers" 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline flex items-center"
-                                  >
-                                    Supabase Auth Helpers
-                                    <ExternalLink className="h-3 w-3 ml-1" />
-                                  </a>
-                                </li>
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
-                      <p className="text-muted-foreground text-center">
-                        Loading verification results...
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-muted-foreground mb-4">
+                    The detailed results will appear here after the verification process is complete.
+                  </p>
                   
-                  <div className="mt-4">
-                    <Button 
-                      onClick={() => window.open(`https://${url}`, '_blank')}
-                      className="gap-2"
-                    >
-                      View Active Widget <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button 
+                    onClick={() => window.open(`https://${url}`, '_blank')}
+                    className="gap-2"
+                  >
+                    View Active Widget <ExternalLink className="h-4 w-4" />
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -318,25 +318,6 @@ export async function GET(
                   }
                   return { found: true };
                 }
-                
-                // Also check for objects that might contain Supabase config
-                if (obj && typeof obj === 'object') {
-                  // Check if this object has supabase-related properties
-                  if (obj.supabaseUrl || obj.supabaseKey || 
-                      (obj.url && typeof obj.url === 'string' && obj.url.includes('supabase.co'))) {
-                    supabaseFound = true;
-                    
-                    // Check for exposed keys
-                    if (obj.supabaseKey && (obj.supabaseKey.startsWith('eyJ') || obj.supabaseKey.includes('anon'))) {
-                      insecureAnonymousKeyFound = true;
-                    }
-                    
-                    return {
-                      found: true,
-                      config: obj
-                    };
-                  }
-                }
               } catch (e) {
                 // Ignore errors when accessing properties
               }
@@ -350,11 +331,8 @@ export async function GET(
             for (const script of scripts) {
               const content = script.textContent || '';
               
-              // Check for Supabase URL patterns - improved to detect more patterns
-              if (content.includes('supabase.co') || 
-                  content.includes('supabaseUrl') || 
-                  content.includes('SUPABASE_URL') ||
-                  content.match(/[a-z0-9]+\.supabase\.co/i)) {
+              // Check for Supabase URL patterns
+              if (content.includes('supabase.co') || content.includes('supabaseUrl')) {
                 supabaseFound = true;
                 
                 // Look for potential API keys
@@ -366,36 +344,6 @@ export async function GET(
                 return { found: true };
               }
             }
-            return { found: false };
-          };
-          
-          // NEW: Search for Supabase references in the entire DOM content
-          const findSupabaseInDOM = () => {
-            // Get the entire HTML content
-            const htmlContent = document.documentElement.outerHTML;
-            
-            // Look for Supabase URL patterns in the entire HTML
-            const supabaseUrlRegex = /[a-z0-9]+\.supabase\.co/gi;
-            const supabaseUrlMatches = htmlContent.match(supabaseUrlRegex);
-            
-            if (supabaseUrlMatches && supabaseUrlMatches.length > 0) {
-              supabaseFound = true;
-              return { 
-                found: true, 
-                matches: supabaseUrlMatches,
-                matchCount: supabaseUrlMatches.length
-              };
-            }
-            
-            // Check for other Supabase patterns
-            if (htmlContent.includes('supabase.co') || 
-                htmlContent.includes('supabaseUrl') || 
-                htmlContent.includes('SUPABASE_URL') ||
-                htmlContent.includes('createClient')) {
-              supabaseFound = true;
-              return { found: true };
-            }
-            
             return { found: false };
           };
           
@@ -414,36 +362,20 @@ export async function GET(
           // Execute the detection functions
           const windowResult = findSupabaseInWindow();
           const scriptsResult = !windowResult.found ? findSupabaseInScripts() : { found: false };
-          const domResult = !windowResult.found && !scriptsResult.found ? findSupabaseInDOM() : { found: false };
-          const envResult = !windowResult.found && !scriptsResult.found && !domResult.found ? findSupabaseInEnv() : { found: false };
+          const envResult = !windowResult.found && !scriptsResult.found ? findSupabaseInEnv() : { found: false };
           
           // Summary of findings
-          const supabaseDetected = windowResult.found || scriptsResult.found || domResult.found || envResult.found;
+          const supabaseDetected = windowResult.found || scriptsResult.found || envResult.found;
           
           // Update widget with results
           if (supabaseDetected) {
             updateStatus('success', 'Supabase detected');
             
-            let detectionSource = '';
-            if (windowResult.found) detectionSource = 'JavaScript objects';
-            else if (scriptsResult.found) detectionSource = 'script tags';
-            else if (domResult.found) detectionSource = 'page content';
-            else if (envResult.found) detectionSource = 'environment variables';
-            
             addResultItem(
               'Supabase Integration Detected', 
-              `Your website is using Supabase for backend functionality. Detection method: ${detectionSource}`,
+              'Your website is using Supabase for backend functionality.',
               'success'
             );
-            
-            // If we found Supabase URLs in the DOM, show them
-            if (domResult.found && domResult.matches) {
-              addResultItem(
-                'Supabase URLs Found',
-                `Found ${domResult.matchCount} reference(s) to Supabase URLs in your page content.`,
-                'info'
-              );
-            }
             
             // Check for insecure practices
             if (insecureAnonymousKeyFound) {
@@ -467,27 +399,18 @@ export async function GET(
             verifyButton.className = 'supacheck-btn';
             verifyButton.textContent = 'Send Verification to Dashboard';
             verifyButton.style.marginTop = '16px';
-            resultsContainer.appendChild(verifyButton);
-            
-            // Setup verification click handler
-            verifyButton.addEventListener('click', function() {
-              // Show loading state
+            verifyButton.onclick = () => {
+              // In a real implementation, this would send data to your server
               verifyButton.innerHTML = '<div class="supacheck-loader"></div>Verifying...';
               verifyButton.disabled = true;
               
-              // Collect findings to send back
-              const findings = {
-                url: window.location.href,
-                supabaseDetected: supabaseDetected,
-                matchedUrls: domResult.matches ? domResult.matches.slice(0, 5) : []
-              };
-              
-              // Send data to server
-              setTimeout(function() {
+              // Simulate sending verification data
+              setTimeout(() => {
                 verifyButton.innerHTML = 'Verification Complete ✓';
                 updateStatus('success', 'Verification sent successfully');
               }, 1500);
-            });
+            };
+            resultsContainer.appendChild(verifyButton);
             
           } else {
             updateStatus('warning', 'No Supabase configuration detected');
