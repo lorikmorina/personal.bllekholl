@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Globe, Home, Settings, CreditCard } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Globe, Home, Settings, CreditCard, Database } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "./DashboardProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -173,6 +173,22 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <div className="flex items-center">
                   <Shield className="w-5 h-5 mr-3" />
                   <span>Light Scan</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              
+              {/* Supabase Check Tool - New button */}
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'supabase-check' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('supabase-check')}
+              >
+                <div className="flex items-center">
+                  <Database className="w-5 h-5 mr-3" />
+                  <span>Supabase Check</span>
                 </div>
                 <ChevronRight className="w-4 h-4" />
               </button>
