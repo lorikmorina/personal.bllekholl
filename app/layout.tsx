@@ -44,19 +44,7 @@ export default function RootLayout({
         async
         />
         
-        {/* Hotjar Tracking Code */}
-        <Script id="hotjar-tracking" strategy="afterInteractive">
-          {`
-            (function(h,o,t,j,a,r){
-                h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-                h._hjSettings={hjid:6379589,hjsv:6};
-                a=o.getElementsByTagName('head')[0];
-                r=o.createElement('script');r.async=1;
-                r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-                a.appendChild(r);
-            })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
-          `}
-        </Script>
+       
 
         
         
@@ -80,13 +68,7 @@ export default function RootLayout({
           <main>{children}</main>
           <Footer />
         </ThemeProvider>
-        {/* Datafa.st Script */}
-        <Script 
-          strategy="afterInteractive" 
-          data-website-id="680bacd74af86c80870875e8"
-          data-domain="securevibing.com"
-          src="https://datafa.st/js/script.js"
-        />
+        
       </body>
     </html>
   )

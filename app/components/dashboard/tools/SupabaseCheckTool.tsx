@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Shield, ShieldCheck, Copy, ExternalLink, Database, Check, Key } from "lucide-react"
+import { Loader2, Shield, ShieldCheck, Copy, ExternalLink, Database, Check, Key, Network, Fingerprint } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useDashboard } from "../DashboardProvider"
 import PaywallModal from "../PaywallModal"
+import SupabaseNetworkMonitor from "./SupabaseNetworkMonitor"
 
 export default function SupabaseCheckTool() {
   const [url, setUrl] = useState("")
@@ -179,9 +180,9 @@ export default function SupabaseCheckTool() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Supabase Detector</CardTitle>
+          <CardTitle className="text-2xl">Supabase Security Inspector</CardTitle>
           <CardDescription>
-            Add a simple script to your website to detect if it's using Supabase and identify potential security concerns.
+            Add a script to your website to detect Supabase usage, monitor network requests, and identify potential security concerns.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -266,10 +267,56 @@ export default function SupabaseCheckTool() {
                     <li>Enter your website URL and generate a verification script</li>
                     <li>Add the script to your website's HTML (preferably in the head section)</li>
                     <li>The script will automatically scan your site for Supabase usage</li>
-                    <li>A widget will appear showing if Supabase is detected and any potential issues</li>
+                    <li>It monitors network requests to identify Supabase endpoints and authorization tokens</li>
+                    <li>Captures and displays user information retrieved during page loads</li>
+                    <li>Results appear in an interactive widget directly on your site</li>
                   </ol>
                 </AlertDescription>
               </Alert>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                <Card className="bg-muted/30">
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm flex items-center">
+                      <Fingerprint className="h-4 w-4 mr-2" />
+                      Static Detection
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="py-2 px-4">
+                    <p className="text-xs text-muted-foreground">
+                      Scans your website's HTML and scripts for Supabase endpoints and API keys.
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-muted/30">
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm flex items-center">
+                      <Network className="h-4 w-4 mr-2" />
+                      Network Monitoring
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="py-2 px-4">
+                    <p className="text-xs text-muted-foreground">
+                      Captures requests to Supabase endpoints, including authentication headers.
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-muted/30">
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      User Data Analysis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="py-2 px-4">
+                    <p className="text-xs text-muted-foreground">
+                      Extracts and visualizes user information retrieved from Supabase responses.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
             
             <TabsContent value="install" className="space-y-4 mt-4">
@@ -298,15 +345,23 @@ export default function SupabaseCheckTool() {
                   </div>
                   
                   <Alert>
-                    <AlertTitle>How the Detector Works</AlertTitle>
+                    <AlertTitle>Enhanced Security Inspector Features</AlertTitle>
                     <AlertDescription>
-                      <p className="mb-2 text-sm">The script functions by:</p>
+                      <p className="mb-2 text-sm">The security inspector provides three main functions:</p>
                       <ol className="list-decimal ml-5 space-y-2 text-sm">
-                        <li>Scanning your website's HTML for Supabase-related scripts and configurations</li>
-                        <li>Detecting Supabase client libraries, API endpoints, and authentication methods</li>
-                        <li>Identifying potential security issues like exposed API keys or misconfigured permissions</li>
-                        <li>Displaying results directly on your site via a small, unobtrusive widget</li>
+                        <li>
+                          <span className="font-medium">Static Detection:</span> Scans your website's code for Supabase-related scripts, endpoints, and API keys
+                        </li>
+                        <li>
+                          <span className="font-medium">Network Monitoring:</span> Captures all requests to Supabase endpoints, including authentication tokens and headers
+                        </li>
+                        <li>
+                          <span className="font-medium">User Data Analysis:</span> Shows what user information is being retrieved from Supabase when a page loads or during authentication
+                        </li>
                       </ol>
+                      <p className="mt-3 text-sm">
+                        Once installed, refresh your website and interact with it as normal. The widget will appear in the bottom-right corner and expand with detailed information when clicked.
+                      </p>
                     </AlertDescription>
                   </Alert>
                   
@@ -326,6 +381,9 @@ export default function SupabaseCheckTool() {
           </Tabs>
         </CardContent>
       </Card>
+      
+      {/* Network Monitor Demo */}
+      <SupabaseNetworkMonitor />
       
       {/* Paywall Modal */}
       <PaywallModal
