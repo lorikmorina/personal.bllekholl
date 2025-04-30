@@ -35,10 +35,11 @@
       background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: sans-serif;
       z-index: 9999; overflow: hidden; transition: all 0.3s ease; color: #1a202c;
+      max-height: 80vh; display: flex; flex-direction: column;
     `;
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding: 10px 15px; background: #3182ce; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer;';
+    header.style.cssText = 'padding: 10px 15px; background: #3182ce; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
     header.textContent = 'Supabase Security Check';
     header.onclick = () => {
       const content = document.getElementById('supabase-check-content');
@@ -54,7 +55,7 @@
 
     const content = document.createElement('div');
     content.id = 'supabase-check-content';
-    content.style.cssText = 'padding: 15px;';
+    content.style.cssText = 'padding: 15px; overflow-y: auto; flex-grow: 1;';
     container.appendChild(content);
 
     document.body.appendChild(container);
@@ -136,7 +137,7 @@
     return requestsContainer;
   }
 
-  // Add a section for discovered tables
+  // Create a section for discovered tables
   function createTablesSection() {
     const sectionEl = document.createElement('div');
     sectionEl.id = 'supabase-tables-section';
@@ -260,6 +261,7 @@
             const pathPart = parts[1].split('?')[0].split('/')[0];
             if (pathPart && pathPart !== 'auth') {
               tableNames.add(pathPart);
+              // These tables from performance entries actually exist
               addTableEntry(pathPart, url);
             }
           }
@@ -319,18 +321,25 @@
     return Array.from(tables);
   }
 
-  // Check if RLS is enabled for tables
-  async function checkRLS(supabaseUrl, supabaseKey, additionalTables = []) {
+  // Verify if tables exist and check RLS
+  async function verifyTablesAndCheckRLS(supabaseUrl, supabaseKey, tablesToVerify = []) {
     // Common tables to check, plus any discovered tables
     const tablesToCheck = [
       ...new Set([
-        ...additionalTables,
+        ...tablesToVerify,
         "profiles", "users", "accounts", "customers", 
         "orders", "products", "posts", "comments"
       ])
     ];
     
     let anyTableWithDisabledRLS = false;
+    const existingTables = new Set();
+    
+    // First, clean up any tables section since we'll repopulate
+    const tablesSection = document.getElementById('supabase-tables');
+    if (tablesSection) {
+      tablesSection.innerHTML = '';
+    }
     
     try {
       for (const table of tablesToCheck) {
@@ -345,22 +354,28 @@
           
           if (response.ok) {
             const data = await response.json();
-            // If we can fetch more than 1 row with just the anon key, RLS is likely disabled
+            // This table exists - add it to our UI
+            existingTables.add(table);
+            addTableEntry(table, `${supabaseUrl}/rest/v1/${table}?select=*&limit=10`);
+            
+            // Check RLS while we're at it
             if (Array.isArray(data) && data.length > 1) {
               anyTableWithDisabledRLS = true;
-              break;
             }
           }
         } catch (tableError) {
-          // Skip tables that don't exist or other errors
+          // Table doesn't exist or other error, don't add to UI
           continue;
         }
       }
       
-      return !anyTableWithDisabledRLS;
+      return { 
+        rlsConfigured: !anyTableWithDisabledRLS, 
+        existingTables: Array.from(existingTables)
+      };
     } catch (error) {
       // If we can't check RLS, assume it's configured properly
-      return true;
+      return { rlsConfigured: true, existingTables: [] };
     }
   }
 
@@ -606,8 +621,8 @@
       // Start monitoring network requests and discover tables
       const discoveredTables = monitorNetworkRequests(supabaseUrl);
       
-      // Check RLS if credentials were found, using discovered tables
-      const rlsConfigured = await checkRLS(supabaseUrl, supabaseKey, discoveredTables);
+      // Verify tables and check RLS
+      const { rlsConfigured, existingTables } = await verifyTablesAndCheckRLS(supabaseUrl, supabaseKey, discoveredTables);
       addStatusItem('Row Level Security', rlsConfigured ? 'Configured' : 'Not Configured', rlsConfigured);
     } else {
       addStatusItem('Supabase', 'Not Found', true);
