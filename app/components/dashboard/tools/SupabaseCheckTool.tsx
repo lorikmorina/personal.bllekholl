@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -14,15 +14,11 @@ import PaywallModal from "../PaywallModal"
 
 export default function SupabaseCheckTool() {
   const [url, setUrl] = useState("")
-  const [generatedScriptId, setGeneratedScriptId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
-  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'pending' | 'verified' | 'failed'>('idle')
-  const [verificationResults, setVerificationResults] = useState<any>(null)
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null)
   const [activeTab, setActiveTab] = useState("generate")
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isPaywallOpen, setIsPaywallOpen] = useState(false)
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const { user } = useDashboard()
@@ -98,42 +94,11 @@ export default function SupabaseCheckTool() {
     return { valid: true, formattedUrl: url };
   };
 
-  // Fetch user profile to check subscription status
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) return
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        
-        if (error) throw error
-        
-        setUserProfile(data)
-      } catch (error) {
-        console.error('Error fetching user profile:', error)
-      } finally {
-        setIsLoadingProfile(false)
-      }
-    }
-    
-    fetchUserProfile()
-  }, [user, supabase])
-
-  // Generate a unique script ID for the user
-  const generateUniqueScriptId = async () => {
-    // Simple random ID generation - in production you might want something more robust
-    const randomId = `supacheck_${Math.random().toString(36).substring(2, 15)}_${Date.now().toString(36)}`;
-    return randomId;
-  }
-
   // Generate the script tag that users will install
-  const generateScriptTag = (scriptId: string) => {
-    const scriptUrl = `${window.location.origin}/api/supacheck/script/${scriptId}`;
-    return `<script src="${scriptUrl}" id="${scriptId}" async></script>`;
+  const generateScriptTag = () => {
+    // Simplified script tag that doesn't need an ID
+    const scriptUrl = `${window.location.origin}/api/supacheck/script`;
+    return `<script src="${scriptUrl}" async></script>`;
   }
 
   // Handle URL validation and script generation
@@ -161,19 +126,7 @@ export default function SupabaseCheckTool() {
         processedUrl = `https://${processedUrl}`;
       }
       
-      // Generate a unique script ID
-      const scriptId = await generateUniqueScriptId();
-      
-      // In a real implementation, you would save this script ID and URL association to your database
-      // For example:
-      // await supabase.from('supacheck_scripts').insert({
-      //   user_id: user.id,
-      //   script_id: scriptId,
-      //   url: processedUrl,
-      //   created_at: new Date()
-      // });
-      
-      setGeneratedScriptId(scriptId);
+      // No need to generate a unique script ID or save anything to the database
       setActiveTab("install");
       
     } catch (error: any) {
@@ -209,9 +162,7 @@ export default function SupabaseCheckTool() {
 
   // Copy script tag to clipboard
   const copyScriptToClipboard = () => {
-    if (!generatedScriptId) return;
-    
-    const scriptTag = generateScriptTag(generatedScriptId);
+    const scriptTag = generateScriptTag();
     navigator.clipboard.writeText(scriptTag);
     
     setCopied(true);
@@ -224,66 +175,20 @@ export default function SupabaseCheckTool() {
     setUrl(cleanedUrl);
   }
 
-  // Add polling logic to check verification status
-  useEffect(() => {
-    // Only start polling if we've generated a script ID
-    if (generatedScriptId && activeTab === "install") {
-      setVerificationStatus('pending');
-      
-      // Start polling for verification status
-      const interval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/supacheck/verify?scriptId=${generatedScriptId}`);
-          const data = await response.json();
-          
-          if (data.status === 'verified') {
-            setVerificationStatus('verified');
-            setVerificationResults(data.results);
-            clearInterval(interval);
-            setPollingInterval(null);
-            
-            // Move to the results tab
-            setActiveTab('verify');
-          }
-        } catch (error) {
-          console.error('Error checking verification status:', error);
-        }
-      }, 5000); // Check every 5 seconds
-      
-      setPollingInterval(interval);
-      
-      // Clean up interval when component unmounts or when tab changes
-      return () => {
-        clearInterval(interval);
-        setPollingInterval(null);
-      };
-    }
-  }, [generatedScriptId, activeTab]);
-
-  // Clear polling when leaving the component
-  useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [pollingInterval]);
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Supabase Security Checker</CardTitle>
+          <CardTitle className="text-2xl">Supabase Detector</CardTitle>
           <CardDescription>
-            Verify ownership of your website and analyze its Supabase configuration for security vulnerabilities.
+            Add a simple script to your website to detect if it's using Supabase and identify potential security concerns.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="generate">Generate Script</TabsTrigger>
-              <TabsTrigger value="install" disabled={!generatedScriptId}>Install</TabsTrigger>
-              <TabsTrigger value="verify" disabled={!generatedScriptId || verificationStatus !== 'verified'}>Results</TabsTrigger>
+              <TabsTrigger value="install">Install &amp; Usage</TabsTrigger>
             </TabsList>
             
             <TabsContent value="generate" className="space-y-4 mt-4">
@@ -360,16 +265,14 @@ export default function SupabaseCheckTool() {
                   <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
                     <li>Enter your website URL and generate a verification script</li>
                     <li>Add the script to your website's HTML (preferably in the head section)</li>
-                    <li>Once verified, our tool will display a small widget on your site's left side</li>
-                    <li>The widget will scan your site for Supabase security issues</li>
-                    <li>View detailed results and fix recommendations</li>
+                    <li>The script will automatically scan your site for Supabase usage</li>
+                    <li>A widget will appear showing if Supabase is detected and any potential issues</li>
                   </ol>
                 </AlertDescription>
               </Alert>
             </TabsContent>
             
             <TabsContent value="install" className="space-y-4 mt-4">
-              {generatedScriptId && (
                 <>
                   <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                     <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -381,7 +284,7 @@ export default function SupabaseCheckTool() {
                   
                   <div className="relative">
                     <pre className="p-4 bg-muted rounded-md overflow-x-auto text-sm font-mono">
-                      {generateScriptTag(generatedScriptId)}
+                      {generateScriptTag()}
                     </pre>
                     <Button 
                       size="sm" 
@@ -395,28 +298,17 @@ export default function SupabaseCheckTool() {
                   </div>
                   
                   <Alert>
-                    <AlertTitle>Next Steps</AlertTitle>
+                    <AlertTitle>How the Detector Works</AlertTitle>
                     <AlertDescription>
-                      <ol className="list-decimal ml-5 mt-2 space-y-2 text-sm">
-                        <li>Add the script to your website's HTML</li>
-                        <li>Visit your website to activate the verification</li>
-                        <li>The verification process will start automatically</li>
-                        <li>A small widget will appear on the left side of your page</li>
-                        <li>Return here after verification to see detailed results</li>
+                      <p className="mb-2 text-sm">The script functions by:</p>
+                      <ol className="list-decimal ml-5 space-y-2 text-sm">
+                        <li>Scanning your website's HTML for Supabase-related scripts and configurations</li>
+                        <li>Detecting Supabase client libraries, API endpoints, and authentication methods</li>
+                        <li>Identifying potential security issues like exposed API keys or misconfigured permissions</li>
+                        <li>Displaying results directly on your site via a small, unobtrusive widget</li>
                       </ol>
                     </AlertDescription>
                   </Alert>
-                  
-                  {/* Add verification status indicator */}
-                  {verificationStatus === 'pending' && (
-                    <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
-                      <Loader2 className="h-4 w-4 text-amber-600 dark:text-amber-400 animate-spin" />
-                      <AlertTitle className="text-amber-800 dark:text-amber-400">Waiting for Verification</AlertTitle>
-                      <AlertDescription className="text-amber-700 dark:text-amber-300">
-                        Please add the script to your website and interact with the widget. We're checking for verification every 5 seconds.
-                      </AlertDescription>
-                    </Alert>
-                  )}
                   
                   <div className="flex justify-between mt-6">
                     <Button variant="outline" onClick={() => setActiveTab("generate")}>
@@ -430,40 +322,6 @@ export default function SupabaseCheckTool() {
                     </Button>
                   </div>
                 </>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="verify" className="space-y-4 mt-4">
-              {/* This tab will show results after verification is complete */}
-              <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <AlertTitle className="text-green-800 dark:text-green-400">Website Verified</AlertTitle>
-                <AlertDescription className="text-green-700 dark:text-green-300">
-                  Your website has been successfully verified. View the Supabase security scan results below.
-                </AlertDescription>
-              </Alert>
-              
-              {/* In a real implementation, this would show actual scan results */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Supabase Security Results</CardTitle>
-                  <CardDescription>
-                    The widget is now active on your website and continuously monitoring Supabase security.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    The detailed results will appear here after the verification process is complete.
-                  </p>
-                  
-                  <Button 
-                    onClick={() => window.open(`https://${url}`, '_blank')}
-                    className="gap-2"
-                  >
-                    View Active Widget <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </CardContent>

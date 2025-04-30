@@ -19,155 +19,148 @@ export async function GET(
   }
   
   // Define the script content that will be injected into the client's website
-  // Using IIFE with named function for better error stacktraces
+  // The key change is to avoid nested function definitions with var declarations
   const scriptContent = `
-    (function SupacheckScanner() {
-      // Use a more unique namespace to avoid collisions
+    (function() {
+      // Ensure we don't initialize multiple times
       if (window.__SUPACHECK_SCANNER_${id}) return;
       window.__SUPACHECK_SCANNER_${id} = true;
       
-      // Config object with script ID
-      var config = {
-        scriptId: "${id}",
-        apiEndpoint: "${process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin}/api/supacheck/verify"
-      };
-      
-      // Error handling function
+      // Error handling - define at top level to avoid nesting issues
       function logError(message, error) {
         console.error("[Supacheck] " + message, error);
       }
       
-      try {
-        // Create a minimal floating indicator - using function declaration for better compatibility
-        function createIndicator(found, urls) {
-          urls = urls || [];
-          var indicator = document.createElement('div');
-          indicator.style.position = 'fixed';
-          indicator.style.bottom = '20px';
-          indicator.style.right = '20px';
-          indicator.style.padding = '10px 15px';
-          indicator.style.borderRadius = '5px';
-          indicator.style.fontSize = '14px';
-          indicator.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-          indicator.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-          indicator.style.cursor = 'pointer';
-          indicator.style.zIndex = '999999';
+      // Create indicator function - defined at top level
+      function createIndicator(found, urls) {
+        urls = urls || [];
+        var indicator = document.createElement('div');
+        indicator.style.position = 'fixed';
+        indicator.style.bottom = '20px';
+        indicator.style.right = '20px';
+        indicator.style.padding = '10px 15px';
+        indicator.style.borderRadius = '5px';
+        indicator.style.fontSize = '14px';
+        indicator.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        indicator.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+        indicator.style.cursor = 'pointer';
+        indicator.style.zIndex = '999999';
+        
+        if (found) {
+          indicator.style.backgroundColor = '#f0fdf4';
+          indicator.style.color = '#166534';
+          indicator.style.border = '1px solid #dcfce7';
+          indicator.textContent = 'Supabase links found: ' + urls.length;
           
-          if (found) {
-            indicator.style.backgroundColor = '#f0fdf4';
-            indicator.style.color = '#166534';
-            indicator.style.border = '1px solid #dcfce7';
-            indicator.textContent = 'Supabase links found: ' + urls.length;
-            
-            // Show details on click - using function for compatibility
-            indicator.addEventListener('click', function() {
-              alert('Supabase URLs found:\\n\\n' + urls.join('\\n'));
-            });
-          } else {
-            indicator.style.backgroundColor = '#f3f4f6';
-            indicator.style.color = '#374151';
-            indicator.style.border = '1px solid #e5e7eb';
-            indicator.textContent = 'No Supabase links found';
-          }
-          
-          document.body.appendChild(indicator);
+          indicator.addEventListener('click', function() {
+            alert('Supabase URLs found:\\n\\n' + urls.join('\\n'));
+          });
+        } else {
+          indicator.style.backgroundColor = '#f3f4f6';
+          indicator.style.color = '#374151';
+          indicator.style.border = '1px solid #e5e7eb';
+          indicator.textContent = 'No Supabase links found';
         }
         
-        // Function to find Supabase links in JS files
-        function findSupabaseLinks() {
-          // Pattern to match <hash>.supabase.co
-          var supabasePattern = /[a-zA-Z0-9-_]+\\.supabase\\.co/g;
+        document.body.appendChild(indicator);
+      }
+      
+      // XHR helper function - defined at top level
+      function fetchContent(url, callback) {
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                callback(xhr.responseText);
+              }
+            }
+          };
+          xhr.send();
+        } catch (err) {
+          // Silently fail
+        }
+      }
+      
+      // Main scanner function - now all helper functions are defined before use
+      function scanForSupabaseLinks() {
+        try {
+          // Pattern to match <hash>.supabase.co - using single backslash and properly escaped
+          var supabasePattern = /[a-zA-Z0-9\-_]+\.supabase\.co/g;
           var foundUrls = [];
           
-          // 1. Scan all script tags on the page
-          function scanScriptTags() {
-            try {
-              var scripts = document.querySelectorAll('script');
-              for (var i = 0; i < scripts.length; i++) {
-                var script = scripts[i];
-                // Check script content
-                var content = script.textContent || '';
-                var matches = content.match(supabasePattern);
-                if (matches) {
-                  for (var j = 0; j < matches.length; j++) {
-                    // Add to array if not already there
-                    if (foundUrls.indexOf(matches[j]) === -1) {
-                      foundUrls.push(matches[j]);
-                    }
-                  }
-                }
-                
-                // Check script src if it's pointing to a JavaScript file
-                var src = script.getAttribute('src');
-                if (src && src.endsWith('.js')) {
-                  fetchAndScanExternalJS(src);
+          // Get all script tags
+          var scripts = document.querySelectorAll('script');
+          for (var i = 0; i < scripts.length; i++) {
+            // Check inline content
+            var content = scripts[i].textContent || '';
+            var matches = content.match(supabasePattern);
+            if (matches) {
+              for (var j = 0; j < matches.length; j++) {
+                if (foundUrls.indexOf(matches[j]) === -1) {
+                  foundUrls.push(matches[j]);
                 }
               }
-            } catch (err) {
-              logError("Error scanning script tags:", err);
             }
-          }
-          
-          // 2. Fetch and scan external JS files
-          function fetchAndScanExternalJS(url) {
-            try {
-              var xhr = new XMLHttpRequest();
-              xhr.open('GET', url, true);
-              xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                  if (xhr.status === 200) {
-                    var content = xhr.responseText;
-                    var matches = content.match(supabasePattern);
-                    if (matches) {
-                      for (var j = 0; j < matches.length; j++) {
-                        // Add to array if not already there
-                        if (foundUrls.indexOf(matches[j]) === -1) {
-                          foundUrls.push(matches[j]);
-                        }
+            
+            // Check external scripts
+            var src = scripts[i].getAttribute('src');
+            if (src && src.endsWith('.js')) {
+              // Use a closure to handle the async XHR properly
+              (function(scriptSrc) {
+                fetchContent(scriptSrc, function(content) {
+                  var matches = content.match(supabasePattern);
+                  if (matches) {
+                    for (var j = 0; j < matches.length; j++) {
+                      if (foundUrls.indexOf(matches[j]) === -1) {
+                        foundUrls.push(matches[j]);
+                        // Update UI immediately when new URL is found
+                        createIndicator(true, foundUrls);
                       }
                     }
                   }
-                }
-              };
-              xhr.send();
-            } catch (err) {
-              // Silently fail for external resources
+                });
+              })(src);
             }
           }
           
-          // 3. Find dynamically loaded scripts by looking at all links on the page
-          function scanForJSLinks() {
-            try {
-              var links = document.querySelectorAll('a[href], link[href]');
-              for (var i = 0; i < links.length; i++) {
-                var link = links[i];
-                var href = link.getAttribute('href');
-                if (href && href.endsWith('.js')) {
-                  fetchAndScanExternalJS(href);
-                }
-              }
-            } catch (err) {
-              logError("Error scanning for JS links:", err);
+          // Get all JS links
+          var links = document.querySelectorAll('a[href], link[href]');
+          for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href');
+            if (href && href.endsWith('.js')) {
+              // Use a closure to handle the async XHR properly
+              (function(linkHref) {
+                fetchContent(linkHref, function(content) {
+                  var matches = content.match(supabasePattern);
+                  if (matches) {
+                    for (var j = 0; j < matches.length; j++) {
+                      if (foundUrls.indexOf(matches[j]) === -1) {
+                        foundUrls.push(matches[j]);
+                        // Update UI immediately when new URL is found
+                        createIndicator(true, foundUrls);
+                      }
+                    }
+                  }
+                });
+              })(href);
             }
           }
           
-          // Run all the scanners
-          scanScriptTags();
-          scanForJSLinks();
-          
-          // After a delay to allow async operations to complete, show results
+          // Show initial results (may be updated later by async callbacks)
           setTimeout(function() {
             createIndicator(foundUrls.length > 0, foundUrls);
-          }, 2000);
+          }, 1000);
+        } catch (err) {
+          logError("Error scanning for Supabase links:", err);
+          // Show error indicator
+          createIndicator(false, []);
         }
-        
-        // Start the detection process with a small delay to ensure DOM is ready
-        setTimeout(function() {
-          findSupabaseLinks();
-        }, 500);
-      } catch (err) {
-        logError("Critical initialization error:", err);
       }
+      
+      // Start scanning with a small delay
+      setTimeout(scanForSupabaseLinks, 500);
     })();
   `;
   
