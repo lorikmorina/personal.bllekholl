@@ -23,6 +23,13 @@ export async function GET(request: NextRequest) {
       function createIndicator(found, details) {
         var results = details || { urls: [], keys: [], issues: [] };
         
+        console.log("[SupaCheck] Creating widget with status:", { 
+          found: found, 
+          urlsCount: results.urls.length,
+          keysCount: results.keys.length,
+          issuesCount: results.issues.length
+        });
+        
         // Create widget container
         widget = document.createElement('div');
         widget.style.position = 'fixed';
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
         widget.style.borderRadius = '8px';
         widget.style.fontSize = '14px';
         widget.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-        widget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.15)';
+        widget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
         widget.style.cursor = 'pointer';
         widget.style.zIndex = '999999';
         widget.style.transition = 'all 0.3s ease';
@@ -40,6 +47,7 @@ export async function GET(request: NextRequest) {
         widget.style.backgroundColor = '#f0fdf4';
         widget.style.color = '#166534';
         widget.style.border = '1px solid #dcfce7';
+        widget.setAttribute('title', 'Click to expand Supabase detection details');
         
         // Create tabs container
         var tabsContainer = document.createElement('div');
@@ -90,12 +98,13 @@ export async function GET(request: NextRequest) {
           header.appendChild(title);
           
           var count = document.createElement('span');
+          count.className = 'supacheck-count';
           count.style.backgroundColor = '#bbf7d0';
           count.style.color = '#166534';
           count.style.padding = '2px 6px';
           count.style.borderRadius = '9999px';
           count.style.fontSize = '12px';
-          count.textContent = results.urls.length.toString();
+          count.textContent = (results.urls.length + results.issues.length).toString();
           header.appendChild(count);
           
           widget.appendChild(header);
@@ -572,6 +581,8 @@ export async function GET(request: NextRequest) {
       // Main scanner function
       function scanForSupabase() {
         try {
+          console.log("[SupaCheck] Starting Supabase scanner...");
+          
           var results = {
             urls: [],
             keys: [],
@@ -582,7 +593,7 @@ export async function GET(request: NextRequest) {
           var supabaseUrlPattern = /[a-zA-Z0-9\-_]+\.supabase\.co/g;
           
           // Pattern to match potential Supabase keys (anon and service_role)
-          var supabaseKeyPattern = /eyJ[a-zA-Z0-9_\-\.]+/g;
+          var supabaseKeyPattern = /eyJ[a-zA-Z0-9_.\-]{20,}(?:[a-zA-Z0-9+/]+=*)?/g;
           
           // Check for common Supabase package names
           var supabasePackages = [
@@ -619,56 +630,64 @@ export async function GET(request: NextRequest) {
             
             var foundIndicator = false;
             
-            // Check for Supabase URLs
-            var urlMatches = content.match(supabaseUrlPattern);
-            if (urlMatches) {
-              for (var j = 0; j < urlMatches.length; j++) {
-                if (results.urls.indexOf(urlMatches[j]) === -1) {
-                  results.urls.push(urlMatches[j]);
-                  foundIndicator = true;
-                  supabaseFound = true;
-                }
-              }
-            }
-            
-            // Check for potential API keys
-            var keyMatches = content.match(supabaseKeyPattern);
-            if (keyMatches) {
-              for (var j = 0; j < keyMatches.length; j++) {
-                if (results.keys.indexOf(keyMatches[j]) === -1) {
-                  results.keys.push(keyMatches[j]);
-                  foundIndicator = true;
-                  supabaseFound = true;
-                  
-                  // Mark as potential issue
-                  if (results.issues.indexOf('Potentially exposed API key') === -1) {
-                    results.issues.push('Potentially exposed API key');
+            try {
+              // Check for Supabase URLs
+              var urlMatches = content.match(supabaseUrlPattern);
+              if (urlMatches) {
+                console.log("[SupaCheck] Found Supabase URLs:", urlMatches);
+                for (var j = 0; j < urlMatches.length; j++) {
+                  if (results.urls.indexOf(urlMatches[j]) === -1) {
+                    results.urls.push(urlMatches[j]);
+                    foundIndicator = true;
+                    supabaseFound = true;
                   }
                 }
               }
-            }
-            
-            // Check for package imports and common patterns
-            for (var i = 0; i < supabasePackages.length; i++) {
-              if (content.includes(supabasePackages[i])) {
-                if (results.issues.indexOf('Supabase package detected: ' + supabasePackages[i]) === -1) {
-                  results.issues.push('Supabase package detected: ' + supabasePackages[i]);
-                  foundIndicator = true;
-                  supabaseFound = true;
+              
+              // Check for potential API keys
+              var keyMatches = content.match(supabaseKeyPattern);
+              if (keyMatches) {
+                console.log("[SupaCheck] Found potential Supabase keys:", keyMatches.length);
+                for (var j = 0; j < keyMatches.length; j++) {
+                  if (results.keys.indexOf(keyMatches[j]) === -1) {
+                    results.keys.push(keyMatches[j]);
+                    foundIndicator = true;
+                    supabaseFound = true;
+                    
+                    // Mark as potential issue
+                    if (results.issues.indexOf('Potentially exposed API key') === -1) {
+                      results.issues.push('Potentially exposed API key');
+                    }
+                  }
                 }
               }
-            }
-            
-            // Check for common Supabase usage patterns
-            for (var i = 0; i < supabaseIdentifiers.length; i++) {
-              if (content.includes(supabaseIdentifiers[i])) {
-                if (results.issues.indexOf('Supabase usage pattern detected') === -1) {
-                  results.issues.push('Supabase usage pattern detected');
-                  foundIndicator = true;
-                  supabaseFound = true;
+              
+              // Check for package imports and common patterns
+              for (var i = 0; i < supabasePackages.length; i++) {
+                if (content.includes(supabasePackages[i])) {
+                  console.log("[SupaCheck] Found Supabase package:", supabasePackages[i]);
+                  if (results.issues.indexOf('Supabase package detected: ' + supabasePackages[i]) === -1) {
+                    results.issues.push('Supabase package detected: ' + supabasePackages[i]);
+                    foundIndicator = true;
+                    supabaseFound = true;
+                  }
                 }
-                break; // One pattern is enough
               }
+              
+              // Check for common Supabase usage patterns
+              for (var i = 0; i < supabaseIdentifiers.length; i++) {
+                if (content.includes(supabaseIdentifiers[i])) {
+                  console.log("[SupaCheck] Found Supabase identifier:", supabaseIdentifiers[i]);
+                  if (results.issues.indexOf('Supabase usage pattern detected') === -1) {
+                    results.issues.push('Supabase usage pattern detected');
+                    foundIndicator = true;
+                    supabaseFound = true;
+                  }
+                  break; // One pattern is enough
+                }
+              }
+            } catch (err) {
+              console.error("[SupaCheck] Error checking content:", err);
             }
             
             return foundIndicator;
@@ -688,14 +707,14 @@ export async function GET(request: NextRequest) {
                 var updated = checkContentForSupabase(content);
                 if (updated && widget) {
                   // Update the count badge
-                  var countBadge = widget.querySelector('[class*="count"]'); // More flexible selector
+                  var countBadge = widget.querySelector('.supacheck-count');
                   if (countBadge) {
-                    countBadge.textContent = results.urls.length.toString();
+                    countBadge.textContent = (results.urls.length + results.issues.length).toString();
                   }
                   
                   // Make sure widget reflects found state
                   var title = widget.querySelector('span');
-                  if (title) {
+                  if (title && title.textContent !== 'Supabase Detected') {
                     title.textContent = 'Supabase Detected';
                   }
                 }
@@ -742,6 +761,14 @@ export async function GET(request: NextRequest) {
             supabaseFound || results.urls.length > 0 || results.keys.length > 0 || results.issues.length > 0, 
             results
           );
+          
+          // Log detection results
+          console.log("[SupaCheck] Detection completed:", {
+            supabaseFound: supabaseFound,
+            urls: results.urls,
+            keys: results.keys,
+            issues: results.issues
+          });
           
           // Setup network monitoring
           setupNetworkMonitoring();
