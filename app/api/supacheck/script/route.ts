@@ -579,16 +579,45 @@ export async function GET(request: NextRequest) {
           };
           
           // Pattern to match <hash>.supabase.co
-          var supabaseUrlPattern = /[a-zA-Z0-9\\-_]+\\.supabase\\.co/g;
+          var supabaseUrlPattern = /[a-zA-Z0-9\-_]+\.supabase\.co/g;
           
           // Pattern to match potential Supabase keys (anon and service_role)
-          var supabaseKeyPattern = /eyJ[a-zA-Z0-9_\\-\\.]+/g;
+          var supabaseKeyPattern = /eyJ[a-zA-Z0-9_\-\.]+/g;
           
-          // Check <script> tags
-          var scripts = document.querySelectorAll('script');
-          for (var i = 0; i < scripts.length; i++) {
-            // Check inline content
-            var content = scripts[i].textContent || '';
+          // Check for common Supabase package names
+          var supabasePackages = [
+            '@supabase/supabase-js',
+            '@supabase/auth-helpers',
+            'supabase-js',
+            'SupabaseClient',
+            'createClient'
+          ];
+          
+          // Additional patterns to identify Supabase usage
+          var supabaseIdentifiers = [
+            'supabase',
+            'Supabase',
+            'SUPABASE',
+            '.from(',
+            '.auth.',
+            '.storage.',
+            '.rpc(',
+            'supabaseUrl',
+            'supabaseKey',
+            'supabaseAnonKey',
+            'SUPABASE_URL',
+            'SUPABASE_KEY',
+            'SUPABASE_ANON_KEY'
+          ];
+          
+          // Flag to track if any Supabase usage is found
+          var supabaseFound = false;
+          
+          // Function to check content for Supabase patterns
+          function checkContentForSupabase(content) {
+            if (!content) return false;
+            
+            var foundIndicator = false;
             
             // Check for Supabase URLs
             var urlMatches = content.match(supabaseUrlPattern);
@@ -596,6 +625,8 @@ export async function GET(request: NextRequest) {
               for (var j = 0; j < urlMatches.length; j++) {
                 if (results.urls.indexOf(urlMatches[j]) === -1) {
                   results.urls.push(urlMatches[j]);
+                  foundIndicator = true;
+                  supabaseFound = true;
                 }
               }
             }
@@ -606,6 +637,8 @@ export async function GET(request: NextRequest) {
               for (var j = 0; j < keyMatches.length; j++) {
                 if (results.keys.indexOf(keyMatches[j]) === -1) {
                   results.keys.push(keyMatches[j]);
+                  foundIndicator = true;
+                  supabaseFound = true;
                   
                   // Mark as potential issue
                   if (results.issues.indexOf('Potentially exposed API key') === -1) {
@@ -615,52 +648,55 @@ export async function GET(request: NextRequest) {
               }
             }
             
-            // Check if using createClient from Supabase
-            if (content.includes('createClient') && 
-                (content.includes('supabase') || content.includes('Supabase'))) {
-              // Add to issues if not already added
-              if (results.issues.indexOf('Supabase client identified') === -1) {
-                results.issues.push('Supabase client identified');
+            // Check for package imports and common patterns
+            for (var i = 0; i < supabasePackages.length; i++) {
+              if (content.includes(supabasePackages[i])) {
+                if (results.issues.indexOf('Supabase package detected: ' + supabasePackages[i]) === -1) {
+                  results.issues.push('Supabase package detected: ' + supabasePackages[i]);
+                  foundIndicator = true;
+                  supabaseFound = true;
+                }
               }
             }
+            
+            // Check for common Supabase usage patterns
+            for (var i = 0; i < supabaseIdentifiers.length; i++) {
+              if (content.includes(supabaseIdentifiers[i])) {
+                if (results.issues.indexOf('Supabase usage pattern detected') === -1) {
+                  results.issues.push('Supabase usage pattern detected');
+                  foundIndicator = true;
+                  supabaseFound = true;
+                }
+                break; // One pattern is enough
+              }
+            }
+            
+            return foundIndicator;
+          }
+          
+          // Check <script> tags
+          var scripts = document.querySelectorAll('script');
+          for (var i = 0; i < scripts.length; i++) {
+            // Check inline content
+            var content = scripts[i].textContent || '';
+            checkContentForSupabase(content);
             
             // Check external scripts
             var src = scripts[i].getAttribute('src');
             if (src && src.endsWith('.js')) {
               fetchContent(src, function(content) {
-                // Check for Supabase URLs
-                var urlMatches = content.match(supabaseUrlPattern);
-                if (urlMatches) {
-                  var updated = false;
-                  for (var j = 0; j < urlMatches.length; j++) {
-                    if (results.urls.indexOf(urlMatches[j]) === -1) {
-                      results.urls.push(urlMatches[j]);
-                      updated = true;
-                    }
+                var updated = checkContentForSupabase(content);
+                if (updated && widget) {
+                  // Update the count badge
+                  var countBadge = widget.querySelector('[class*="count"]'); // More flexible selector
+                  if (countBadge) {
+                    countBadge.textContent = results.urls.length.toString();
                   }
-                  if (updated && widget) {
-                    // Update the count badge
-                    var countBadge = widget.querySelector('.supacheck-count');
-                    if (countBadge) {
-                      countBadge.textContent = results.urls.length.toString();
-                    }
-                  }
-                }
-                
-                // Check for potential API keys
-                var keyMatches = content.match(supabaseKeyPattern);
-                if (keyMatches) {
-                  var updated = false;
-                  for (var j = 0; j < keyMatches.length; j++) {
-                    if (results.keys.indexOf(keyMatches[j]) === -1) {
-                      results.keys.push(keyMatches[j]);
-                      updated = true;
-                      
-                      // Mark as potential issue
-                      if (results.issues.indexOf('Potentially exposed API key') === -1) {
-                        results.issues.push('Potentially exposed API key');
-                      }
-                    }
+                  
+                  // Make sure widget reflects found state
+                  var title = widget.querySelector('span');
+                  if (title) {
+                    title.textContent = 'Supabase Detected';
                   }
                 }
               });
@@ -670,15 +706,40 @@ export async function GET(request: NextRequest) {
           // Also check the current page HTML for common signs of Supabase integration
           var html = document.documentElement.innerHTML;
           
-          if (html.includes('supabase') || html.includes('Supabase')) {
+          // Add env variables check
+          var envVarPattern = /(VITE_|NEXT_PUBLIC_|REACT_APP_|GATSBY_)SUPABASE/i;
+          var envVarMatches = html.match(envVarPattern);
+          if (envVarMatches) {
+            if (results.issues.indexOf('Supabase environment variables detected') === -1) {
+              results.issues.push('Supabase environment variables detected');
+              supabaseFound = true;
+            }
+          }
+          
+          // Check for Supabase in HTML
+          if (checkContentForSupabase(html)) {
             if (results.issues.indexOf('Potential Supabase usage detected in HTML') === -1) {
               results.issues.push('Potential Supabase usage detected in HTML');
+              supabaseFound = true;
+            }
+          }
+          
+          // Check meta tags and links for Supabase references
+          var metaTags = document.querySelectorAll('meta');
+          for (var i = 0; i < metaTags.length; i++) {
+            var content = metaTags[i].getAttribute('content') || '';
+            if (content.includes('supabase') || content.includes('Supabase')) {
+              if (results.issues.indexOf('Supabase reference in meta tags') === -1) {
+                results.issues.push('Supabase reference in meta tags');
+                supabaseFound = true;
+              }
+              break;
             }
           }
           
           // Create initial UI
           createIndicator(
-            results.urls.length > 0 || results.keys.length > 0 || results.issues.length > 0, 
+            supabaseFound || results.urls.length > 0 || results.keys.length > 0 || results.issues.length > 0, 
             results
           );
           

@@ -214,7 +214,7 @@ export default function SupabaseNetworkMonitor() {
                               <div className="text-sm flex items-center">
                                 <span className="font-semibold mr-1">Token:</span>
                                 <code className="bg-muted-foreground/10 px-1 rounded truncate max-w-[300px]">
-                                  {showTokens ? req.authToken : maskSensitiveValue(req.authToken)}
+                                  {showTokens ? req.authToken : (req.authToken ? maskSensitiveValue(req.authToken) : "")}
                                 </code>
                                 <Button 
                                   variant="ghost" 
