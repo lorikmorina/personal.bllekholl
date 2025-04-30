@@ -70,6 +70,9 @@
   // Store captured response data
   const capturedResponses = new Map();
 
+  // Keep track of Supabase credentials globally
+  window._supabaseAnonKey = null;
+
   // Store captured auth tokens from requests
   const capturedAuthTokens = new Map();
 
@@ -869,6 +872,15 @@
         // Track this as our verification request
         ourVerificationRequests.add(verificationUrl);
         
+        // Store the key used for verification to reuse later
+        window._supabaseAnonKey = supabaseKey;
+        
+        // Also track the headers we're using for verification
+        window._lastVerificationHeaders = {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        };
+        
         try {
           const response = await fetch(verificationUrl, {
             method: 'GET',
@@ -978,6 +990,11 @@
         }
       }
     }
+    
+    // Store the key globally for other functions to use
+    if (finalSupabaseKey) {
+      window._supabaseAnonKey = finalSupabaseKey;
+    }
 
     return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
   }
@@ -1042,9 +1059,17 @@
         if (init.headers instanceof Headers) {
           const authHeader = init.headers.get('Authorization');
           if (authHeader) extractedAuthToken = authHeader;
+          
+          // Also capture the apikey if present
+          const apiKey = init.headers.get('apikey');
+          if (apiKey) window._supabaseAnonKey = apiKey;
         } else if (typeof init.headers === 'object') {
           // Could be in either format: 'Authorization' or lowercase
           extractedAuthToken = init.headers.Authorization || init.headers.authorization;
+          
+          // Also capture the apikey if present
+          const apiKey = init.headers.apikey || init.headers.ApiKey || init.headers.APIKEY;
+          if (apiKey) window._supabaseAnonKey = apiKey;
         }
         
         // Clean up token format (remove 'Bearer ' prefix if present)
@@ -1057,6 +1082,9 @@
           extractedTableName = extractTableNameFromUrl(url);
           if (extractedTableName) {
             capturedAuthTokens.set(extractedTableName, extractedAuthToken);
+            console.log(`Captured auth token for table '${extractedTableName}'`, {
+              token: extractedAuthToken.substring(0, 5) + '...' 
+            });
           }
         }
       }
@@ -1171,6 +1199,12 @@
         if (this._supaTableName) {
           capturedAuthTokens.set(this._supaTableName, authToken);
         }
+      }
+      
+      // Also capture apikey header
+      if (this._supaRequestUrl && name.toLowerCase() === 'apikey') {
+        this._supaRequestHeaders.apikey = value;
+        window._supabaseAnonKey = value;
       }
       
       originalXhrSetRequestHeader.apply(this, arguments);
@@ -1290,22 +1324,83 @@
       // Add to our verification requests to avoid loops
       ourVerificationRequests.add(queryUrl);
       
-      // Make the request with the captured token
-      const response = await fetch(queryUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      // Find the anon key (we may have captured it during verification)
+      const supabaseKey = findSupabaseAnonKey();
+      
+      // Display an error if we can't find the apikey
+      if (!supabaseKey) {
+        console.error(`Error fetching table '${tableName}': No apikey found`);
+        addCompleteTableDataEntry(queryUrl, { 
+          error: "Can't find the apikey needed to fetch data",
+          hint: "Make sure your Supabase client includes the apikey header in requests"
+        }, tableName);
+        return null;
+      }
+      
+      // Format the token correctly - ensure it doesn't have 'Bearer ' prefix
+      let formattedToken = token;
+      if (formattedToken.startsWith('Bearer ')) {
+        formattedToken = formattedToken.substring(7);
+      }
+      
+      console.log(`Fetching complete data for '${tableName}' using:`, {
+        url: queryUrl,
+        apikey: supabaseKey ? (supabaseKey.length > 10 ? supabaseKey.substring(0, 5) + '...' : supabaseKey) : 'not found',
+        token: formattedToken ? (formattedToken.length > 10 ? formattedToken.substring(0, 5) + '...' : formattedToken) : 'not found'
       });
       
-      if (response.ok) {
-        const data = await response.json();
+      // Try the two different ways of authentication to maximize chances of success
+      
+      // First try: Using just the apikey in both headers
+      try {
+        const response1 = await fetch(queryUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
         
-        // Add to complete data section
-        addCompleteTableDataEntry(queryUrl, data, tableName);
+        if (response1.ok) {
+          const data = await response1.json();
+          console.log(`Successfully fetched table '${tableName}' using apikey method`);
+          addCompleteTableDataEntry(queryUrl, data, tableName);
+          return { url: queryUrl, data, tableName };
+        }
+      } catch (err) {
+        console.error('First attempt failed:', err);
+      }
+      
+      // Second try: Using the captured token
+      try {
+        const response2 = await fetch(queryUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${formattedToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
         
-        return { url: queryUrl, data, tableName };
+        if (response2.ok) {
+          const data = await response2.json();
+          console.log(`Successfully fetched table '${tableName}' using token method`);
+          addCompleteTableDataEntry(queryUrl, data, tableName);
+          return { url: queryUrl, data, tableName };
+        } else {
+          console.error(`Error fetching table '${tableName}': Status ${response2.status}`);
+          addCompleteTableDataEntry(queryUrl, { 
+            error: `Failed to load data (Status ${response2.status})`,
+            hint: "Check that your RLS policies allow access to this table"
+          }, tableName);
+        }
+      } catch (error) {
+        console.error('Second attempt failed:', error);
+        addCompleteTableDataEntry(queryUrl, { 
+          error: `Exception: ${error.message}`,
+          hint: "Check network console for more details"
+        }, tableName);
       }
       
       return null;
@@ -1313,6 +1408,42 @@
       console.error('Error fetching complete table data:', error);
       return null;
     }
+  }
+  
+  // Helper function to find the Supabase anon key
+  function findSupabaseAnonKey() {
+    // First try to use the last known verification headers
+    if (window._lastVerificationHeaders && window._lastVerificationHeaders.apikey) {
+      return window._lastVerificationHeaders.apikey;
+    }
+    
+    // Next check if we have the global variable
+    if (window._supabaseAnonKey) {
+      return window._supabaseAnonKey;
+    }
+    
+    // Try to find it in the verification functions
+    for (const url of ourVerificationRequests) {
+      // Look for apikey in query params
+      const match = /apikey=([a-zA-Z0-9.]+)/.exec(url);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    
+    // Check if we have it in the script somewhere
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      if (script.textContent) {
+        const keyMatch = /supabaseKey\s*=\s*['"]([a-zA-Z0-9.]+)['"]/.exec(script.textContent);
+        if (keyMatch && keyMatch[1]) {
+          return keyMatch[1];
+        }
+      }
+    }
+    
+    // Fallback to a default
+    return '';
   }
   
   // Add an entry to the complete table data section
