@@ -105,42 +105,249 @@ export async function GET() {
         contentEl.appendChild(findingEl);
       }
       
-      // Search for Supabase URLs and keys in scripts
-      function findSupabaseCredentials() {
+      // Add a loading indicator
+      function showLoading(message) {
+        const loadingEl = document.createElement('div');
+        loadingEl.id = 'supabase-check-loading';
+        loadingEl.style.cssText = \`
+          display: flex;
+          align-items: center;
+          margin-bottom: 10px;
+          padding: 10px;
+          background: #EFF6FF;
+          border-radius: 4px;
+        \`;
+        
+        const spinner = document.createElement('div');
+        spinner.style.cssText = \`
+          width: 16px;
+          height: 16px;
+          border: 2px solid #3B82F6;
+          border-top-color: transparent;
+          border-radius: 50%;
+          margin-right: 10px;
+          animation: spin 1s linear infinite;
+        \`;
+        
+        // Add the keyframes for spinner
+        if (!document.getElementById('spinner-keyframes')) {
+          const style = document.createElement('style');
+          style.id = 'spinner-keyframes';
+          style.textContent = \`
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          \`;
+          document.head.appendChild(style);
+        }
+        
+        const textEl = document.createElement('div');
+        textEl.textContent = message;
+        
+        loadingEl.appendChild(spinner);
+        loadingEl.appendChild(textEl);
+        contentEl.appendChild(loadingEl);
+        
+        return loadingEl;
+      }
+      
+      // Remove loading indicator
+      function hideLoading() {
+        const loadingEl = document.getElementById('supabase-check-loading');
+        if (loadingEl) {
+          loadingEl.remove();
+        }
+      }
+      
+      // Fetch and analyze external JS files
+      async function fetchAndAnalyzeScripts() {
+        // Find all script tags with src attribute
+        const scriptTags = Array.from(document.querySelectorAll('script[src]'));
+        const scriptUrls = scriptTags.map(script => {
+          const src = script.getAttribute('src');
+          if (src.startsWith('http')) {
+            return src;
+          } else if (src.startsWith('/')) {
+            return \`\${window.location.origin}\${src}\`;
+          } else {
+            return \`\${window.location.origin}/\${src}\`;
+          }
+        });
+        
+        // Filter out URLs that are likely to be third-party scripts or not relevant
+        const relevantScripts = scriptUrls.filter(url => {
+          const skipPatterns = ['google', 'analytics', 'ga.js', 'gtag', 'facebook', 'fbevents', 'hotjar', 'clarity'];
+          return !skipPatterns.some(pattern => url.includes(pattern));
+        });
+        
+        if (relevantScripts.length === 0) {
+          addFinding('Script Scan', 'No relevant external JavaScript files found to scan.', 'info');
+          return { urls: [], contents: [] };
+        }
+        
+        const loadingEl = showLoading(\`Scanning \${relevantScripts.length} JS files...\`);
+        
+        let scriptContents = [];
+        
+        // Fetch scripts with proper error handling and CORS consideration
+        for (const url of relevantScripts) {
+          try {
+            const response = await fetch(url, { 
+              // Use no-cors as a fallback, though it will limit content access
+              mode: 'no-cors',
+              credentials: 'omit'
+            });
+            
+            // For no-cors responses, we won't be able to access the content directly
+            // but we can still record that we tried to scan it
+            if (response.type === 'opaque') {
+              console.log('Cannot access content of script due to CORS policy:', url);
+              scriptContents.push({
+                url: url,
+                content: null,
+                error: 'CORS restriction'
+              });
+              continue;
+            }
+            
+            const text = await response.text();
+            scriptContents.push({
+              url: url,
+              content: text
+            });
+          } catch (error) {
+            console.error('Error fetching script:', url, error);
+            scriptContents.push({
+              url: url,
+              content: null,
+              error: error.message
+            });
+          }
+        }
+        
+        hideLoading();
+        
+        return {
+          urls: relevantScripts,
+          contents: scriptContents
+        };
+      }
+      
+      // Search for Supabase URLs and keys in all sources
+      async function findSupabaseCredentials() {
         let found = false;
         let supabaseUrl = null;
         let supabaseKey = null;
+        let foundInFile = null;
         
-        // Check all scripts in the document
-        const scripts = document.querySelectorAll('script');
-        scripts.forEach(script => {
+        // First check inline scripts
+        addFinding('Script Scan', 'Scanning inline scripts...', 'info');
+        
+        const inlineScripts = document.querySelectorAll('script:not([src])');
+        inlineScripts.forEach(script => {
           if (script.textContent) {
-            // Look for Supabase URL pattern (something.supabase.co)
-            const urlMatch = script.textContent.match(/['"]https:\\/\\/([a-z0-9-]+)\\.supabase\\.co['"]/);
-            if (urlMatch) {
-              supabaseUrl = urlMatch[0].replace(/['"]/g, '');
+            // Look for Supabase URL and key in various formats
+            checkScriptContent(script.textContent, 'Inline script');
+          }
+        });
+        
+        // Then check external scripts
+        const { contents } = await fetchAndAnalyzeScripts();
+        
+        // Count accessible scripts
+        const accessibleScripts = contents.filter(s => s.content !== null).length;
+        const inaccessibleScripts = contents.filter(s => s.content === null).length;
+        
+        addFinding(
+          'External Scripts', 
+          \`Scanned \${accessibleScripts} external scripts.\${inaccessibleScripts > 0 ? \` \${inaccessibleScripts} scripts were inaccessible due to CORS restrictions.\` : ''}\`,
+          'info'
+        );
+        
+        // Check each accessible script
+        for (const script of contents) {
+          if (script.content) {
+            checkScriptContent(script.content, script.url);
+          }
+        }
+        
+        function checkScriptContent(content, source) {
+          // Pattern 1: Standard format with quotes
+          // Example: "https://something.supabase.co"
+          const urlMatches = content.match(/["']https:\/\/([a-z0-9-]+)\.supabase\.co["']/g);
+          
+          // Pattern 2: Function parameter or object format
+          // Example: supabaseUrl: e="https://something.supabase.co"
+          // or anything with .supabase.co in a string-like context
+          const urlMatches2 = content.match(/[=:]\s*["']https:\/\/([a-z0-9-]+)\.supabase\.co["']/g);
+          
+          // Pattern 3: Detect even without quotes by looking for URL pattern
+          const urlMatches3 = content.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/g);
+          
+          // Combine all URL matches
+          const allUrlMatches = [
+            ...(urlMatches || []),
+            ...(urlMatches2 || []),
+            ...(urlMatches3 || [])
+          ];
+          
+          if (allUrlMatches.length > 0) {
+            // Extract the first URL that matches our pattern
+            let matchedUrl = allUrlMatches[0];
+            
+            // Clean the URL from any surrounding characters
+            supabaseUrl = matchedUrl.match(/https:\/\/([a-z0-9-]+)\.supabase\.co/)[0];
+            
+            // Pattern 1: Look for anon key in standard format
+            // Example: "eyJhbG..." or 'sbp_...'
+            const keyMatches = content.match(/["'](?:eyJ[a-zA-Z0-9_.-]{20,}|sbp_[a-zA-Z0-9_.-]{20,})["']/g);
+            
+            // Pattern 2: Function parameter or object format
+            // Example: supabaseKey: t="eyJhbG..."
+            const keyMatches2 = content.match(/[=:]\s*["'](?:eyJ[a-zA-Z0-9_.-]{20,}|sbp_[a-zA-Z0-9_.-]{20,})["']/g);
+            
+            // Pattern 3: Detect even without quotes
+            const keyMatches3 = content.match(/(?:eyJ[a-zA-Z0-9_.-]{40,}|sbp_[a-zA-Z0-9_.-]{40,})/g);
+            
+            // Combine all key matches
+            const allKeyMatches = [
+              ...(keyMatches || []),
+              ...(keyMatches2 || []),
+              ...(keyMatches3 || [])
+            ];
+            
+            if (allKeyMatches.length > 0) {
+              // Extract the first key that matches our pattern
+              let matchedKey = allKeyMatches[0];
               
-              // Look for anon key nearby (typically starts with eyJ or sbp_)
-              const keyMatch = script.textContent.match(/['"](?:eyJ|sbp_)[a-zA-Z0-9._-]{40,}['"]/);
+              // Clean the key from any surrounding characters
+              let keyMatch;
+              if (matchedKey.includes('eyJ')) {
+                keyMatch = matchedKey.match(/eyJ[a-zA-Z0-9_.-]{20,}/);
+              } else if (matchedKey.includes('sbp_')) {
+                keyMatch = matchedKey.match(/sbp_[a-zA-Z0-9_.-]{20,}/);
+              }
+              
               if (keyMatch) {
-                supabaseKey = keyMatch[0].replace(/['"]/g, '');
+                supabaseKey = keyMatch[0];
                 found = true;
+                foundInFile = source;
                 
                 addFinding(
                   'Supabase Credentials Found', 
-                  \`URL: \${supabaseUrl}\\nKey: \${supabaseKey.substring(0, 8)}...\`, 
+                  \`Found in: \${typeof source === 'string' ? source : 'Inline script'}\\nURL: \${supabaseUrl}\\nKey: \${supabaseKey.substring(0, 8)}...\`, 
                   'warning'
                 );
               }
             }
           }
-        });
-        
-        if (!found) {
-          addFinding('Supabase Scan', 'No Supabase credentials found in inline scripts.', 'info');
         }
         
-        return { supabaseUrl, supabaseKey };
+        if (!found) {
+          addFinding('Supabase Scan Result', 'No Supabase credentials found in any scripts.', 'info');
+        }
+        
+        return { supabaseUrl, supabaseKey, foundInFile };
       }
       
       // Check for network requests to Supabase
@@ -217,15 +424,84 @@ export async function GET() {
           
           return response;
         };
+        
+        // Also intercept XMLHttpRequest for older code
+        const originalXhrOpen = XMLHttpRequest.prototype.open;
+        const originalXhrSend = XMLHttpRequest.prototype.send;
+        
+        XMLHttpRequest.prototype.open = function(method, url) {
+          this._supaRequestUrl = url;
+          this._supaRequestMethod = method;
+          return originalXhrOpen.apply(this, arguments);
+        };
+        
+        XMLHttpRequest.prototype.send = function() {
+          if (this._supaRequestUrl && this._supaRequestUrl.includes(supabaseUrl.replace(/https:\\/\\//g, ''))) {
+            const originalOnLoad = this.onload;
+            this.onload = function() {
+              try {
+                const data = JSON.parse(this.responseText);
+                
+                const requestEl = document.createElement('div');
+                requestEl.style.cssText = \`
+                  margin: 10px 0;
+                  padding: 8px;
+                  background: #f8fafc;
+                  border-radius: 4px;
+                  font-size: 12px;
+                  border: 1px solid #e2e8f0;
+                \`;
+                
+                // Add URL and method
+                const headerEl = document.createElement('div');
+                headerEl.style.cssText = \`
+                  font-weight: bold;
+                  margin-bottom: 5px;
+                  word-break: break-all;
+                \`;
+                headerEl.textContent = \`\${this._supaRequestMethod} \${this._supaRequestUrl}\`;
+                requestEl.appendChild(headerEl);
+                
+                // Add the response data
+                const bodyEl = document.createElement('pre');
+                bodyEl.style.cssText = \`
+                  margin: 0;
+                  white-space: pre-wrap;
+                  word-break: break-all;
+                  max-height: 120px;
+                  overflow-y: auto;
+                  font-family: monospace;
+                  font-size: 11px;
+                \`;
+                bodyEl.textContent = JSON.stringify(data, null, 2);
+                requestEl.appendChild(bodyEl);
+                
+                // Add to the container
+                const requestsContainer = document.getElementById('supabase-requests');
+                if (requestsContainer) {
+                  requestsContainer.appendChild(requestEl);
+                }
+              } catch (e) {
+                console.error('Error parsing Supabase XHR response:', e);
+              }
+              
+              if (originalOnLoad) {
+                originalOnLoad.apply(this, arguments);
+              }
+            };
+          }
+          
+          return originalXhrSend.apply(this, arguments);
+        };
       }
       
       // Main function to run all checks
-      function runChecks() {
+      async function runChecks() {
         // Add initial info
         addFinding('Supabase Security Check', 'Scanning page for Supabase usage...', 'info');
         
-        // Look for Supabase credentials in page scripts
-        const { supabaseUrl } = findSupabaseCredentials();
+        // Look for Supabase credentials in page scripts and external scripts
+        const { supabaseUrl } = await findSupabaseCredentials();
         
         // Monitor network requests if we found a Supabase URL
         if (supabaseUrl) {
