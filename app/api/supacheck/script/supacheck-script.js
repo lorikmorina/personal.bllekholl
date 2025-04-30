@@ -136,6 +136,73 @@
     return requestsContainer;
   }
 
+  // Add a section for discovered tables
+  function createTablesSection() {
+    const sectionEl = document.createElement('div');
+    sectionEl.id = 'supabase-tables-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
+    
+    const titleEl = document.createElement('div');
+    titleEl.textContent = 'Discovered Tables';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
+    
+    const tablesContainer = document.createElement('div');
+    tablesContainer.id = 'supabase-tables';
+    
+    sectionEl.appendChild(titleEl);
+    sectionEl.appendChild(tablesContainer);
+    contentEl.appendChild(sectionEl);
+    return tablesContainer;
+  }
+
+  // Add a table entry to the list
+  function addTableEntry(tableName, endpoint) {
+    const tablesContainer = document.getElementById('supabase-tables');
+    if (!tablesContainer) return;
+    
+    // Check if this table is already listed
+    if (document.getElementById(`table-${tableName}`)) {
+      return; // Already added
+    }
+    
+    const tableEl = document.createElement('div');
+    tableEl.id = `table-${tableName}`;
+    tableEl.style.cssText = `
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: #F9FAFB;
+      border-radius: 4px;
+      font-size: 12px;
+      border-left: 3px solid #22C55E;
+    `;
+    
+    const tableNameEl = document.createElement('div');
+    tableNameEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 2px;
+    `;
+    tableNameEl.textContent = tableName;
+    
+    const endpointEl = document.createElement('div');
+    endpointEl.style.cssText = `
+      font-size: 11px;
+      color: #6B7280;
+      word-break: break-all;
+    `;
+    endpointEl.textContent = endpoint;
+    
+    tableEl.appendChild(tableNameEl);
+    tableEl.appendChild(endpointEl);
+    tablesContainer.appendChild(tableEl);
+  }
+
   // Add loading indicator
   function showLoading() {
     const loadingEl = document.createElement('div');
@@ -165,10 +232,104 @@
     if (loadingEl) loadingEl.remove();
   }
 
-  // Check if RLS is enabled for common tables
-  async function checkRLS(supabaseUrl, supabaseKey) {
-    // Common tables to check
-    const tablesToCheck = ["profiles", "users", "accounts", "customers", "orders", "products", "posts", "comments"];
+  // Analyze the Performance API entries to find prior Supabase requests
+  function analyzePerformanceEntries(supabaseUrl) {
+    if (!window.performance || !window.performance.getEntriesByType) {
+      return { requests: [], tableNames: [], authToken: null };
+    }
+    
+    const baseUrl = supabaseUrl.replace(/^https?:\/\//, '');
+    const resources = window.performance.getEntriesByType('resource');
+    const requests = [];
+    const tableNames = new Set();
+    let authToken = null;
+    
+    // Look for Supabase requests in performance resources
+    for (const resource of resources) {
+      if (resource.name && resource.name.includes(baseUrl)) {
+        const url = resource.name;
+        let method = 'GET'; // Default, since Performance API doesn't provide the method
+        
+        requests.push({ method, url });
+        
+        // Try to extract the table name from the URL
+        // Example: https://xyz.supabase.co/rest/v1/profiles?select=*
+        if (url.includes('/rest/v1/')) {
+          const parts = url.split('/rest/v1/');
+          if (parts.length > 1) {
+            const pathPart = parts[1].split('?')[0].split('/')[0];
+            if (pathPart && pathPart !== 'auth') {
+              tableNames.add(pathPart);
+              addTableEntry(pathPart, url);
+            }
+          }
+        }
+      }
+    }
+    
+    // Try to find the auth token in local storage or IndexedDB
+    try {
+      // Check localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.includes('supabase') || key.includes('auth'))) {
+          try {
+            const value = localStorage.getItem(key);
+            const data = JSON.parse(value);
+            if (data && data.access_token) {
+              authToken = data.access_token;
+              break;
+            }
+            if (data && data.currentSession && data.currentSession.access_token) {
+              authToken = data.currentSession.access_token;
+              break;
+            }
+          } catch (e) {
+            // Not a valid JSON, skip
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore storage access errors
+    }
+    
+    return { requests, tableNames: Array.from(tableNames), authToken };
+  }
+
+  // Check headers for tables
+  function checkForHeaderTables() {
+    // First, try to find tables through performance entries
+    if (!window.performance || !window.performance.getEntriesByType) {
+      return [];
+    }
+    
+    const tables = new Set();
+    
+    // Check for any meta tags with Supabase info
+    document.querySelectorAll('meta').forEach(meta => {
+      const content = meta.getAttribute('content') || '';
+      if (content.includes('supabase.co/rest/v1/')) {
+        const match = content.match(/\/rest\/v1\/([a-zA-Z0-9_]+)/);
+        if (match && match[1]) {
+          tables.add(match[1]);
+        }
+      }
+    });
+    
+    return Array.from(tables);
+  }
+
+  // Check if RLS is enabled for tables
+  async function checkRLS(supabaseUrl, supabaseKey, additionalTables = []) {
+    // Common tables to check, plus any discovered tables
+    const tablesToCheck = [
+      ...new Set([
+        ...additionalTables,
+        "profiles", "users", "accounts", "customers", 
+        "orders", "products", "posts", "comments"
+      ])
+    ];
+    
     let anyTableWithDisabledRLS = false;
     
     try {
@@ -285,6 +446,9 @@
     const requestsContainer = createNetworkSection();
     const baseUrl = supabaseUrl.replace(/^https?:\/\//, '');
     
+    // Create the tables section
+    createTablesSection();
+    
     // Create counter for requests
     const requestCountEl = document.createElement('div');
     requestCountEl.id = 'supabase-request-count';
@@ -293,10 +457,36 @@
       color: #6B7280;
       margin-bottom: 5px;
     `;
-    requestCountEl.textContent = "No requests detected yet";
+    requestCountEl.textContent = "Checking for existing requests...";
     requestsContainer.appendChild(requestCountEl);
+    
+    // First, check for existing requests using Performance API
+    const { requests, tableNames } = analyzePerformanceEntries(supabaseUrl);
+    
+    // Add any additional tables from headers
+    const headerTables = checkForHeaderTables();
+    const allTables = [...new Set([...tableNames, ...headerTables])];
+    
+    // Update the request count
+    if (requests.length > 0) {
+      requestCount = requests.length;
+      requestCountEl.textContent = `${requestCount} request${requestCount !== 1 ? 's' : ''} detected`;
+      
+      // Add those requests to the list
+      for (const req of requests) {
+        addRequestEntry(req.method, req.url);
+      }
+    } else {
+      requestCountEl.textContent = "No requests detected yet";
+      // Show login message if no requests found
+      setTimeout(() => {
+        if (requestCount === 0) {
+          addLoginMessage();
+        }
+      }, 1000);
+    }
 
-    // Intercept fetch requests
+    // Intercept fetch requests for new ones
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
       const p = originalFetch.apply(this, arguments);
@@ -306,6 +496,17 @@
       if (url && url.includes(baseUrl)) {
         requestCount++;
         updateRequestCount();
+        
+        // Check for table names in the URL
+        if (url.includes('/rest/v1/')) {
+          const parts = url.split('/rest/v1/');
+          if (parts.length > 1) {
+            const pathPart = parts[1].split('?')[0].split('/')[0];
+            if (pathPart && pathPart !== 'auth') {
+              addTableEntry(pathPart, url);
+            }
+          }
+        }
         
         p.then(function(response) {
           try {
@@ -324,6 +525,17 @@
       if (url && url.includes(baseUrl)) {
         this._supaRequestUrl = url;
         this._supaRequestMethod = method;
+        
+        // Check for table names in the URL
+        if (url.includes('/rest/v1/')) {
+          const parts = url.split('/rest/v1/');
+          if (parts.length > 1) {
+            const pathPart = parts[1].split('?')[0].split('/')[0];
+            if (pathPart && pathPart !== 'auth') {
+              addTableEntry(pathPart, url);
+            }
+          }
+        }
         
         const originalOnLoad = this.onload;
         this.onload = function() {
@@ -374,12 +586,7 @@
       }
     }
     
-    // Show login message if no requests after 3 seconds
-    setTimeout(() => {
-      if (requestCount === 0) {
-        addLoginMessage();
-      }
-    }, 3000);
+    return allTables; // Return all discovered tables
   }
 
   // Main execution
@@ -396,12 +603,12 @@
     if (supabaseUrl && supabaseKey) {
       addStatusItem('Supabase', 'Found', false);
       
-      // Check RLS if credentials were found
-      const rlsConfigured = await checkRLS(supabaseUrl, supabaseKey);
-      addStatusItem('Row Level Security', rlsConfigured ? 'Configured' : 'Not Configured', rlsConfigured);
+      // Start monitoring network requests and discover tables
+      const discoveredTables = monitorNetworkRequests(supabaseUrl);
       
-      // Start monitoring network requests
-      monitorNetworkRequests(supabaseUrl);
+      // Check RLS if credentials were found, using discovered tables
+      const rlsConfigured = await checkRLS(supabaseUrl, supabaseKey, discoveredTables);
+      addStatusItem('Row Level Security', rlsConfigured ? 'Configured' : 'Not Configured', rlsConfigured);
     } else {
       addStatusItem('Supabase', 'Not Found', true);
     }
