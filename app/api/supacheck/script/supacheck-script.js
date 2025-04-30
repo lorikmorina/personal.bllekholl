@@ -31,7 +31,7 @@
     const container = document.createElement('div');
     container.id = 'supabase-check-widget';
     container.style.cssText = `
-      position: fixed; bottom: 20px; right: 20px; width: 280px;
+      position: fixed; bottom: 20px; right: 20px; width: 320px;
       background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: sans-serif;
       z-index: 9999; overflow: hidden; transition: all 0.3s ease; color: #1a202c;
@@ -66,6 +66,9 @@
   
   // Keep track of our own verification requests so we don't display them
   const ourVerificationRequests = new Set();
+  
+  // Store captured response data
+  const capturedResponses = new Map();
 
   // Helper function to add status item to the widget
   function addStatusItem(label, status, isOk = true) {
@@ -166,6 +169,32 @@
     return tablesContainer;
   }
 
+  // Create a section for response data
+  function createResponseSection() {
+    const sectionEl = document.createElement('div');
+    sectionEl.id = 'supabase-response-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
+    
+    const titleEl = document.createElement('div');
+    titleEl.textContent = 'Response Data';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
+    
+    const responseContainer = document.createElement('div');
+    responseContainer.id = 'supabase-responses';
+    
+    sectionEl.appendChild(titleEl);
+    sectionEl.appendChild(responseContainer);
+    contentEl.appendChild(sectionEl);
+    return responseContainer;
+  }
+
   // Add a table entry to the list
   function addTableEntry(tableName, endpoint) {
     const tablesContainer = document.getElementById('supabase-tables');
@@ -205,6 +234,218 @@
     tableEl.appendChild(tableNameEl);
     tableEl.appendChild(endpointEl);
     tablesContainer.appendChild(tableEl);
+  }
+
+  // Create a collapsible JSON viewer
+  function createJsonViewer(id, data, endpoint) {
+    if (!data || typeof data !== 'object') return null;
+    
+    const containerEl = document.createElement('div');
+    containerEl.id = `json-container-${id}`;
+    containerEl.style.cssText = `
+      margin-bottom: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    `;
+    
+    // Header with endpoint info
+    const headerEl = document.createElement('div');
+    headerEl.style.cssText = `
+      padding: 8px 12px;
+      background: #EBF5FF;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
+    
+    // Extract endpoint path for display
+    let endpointPath = endpoint;
+    try {
+      const url = new URL(endpoint);
+      endpointPath = url.pathname + url.search;
+    } catch (e) {}
+    
+    const endpointText = document.createElement('div');
+    endpointText.textContent = endpointPath;
+    endpointText.style.overflow = 'hidden';
+    endpointText.style.textOverflow = 'ellipsis';
+    endpointText.style.whiteSpace = 'nowrap';
+    
+    const toggleEl = document.createElement('span');
+    toggleEl.textContent = '▼';
+    toggleEl.style.marginLeft = '8px';
+    
+    headerEl.appendChild(endpointText);
+    headerEl.appendChild(toggleEl);
+    containerEl.appendChild(headerEl);
+    
+    // Content with JSON data
+    const contentEl = document.createElement('div');
+    contentEl.id = `json-content-${id}`;
+    contentEl.style.cssText = `
+      padding: 0;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #F8FAFC;
+    `;
+    
+    // Create table representation of JSON
+    const tableEl = document.createElement('table');
+    tableEl.style.cssText = `
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    `;
+    
+    // If data is an array, create a table for each item
+    if (Array.isArray(data)) {
+      if (data.length > 0) {
+        for (let i = 0; i < Math.min(data.length, 5); i++) {
+          const item = data[i];
+          const rowEl = document.createElement('tr');
+          
+          const cellEl = document.createElement('td');
+          cellEl.style.cssText = `
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+          `;
+          
+          const itemJsonViewer = createJsonViewer(`${id}-item-${i}`, item, `Item ${i+1}`);
+          if (itemJsonViewer) {
+            cellEl.appendChild(itemJsonViewer);
+          } else {
+            cellEl.textContent = JSON.stringify(item);
+          }
+          
+          rowEl.appendChild(cellEl);
+          tableEl.appendChild(rowEl);
+        }
+        
+        if (data.length > 5) {
+          const rowEl = document.createElement('tr');
+          const cellEl = document.createElement('td');
+          cellEl.style.cssText = `
+            padding: 8px;
+            color: #6B7280;
+            font-style: italic;
+            text-align: center;
+          `;
+          cellEl.textContent = `+ ${data.length - 5} more items`;
+          rowEl.appendChild(cellEl);
+          tableEl.appendChild(rowEl);
+        }
+      } else {
+        const rowEl = document.createElement('tr');
+        const cellEl = document.createElement('td');
+        cellEl.style.cssText = `
+          padding: 8px;
+          color: #6B7280;
+          font-style: italic;
+        `;
+        cellEl.textContent = 'Empty array';
+        rowEl.appendChild(cellEl);
+        tableEl.appendChild(rowEl);
+      }
+    } else {
+      // Object representation as key-value pairs
+      Object.entries(data).forEach(([key, value]) => {
+        const rowEl = document.createElement('tr');
+        rowEl.style.borderBottom = '1px solid #e2e8f0';
+        
+        const keyEl = document.createElement('td');
+        keyEl.style.cssText = `
+          padding: 6px 8px;
+          font-weight: bold;
+          width: 40%;
+          word-break: break-all;
+          vertical-align: top;
+          border-right: 1px solid #e2e8f0;
+        `;
+        keyEl.textContent = key;
+        
+        const valueEl = document.createElement('td');
+        valueEl.style.cssText = `
+          padding: 6px 8px;
+          word-break: break-all;
+        `;
+        
+        if (value === null) {
+          valueEl.textContent = 'null';
+          valueEl.style.fontStyle = 'italic';
+          valueEl.style.color = '#6B7280';
+        } else if (typeof value === 'object') {
+          const nestedJsonString = JSON.stringify(value, null, 2);
+          if (nestedJsonString.length < 100) {
+            valueEl.textContent = nestedJsonString;
+          } else {
+            valueEl.textContent = `Object with ${Object.keys(value).length} properties`;
+            valueEl.style.color = '#3B82F6';
+            valueEl.style.cursor = 'pointer';
+            valueEl.onclick = () => {
+              const details = document.createElement('pre');
+              details.style.cssText = `
+                margin: 8px 0 0;
+                padding: 8px;
+                background: #F1F5F9;
+                border-radius: 4px;
+                overflow-x: auto;
+                white-space: pre-wrap;
+                font-family: monospace;
+                font-size: 11px;
+              `;
+              details.textContent = nestedJsonString;
+              if (valueEl.querySelector('pre')) {
+                valueEl.removeChild(valueEl.querySelector('pre'));
+              } else {
+                valueEl.appendChild(details);
+              }
+            };
+          }
+        } else {
+          valueEl.textContent = String(value);
+        }
+        
+        rowEl.appendChild(keyEl);
+        rowEl.appendChild(valueEl);
+        tableEl.appendChild(rowEl);
+      });
+    }
+    
+    contentEl.appendChild(tableEl);
+    containerEl.appendChild(contentEl);
+    
+    // Toggle content visibility on header click
+    headerEl.onclick = () => {
+      if (contentEl.style.display === 'none') {
+        contentEl.style.display = 'block';
+        toggleEl.textContent = '▼';
+      } else {
+        contentEl.style.display = 'none';
+        toggleEl.textContent = '►';
+      }
+    };
+    
+    return containerEl;
+  }
+
+  // Add a response entry to the list
+  function addResponseEntry(url, data) {
+    const responsesContainer = document.getElementById('supabase-responses');
+    if (!responsesContainer) return;
+    
+    // Generate a unique ID for this response
+    const id = `response-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // Create the JSON viewer
+    const jsonViewer = createJsonViewer(id, data, url);
+    if (jsonViewer) {
+      responsesContainer.appendChild(jsonViewer);
+    }
   }
 
   // Add loading indicator
@@ -486,6 +727,7 @@
   function monitorNetworkRequests(supabaseUrl) {
     let requestCount = 0;
     const requestsContainer = createNetworkSection();
+    const responseContainer = createResponseSection();
     const baseUrl = supabaseUrl.replace(/^https?:\/\//, '');
     
     // Create the tables section
@@ -517,6 +759,11 @@
       // Add those requests to the list
       for (const req of requests) {
         addRequestEntry(req.method, req.url);
+        
+        // Try to fetch this request again to get the response data
+        if (req.url.includes('/rest/v1/')) {
+          fetchAndDisplayResponse(req.url);
+        }
       }
     } else {
       requestCountEl.textContent = "No requests detected yet";
@@ -531,10 +778,15 @@
     // Intercept fetch requests for new ones
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
-      const p = originalFetch.apply(this, arguments);
+      const url = (typeof input === 'string') ? input : input?.url;
+      
+      // Store the original arguments to use in our proxy
+      const fetchArgs = arguments;
+      
+      // Call the original fetch
+      const p = originalFetch.apply(this, fetchArgs);
       
       // Check if this is a Supabase request
-      const url = (typeof input === 'string') ? input : input?.url;
       if (url && url.includes(baseUrl)) {
         // Skip our own verification requests
         if (!isVerificationRequest(url)) {
@@ -553,10 +805,20 @@
             }
           }
           
+          // Intercept and capture the response
           p.then(function(response) {
             try {
               const method = (init && init.method) ? init.method : 'GET';
               addRequestEntry(method, url);
+              
+              // Clone the response and extract the JSON data
+              const clonedResponse = response.clone();
+              clonedResponse.json().then(data => {
+                capturedResponses.set(url, data);
+                addResponseEntry(url, data);
+              }).catch(() => {
+                // Not JSON data, ignore
+              });
             } catch (e) {}
           });
         }
@@ -567,6 +829,8 @@
 
     // Intercept XMLHttpRequest
     const originalXhrOpen = XMLHttpRequest.prototype.open;
+    const originalXhrSend = XMLHttpRequest.prototype.send;
+    
     XMLHttpRequest.prototype.open = function(method, url) {
       if (url && url.includes(baseUrl)) {
         this._supaRequestUrl = url;
@@ -591,11 +855,27 @@
             requestCount++;
             updateRequestCount();
             addRequestEntry(method, url);
+            
+            // Try to parse the response as JSON
+            try {
+              if (this.responseType === '' || this.responseType === 'text') {
+                const data = JSON.parse(this.responseText);
+                capturedResponses.set(url, data);
+                addResponseEntry(url, data);
+              }
+            } catch (e) {
+              // Not JSON data, ignore
+            }
+            
             if (originalOnLoad) originalOnLoad.apply(this, arguments);
           };
         }
       }
       originalXhrOpen.apply(this, arguments);
+    };
+    
+    XMLHttpRequest.prototype.send = function() {
+      originalXhrSend.apply(this, arguments);
     };
     
     // Add a request entry to the list
@@ -615,6 +895,7 @@
         border-radius: 4px;
         font-size: 12px;
         border-left: 3px solid #3B82F6;
+        cursor: pointer;
       `;
       
       const methodEl = document.createElement('span');
@@ -629,8 +910,51 @@
       requestEl.appendChild(document.createTextNode(endpoint));
       requestsContainer.appendChild(requestEl);
       
+      // Make request entry clickable to show response
+      requestEl.onclick = () => {
+        // Try to fetch if we don't have the response yet
+        if (!capturedResponses.has(url)) {
+          fetchAndDisplayResponse(url);
+        } else {
+          // Focus on the response section
+          const responseEl = document.getElementById(`json-container-${url.replace(/[^a-zA-Z0-9]/g, '-')}`);
+          if (responseEl) {
+            responseEl.scrollIntoView({ behavior: 'smooth' });
+          }
+        }
+      };
+      
       // Scroll to bottom to show latest request
       requestsContainer.scrollTop = requestsContainer.scrollHeight;
+    }
+    
+    // Fetch and display response for existing requests
+    async function fetchAndDisplayResponse(url) {
+      // Skip if we already have the response or it's our verification request
+      if (capturedResponses.has(url) || isVerificationRequest(url)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(url, {
+          credentials: 'include', // Include cookies to get authenticated response
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          try {
+            const data = await response.json();
+            capturedResponses.set(url, data);
+            addResponseEntry(url, data);
+          } catch (e) {
+            // Not JSON data
+          }
+        }
+      } catch (error) {
+        // Failed to fetch, ignore
+      }
     }
     
     // Update the request counter
