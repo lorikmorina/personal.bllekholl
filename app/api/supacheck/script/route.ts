@@ -21,13 +21,40 @@ export async function GET() {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         'Pragma': 'no-cache',
         'Expires': '0',
+        // Add proper CORS headers
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Cross-Origin-Resource-Policy': 'cross-origin',
       },
     });
   } catch (error) {
     console.error('Error serving script:', error);
-    return new NextResponse(`console.error('Error loading Supabase check script: ${error}');`, {
-      status: 500,
-      headers: { 'Content-Type': 'application/javascript' },
-    });
+    // Improved error response with CORS headers
+    return new NextResponse(
+      `console.error('Error loading Supabase check script:', ${JSON.stringify(String(error))});`,
+      {
+        status: 500,
+        headers: { 
+          'Content-Type': 'application/javascript',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        },
+      }
+    );
   }
+}
+
+export async function OPTIONS() {
+  // Handle preflight requests
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400', // 24 hours
+    },
+  });
 } 

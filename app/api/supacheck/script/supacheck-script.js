@@ -113,6 +113,47 @@
     contentEl.appendChild(messageEl);
   }
 
+  // Add a message about CORS limitations
+  function addCorsInfoMessage() {
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #FEF3C7;
+      border-radius: 4px;
+      border-left: 3px solid #F59E0B;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
+    messageEl.innerHTML = "⚠️ <strong>CORS Alert:</strong> Some Supabase requests may not be visible due to CORS restrictions. " +
+      "If you're testing on a different domain than your app, data may be limited.<br><br>" +
+      "For complete testing, run this check directly on your deployed application.";
+    
+    contentEl.appendChild(messageEl);
+  }
+
+  // Update the existing addResponseInfoMessage function
+  function addResponseInfoMessage() {
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #FEF3C7;
+      border-radius: 4px;
+      border-left: 3px solid #F59E0B;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
+    messageEl.innerHTML = "Due to CORS limitations, we can only show responses captured in real-time.<br><br>" +
+      "Cross-origin restrictions may prevent viewing responses from different domains. " +
+      "Refresh the page and use the app to see response data from new requests.";
+    
+    const responsesContainer = document.getElementById('supabase-responses');
+    if (responsesContainer && responsesContainer.children.length === 0) {
+      responsesContainer.appendChild(messageEl);
+    }
+  }
+
   // Create a section for network requests
   function createNetworkSection() {
     const sectionEl = document.createElement('div');
@@ -192,6 +233,10 @@
     sectionEl.appendChild(titleEl);
     sectionEl.appendChild(responseContainer);
     contentEl.appendChild(sectionEl);
+    
+    // Add info message by default
+    addResponseInfoMessage();
+    
     return responseContainer;
   }
 
@@ -238,7 +283,7 @@
 
   // Create a collapsible JSON viewer
   function createJsonViewer(id, data, endpoint) {
-    if (!data || typeof data !== 'object') return null;
+    if (!data) return null;
     
     const containerEl = document.createElement('div');
     containerEl.id = `json-container-${id}`;
@@ -294,129 +339,277 @@
       background: #F8FAFC;
     `;
     
+    // Handle error responses specially
+    if (data.error || data.code || (data.message && (data.statusCode || data.status))) {
+      const errorEl = document.createElement('div');
+      errorEl.style.cssText = `
+        padding: 12px;
+        background: #FEF2F2;
+        color: #B91C1C;
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      `;
+      
+      const errorTitle = document.createElement('div');
+      errorTitle.style.cssText = `
+        font-weight: bold;
+        margin-bottom: 8px;
+      `;
+      
+      errorTitle.textContent = `Error ${data.statusCode || data.status || 'Response'}`;
+      errorEl.appendChild(errorTitle);
+      
+      const errorMessage = document.createElement('div');
+      errorMessage.textContent = data.message || data.error || JSON.stringify(data, null, 2);
+      errorEl.appendChild(errorMessage);
+      
+      contentEl.appendChild(errorEl);
+    }
     // Create table representation of JSON
-    const tableEl = document.createElement('table');
-    tableEl.style.cssText = `
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-    `;
-    
-    // If data is an array, create a table for each item
-    if (Array.isArray(data)) {
-      if (data.length > 0) {
-        for (let i = 0; i < Math.min(data.length, 5); i++) {
-          const item = data[i];
-          const rowEl = document.createElement('tr');
-          
-          const cellEl = document.createElement('td');
-          cellEl.style.cssText = `
+    else {
+      const tableEl = document.createElement('table');
+      tableEl.style.cssText = `
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      `;
+      
+      // If data is an array, create a table for each item
+      if (Array.isArray(data)) {
+        if (data.length > 0) {
+          // Add count header
+          const countRow = document.createElement('tr');
+          const countCell = document.createElement('td');
+          countCell.style.cssText = `
             padding: 8px;
+            background: #F1F5F9;
+            color: #475569;
+            font-style: italic;
+            text-align: center;
             border-bottom: 1px solid #e2e8f0;
           `;
+          countCell.textContent = `${data.length} item${data.length !== 1 ? 's' : ''} in array`;
+          countRow.appendChild(countCell);
+          tableEl.appendChild(countRow);
           
-          const itemJsonViewer = createJsonViewer(`${id}-item-${i}`, item, `Item ${i+1}`);
-          if (itemJsonViewer) {
-            cellEl.appendChild(itemJsonViewer);
-          } else {
-            cellEl.textContent = JSON.stringify(item);
+          for (let i = 0; i < Math.min(data.length, 5); i++) {
+            const item = data[i];
+            const rowEl = document.createElement('tr');
+            
+            const cellEl = document.createElement('td');
+            cellEl.style.cssText = `
+              padding: 8px;
+              border-bottom: 1px solid #e2e8f0;
+            `;
+            
+            // Display objects in a readable format
+            if (typeof item === 'object' && item !== null) {
+              const keys = Object.keys(item);
+              
+              // For items with more than 4 keys, show a summary
+              if (keys.length > 4) {
+                const summaryDiv = document.createElement('div');
+                summaryDiv.style.cssText = `
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 4px;
+                `;
+                
+                // Show ID or key properties prominently
+                const idKeys = keys.filter(k => 
+                  ['id', 'uuid', 'key', 'name', 'title'].includes(k.toLowerCase()));
+                
+                if (idKeys.length > 0) {
+                  const idKey = idKeys[0];
+                  const idValue = String(item[idKey]);
+                  
+                  const idBadge = document.createElement('span');
+                  idBadge.style.cssText = `
+                    background: #E0F2FE;
+                    color: #0369A1;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: bold;
+                  `;
+                  idBadge.textContent = `${idKey}: ${idValue}`;
+                  summaryDiv.appendChild(idBadge);
+                }
+                
+                // Show additional key info in badges
+                for (let j = 0; j < Math.min(3, keys.length); j++) {
+                  const key = keys[j];
+                  if (idKeys.includes(key)) continue; // Skip keys we already showed
+                  
+                  const value = item[key];
+                  if (value === null || value === undefined) continue;
+                  
+                  const badge = document.createElement('span');
+                  badge.style.cssText = `
+                    background: #F1F5F9;
+                    color: #475569;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                  `;
+                  
+                  // Format value based on type
+                  let displayValue = String(value);
+                  if (typeof value === 'object') {
+                    displayValue = Array.isArray(value) ? 
+                      `[${value.length} items]` : 
+                      '{...}';
+                  } else if (displayValue.length > 20) {
+                    displayValue = displayValue.substring(0, 20) + '...';
+                  }
+                  
+                  badge.textContent = `${key}: ${displayValue}`;
+                  summaryDiv.appendChild(badge);
+                }
+                
+                // Add expand button
+                const expandBtn = document.createElement('button');
+                expandBtn.style.cssText = `
+                  background: #F8FAFC;
+                  border: 1px solid #CBD5E1;
+                  border-radius: 4px;
+                  padding: 2px 6px;
+                  font-size: 11px;
+                  cursor: pointer;
+                  margin-left: auto;
+                `;
+                expandBtn.textContent = 'View Full';
+                
+                expandBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  const pre = document.createElement('pre');
+                  pre.style.cssText = `
+                    margin: 8px 0;
+                    padding: 8px;
+                    background: #F1F5F9;
+                    border-radius: 4px;
+                    overflow-x: auto;
+                    font-family: monospace;
+                    font-size: 11px;
+                  `;
+                  pre.textContent = JSON.stringify(item, null, 2);
+                  
+                  if (summaryDiv.nextElementSibling?.tagName === 'PRE') {
+                    summaryDiv.nextElementSibling.remove();
+                    expandBtn.textContent = 'View Full';
+                  } else {
+                    summaryDiv.parentNode.insertBefore(pre, summaryDiv.nextElementSibling);
+                    expandBtn.textContent = 'Collapse';
+                  }
+                };
+                
+                summaryDiv.appendChild(expandBtn);
+                cellEl.appendChild(summaryDiv);
+              } else {
+                // For simple objects, just stringify
+                cellEl.textContent = JSON.stringify(item, null, 2);
+              }
+            } else {
+              // For primitives, just display as text
+              cellEl.textContent = String(item);
+            }
+            
+            rowEl.appendChild(cellEl);
+            tableEl.appendChild(rowEl);
           }
           
-          rowEl.appendChild(cellEl);
-          tableEl.appendChild(rowEl);
-        }
-        
-        if (data.length > 5) {
+          if (data.length > 5) {
+            const rowEl = document.createElement('tr');
+            const cellEl = document.createElement('td');
+            cellEl.style.cssText = `
+              padding: 8px;
+              color: #6B7280;
+              font-style: italic;
+              text-align: center;
+            `;
+            cellEl.textContent = `+ ${data.length - 5} more items`;
+            rowEl.appendChild(cellEl);
+            tableEl.appendChild(rowEl);
+          }
+        } else {
           const rowEl = document.createElement('tr');
           const cellEl = document.createElement('td');
           cellEl.style.cssText = `
             padding: 8px;
             color: #6B7280;
             font-style: italic;
-            text-align: center;
           `;
-          cellEl.textContent = `+ ${data.length - 5} more items`;
+          cellEl.textContent = 'Empty array';
           rowEl.appendChild(cellEl);
           tableEl.appendChild(rowEl);
         }
       } else {
-        const rowEl = document.createElement('tr');
-        const cellEl = document.createElement('td');
-        cellEl.style.cssText = `
-          padding: 8px;
-          color: #6B7280;
-          font-style: italic;
-        `;
-        cellEl.textContent = 'Empty array';
-        rowEl.appendChild(cellEl);
-        tableEl.appendChild(rowEl);
-      }
-    } else {
-      // Object representation as key-value pairs
-      Object.entries(data).forEach(([key, value]) => {
-        const rowEl = document.createElement('tr');
-        rowEl.style.borderBottom = '1px solid #e2e8f0';
-        
-        const keyEl = document.createElement('td');
-        keyEl.style.cssText = `
-          padding: 6px 8px;
-          font-weight: bold;
-          width: 40%;
-          word-break: break-all;
-          vertical-align: top;
-          border-right: 1px solid #e2e8f0;
-        `;
-        keyEl.textContent = key;
-        
-        const valueEl = document.createElement('td');
-        valueEl.style.cssText = `
-          padding: 6px 8px;
-          word-break: break-all;
-        `;
-        
-        if (value === null) {
-          valueEl.textContent = 'null';
-          valueEl.style.fontStyle = 'italic';
-          valueEl.style.color = '#6B7280';
-        } else if (typeof value === 'object') {
-          const nestedJsonString = JSON.stringify(value, null, 2);
-          if (nestedJsonString.length < 100) {
-            valueEl.textContent = nestedJsonString;
+        // Object representation as key-value pairs
+        Object.entries(data).forEach(([key, value]) => {
+          const rowEl = document.createElement('tr');
+          rowEl.style.borderBottom = '1px solid #e2e8f0';
+          
+          const keyEl = document.createElement('td');
+          keyEl.style.cssText = `
+            padding: 6px 8px;
+            font-weight: bold;
+            width: 40%;
+            word-break: break-all;
+            vertical-align: top;
+            border-right: 1px solid #e2e8f0;
+          `;
+          keyEl.textContent = key;
+          
+          const valueEl = document.createElement('td');
+          valueEl.style.cssText = `
+            padding: 6px 8px;
+            word-break: break-all;
+          `;
+          
+          if (value === null) {
+            valueEl.textContent = 'null';
+            valueEl.style.fontStyle = 'italic';
+            valueEl.style.color = '#6B7280';
+          } else if (typeof value === 'object') {
+            const nestedJsonString = JSON.stringify(value, null, 2);
+            if (nestedJsonString.length < 100) {
+              valueEl.textContent = nestedJsonString;
+            } else {
+              valueEl.textContent = `Object with ${Object.keys(value).length} properties`;
+              valueEl.style.color = '#3B82F6';
+              valueEl.style.cursor = 'pointer';
+              valueEl.onclick = () => {
+                const details = document.createElement('pre');
+                details.style.cssText = `
+                  margin: 8px 0 0;
+                  padding: 8px;
+                  background: #F1F5F9;
+                  border-radius: 4px;
+                  overflow-x: auto;
+                  white-space: pre-wrap;
+                  font-family: monospace;
+                  font-size: 11px;
+                `;
+                details.textContent = nestedJsonString;
+                if (valueEl.querySelector('pre')) {
+                  valueEl.removeChild(valueEl.querySelector('pre'));
+                } else {
+                  valueEl.appendChild(details);
+                }
+              };
+            }
           } else {
-            valueEl.textContent = `Object with ${Object.keys(value).length} properties`;
-            valueEl.style.color = '#3B82F6';
-            valueEl.style.cursor = 'pointer';
-            valueEl.onclick = () => {
-              const details = document.createElement('pre');
-              details.style.cssText = `
-                margin: 8px 0 0;
-                padding: 8px;
-                background: #F1F5F9;
-                border-radius: 4px;
-                overflow-x: auto;
-                white-space: pre-wrap;
-                font-family: monospace;
-                font-size: 11px;
-              `;
-              details.textContent = nestedJsonString;
-              if (valueEl.querySelector('pre')) {
-                valueEl.removeChild(valueEl.querySelector('pre'));
-              } else {
-                valueEl.appendChild(details);
-              }
-            };
+            valueEl.textContent = String(value);
           }
-        } else {
-          valueEl.textContent = String(value);
-        }
-        
-        rowEl.appendChild(keyEl);
-        rowEl.appendChild(valueEl);
-        tableEl.appendChild(rowEl);
-      });
+          
+          rowEl.appendChild(keyEl);
+          rowEl.appendChild(valueEl);
+          tableEl.appendChild(rowEl);
+        });
+      }
+      
+      contentEl.appendChild(tableEl);
     }
     
-    contentEl.appendChild(tableEl);
     containerEl.appendChild(contentEl);
     
     // Toggle content visibility on header click
@@ -438,8 +631,19 @@
     const responsesContainer = document.getElementById('supabase-responses');
     if (!responsesContainer) return;
     
+    // Remove any info message if it exists
+    const infoMessage = responsesContainer.querySelector('div[style*="background: #FEF3C7"]');
+    if (infoMessage) {
+      responsesContainer.removeChild(infoMessage);
+    }
+    
     // Generate a unique ID for this response
-    const id = `response-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const id = url.replace(/[^a-zA-Z0-9]/g, '-');
+    
+    // Skip if we already have this response
+    if (document.getElementById(`json-container-${id}`)) {
+      return;
+    }
     
     // Create the JSON viewer
     const jsonViewer = createJsonViewer(id, data, url);
@@ -759,11 +963,6 @@
       // Add those requests to the list
       for (const req of requests) {
         addRequestEntry(req.method, req.url);
-        
-        // Try to fetch this request again to get the response data
-        if (req.url.includes('/rest/v1/')) {
-          fetchAndDisplayResponse(req.url);
-        }
       }
     } else {
       requestCountEl.textContent = "No requests detected yet";
@@ -780,11 +979,8 @@
     window.fetch = function(input, init) {
       const url = (typeof input === 'string') ? input : input?.url;
       
-      // Store the original arguments to use in our proxy
-      const fetchArgs = arguments;
-      
       // Call the original fetch
-      const p = originalFetch.apply(this, fetchArgs);
+      const p = originalFetch.apply(this, arguments);
       
       // Check if this is a Supabase request
       if (url && url.includes(baseUrl)) {
@@ -887,6 +1083,12 @@
       
       const endpoint = url.split('/').slice(3).join('/');
       
+      // Avoid duplicates
+      const existingRequests = document.querySelectorAll(`div[data-url="${url}"]`);
+      if (existingRequests.length > 0) {
+        return;
+      }
+      
       const requestEl = document.createElement('div');
       requestEl.style.cssText = `
         padding: 6px 8px;
@@ -897,6 +1099,7 @@
         border-left: 3px solid #3B82F6;
         cursor: pointer;
       `;
+      requestEl.dataset.url = url;
       
       const methodEl = document.createElement('span');
       methodEl.textContent = method;
@@ -912,49 +1115,25 @@
       
       // Make request entry clickable to show response
       requestEl.onclick = () => {
-        // Try to fetch if we don't have the response yet
-        if (!capturedResponses.has(url)) {
-          fetchAndDisplayResponse(url);
-        } else {
-          // Focus on the response section
-          const responseEl = document.getElementById(`json-container-${url.replace(/[^a-zA-Z0-9]/g, '-')}`);
+        // Focus on the response section if we have a response
+        if (capturedResponses.has(url)) {
+          const id = url.replace(/[^a-zA-Z0-9]/g, '-');
+          const responseEl = document.getElementById(`json-container-${id}`);
           if (responseEl) {
             responseEl.scrollIntoView({ behavior: 'smooth' });
+            
+            // Highlight the entry by flashing it
+            const originalBackground = responseEl.style.background;
+            responseEl.style.background = '#FDE68A';
+            setTimeout(() => {
+              responseEl.style.background = originalBackground;
+            }, 1000);
           }
         }
       };
       
       // Scroll to bottom to show latest request
       requestsContainer.scrollTop = requestsContainer.scrollHeight;
-    }
-    
-    // Fetch and display response for existing requests
-    async function fetchAndDisplayResponse(url) {
-      // Skip if we already have the response or it's our verification request
-      if (capturedResponses.has(url) || isVerificationRequest(url)) {
-        return;
-      }
-      
-      try {
-        const response = await fetch(url, {
-          credentials: 'include', // Include cookies to get authenticated response
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          try {
-            const data = await response.json();
-            capturedResponses.set(url, data);
-            addResponseEntry(url, data);
-          } catch (e) {
-            // Not JSON data
-          }
-        }
-      } catch (error) {
-        // Failed to fetch, ignore
-      }
     }
     
     // Update the request counter
@@ -977,6 +1156,9 @@
     
     // Clear loading indicator
     hideLoading();
+    
+    // Show CORS information message
+    addCorsInfoMessage();
     
     // Display Supabase status
     if (supabaseUrl && supabaseKey) {
