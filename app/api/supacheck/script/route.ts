@@ -21,17 +21,23 @@ export async function GET(request: NextRequest) {
       
       // Create indicator function
       function createIndicator(found, details) {
-        var results = details || { urls: [], keys: [], issues: [] };
+        var results = details || { url: null, key: null, issues: [] };
         
         console.log("[SupaCheck] Creating widget with status:", { 
           found: found, 
-          urlsCount: results.urls.length,
-          keysCount: results.keys.length,
-          issuesCount: results.issues.length
+          urlFound: !!results.url,
+          keyFound: !!results.key
         });
+        
+        // Remove existing widget if any
+        var existingWidget = document.getElementById('supacheck-widget');
+        if (existingWidget) {
+          existingWidget.remove();
+        }
         
         // Create widget container
         widget = document.createElement('div');
+        widget.id = 'supacheck-widget';
         widget.style.position = 'fixed';
         widget.style.bottom = '20px';
         widget.style.right = '20px';
@@ -44,14 +50,36 @@ export async function GET(request: NextRequest) {
         widget.style.zIndex = '999999';
         widget.style.transition = 'all 0.3s ease';
         widget.style.maxWidth = '300px';
-        widget.style.backgroundColor = '#f0fdf4';
-        widget.style.color = '#166534';
-        widget.style.border = '1px solid #dcfce7';
+        widget.style.backgroundColor = found ? '#f0fdf4' : '#fef2f2';
+        widget.style.color = found ? '#166534' : '#b91c1c';
+        widget.style.border = found ? '1px solid #dcfce7' : '1px solid #fecaca';
         widget.setAttribute('title', 'Click to expand Supabase detection details');
         
-        // Create tabs container
+        // Create header
+        var header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.alignItems = 'center';
+        header.style.justifyContent = 'space-between';
+        header.style.marginBottom = isExpanded ? '4px' : '0'; // Adjust margin based on expansion
+        
+        var title = document.createElement('span');
+        title.style.fontWeight = 'bold';
+        title.textContent = found ? 'Supabase Detected' : 'Supabase Not Found';
+        header.appendChild(title);
+        
+        if (found) {
+          var statusIcon = document.createElement('span');
+          statusIcon.textContent = '✅';
+          statusIcon.style.marginLeft = '8px';
+          header.appendChild(statusIcon);
+        }
+        
+        widget.appendChild(header);
+
+        // Create tabs container (always create but hide if not expanded)
         var tabsContainer = document.createElement('div');
-        tabsContainer.style.display = 'none';
+        tabsContainer.id = 'supacheck-tabs-container';
+        tabsContainer.style.display = isExpanded ? 'block' : 'none';
         tabsContainer.style.marginTop = '10px';
         
         // Create tab headers
@@ -60,308 +88,165 @@ export async function GET(request: NextRequest) {
         tabHeaders.style.borderBottom = '1px solid rgba(0,0,0,0.1)';
         tabHeaders.style.marginBottom = '8px';
         
-        var detectionTab = createTabHeader('Detection', true);
-        var requestsTab = createTabHeader('Requests', false);
-        var userTab = createTabHeader('User Info', false);
+        var detectionTabHeader = createTabHeader('Detection', true);
+        var requestsTabHeader = createTabHeader('Network', false);
+        var userTabHeader = createTabHeader('User Info', false);
         
-        tabHeaders.appendChild(detectionTab);
-        tabHeaders.appendChild(requestsTab);
-        tabHeaders.appendChild(userTab);
+        tabHeaders.appendChild(detectionTabHeader);
+        tabHeaders.appendChild(requestsTabHeader);
+        tabHeaders.appendChild(userTabHeader);
         
         tabsContainer.appendChild(tabHeaders);
         
         // Create tab contents
         var detectionContent = document.createElement('div');
         detectionContent.className = 'supacheck-tab-content';
+        detectionContent.setAttribute('data-tab', 'detection');
         detectionContent.style.display = 'block';
         
         var requestsContent = document.createElement('div');
         requestsContent.className = 'supacheck-tab-content';
+        requestsContent.setAttribute('data-tab', 'network');
         requestsContent.style.display = 'none';
+        requestsContent.id = 'supacheck-requests-list'; // Use this for requests
+        requestsContent.style.fontSize = '12px';
+        requestsContent.style.maxHeight = '200px';
+        requestsContent.style.overflowY = 'auto';
         
         var userContent = document.createElement('div');
         userContent.className = 'supacheck-tab-content';
+        userContent.setAttribute('data-tab', 'user info');
         userContent.style.display = 'none';
+        userContent.id = 'supacheck-user-info-content'; // Use this for user info
+        userContent.style.fontSize = '12px';
+        userContent.style.maxHeight = '200px';
+        userContent.style.overflowY = 'auto';
         
-        // Fill detection tab content
-        if (found) {
-          // Create header
-          var header = document.createElement('div');
-          header.style.display = 'flex';
-          header.style.alignItems = 'center';
-          header.style.justifyContent = 'space-between';
-          header.style.marginBottom = '4px';
-          
-          var title = document.createElement('span');
-          title.style.fontWeight = 'bold';
-          title.textContent = 'Supabase Detected';
-          header.appendChild(title);
-          
-          var count = document.createElement('span');
-          count.className = 'supacheck-count';
-          count.style.backgroundColor = '#bbf7d0';
-          count.style.color = '#166534';
-          count.style.padding = '2px 6px';
-          count.style.borderRadius = '9999px';
-          count.style.fontSize = '12px';
-          count.textContent = (results.urls.length + results.issues.length).toString();
-          header.appendChild(count);
-          
-          widget.appendChild(header);
-          
-          // Fill detection content
-          if (results.urls.length > 0) {
-            var urlsTitle = document.createElement('div');
-            urlsTitle.style.fontWeight = 'bold';
-            urlsTitle.style.marginBottom = '4px';
-            urlsTitle.textContent = 'Detected endpoints:';
-            detectionContent.appendChild(urlsTitle);
-            
-            var urlsList = document.createElement('ul');
-            urlsList.style.margin = '0';
-            urlsList.style.paddingLeft = '16px';
-            
-            for (var i = 0; i < results.urls.length; i++) {
-              var listItem = document.createElement('li');
-              listItem.textContent = results.urls[i];
-              urlsList.appendChild(listItem);
-            }
-            
-            detectionContent.appendChild(urlsList);
-          }
-          
-          if (results.keys.length > 0) {
-            var keysTitle = document.createElement('div');
-            keysTitle.style.fontWeight = 'bold';
-            keysTitle.style.marginTop = '8px';
-            keysTitle.style.marginBottom = '4px';
-            keysTitle.textContent = 'Potential API keys found:';
-            detectionContent.appendChild(keysTitle);
-            
-            var keysList = document.createElement('ul');
-            keysList.style.margin = '0';
-            keysList.style.paddingLeft = '16px';
-            keysList.style.color = '#b91c1c';
-            
-            for (var i = 0; i < results.keys.length; i++) {
-              var keyItem = document.createElement('li');
-              keyItem.textContent = results.keys[i].substring(0, 8) + '...';
-              keysList.appendChild(keyItem);
-            }
-            
-            detectionContent.appendChild(keysList);
-          }
-          
-          if (results.issues.length > 0) {
-            var issuesTitle = document.createElement('div');
-            issuesTitle.style.fontWeight = 'bold';
-            issuesTitle.style.marginTop = '8px';
-            issuesTitle.style.marginBottom = '4px';
-            issuesTitle.textContent = 'Potential issues:';
-            detectionContent.appendChild(issuesTitle);
-            
-            var issuesList = document.createElement('ul');
-            issuesList.style.margin = '0';
-            issuesList.style.paddingLeft = '16px';
-            issuesList.style.color = '#b91c1c';
-            
-            for (var i = 0; i < results.issues.length; i++) {
-              var issueItem = document.createElement('li');
-              issueItem.textContent = results.issues[i];
-              issuesList.appendChild(issueItem);
-            }
-            
-            detectionContent.appendChild(issuesList);
-          }
-        } else {
-          var noSupabase = document.createElement('p');
-          noSupabase.textContent = 'No Supabase usage detected in static scan.';
-          detectionContent.appendChild(noSupabase);
-        }
-        
-        // Set up requests tab with default content
-        var requestsIntro = document.createElement('p');
-        requestsIntro.style.fontSize = '13px';
-        requestsIntro.style.marginBottom = '8px';
-        requestsIntro.textContent = 'Monitoring network for Supabase requests...';
-        requestsContent.appendChild(requestsIntro);
-        
-        var requestsList = document.createElement('div');
-        requestsList.id = 'supacheck-requests-list';
-        requestsList.style.fontSize = '12px';
-        requestsList.style.maxHeight = '200px';
-        requestsList.style.overflowY = 'auto';
-        requestsContent.appendChild(requestsList);
-        
-        // Set up user tab with default content
-        var userIntro = document.createElement('p');
-        userIntro.style.fontSize = '13px';
-        userIntro.textContent = 'Waiting to capture user information...';
-        userContent.appendChild(userIntro);
-        
-        var userInfo = document.createElement('pre');
-        userInfo.id = 'supacheck-user-info';
-        userInfo.style.fontSize = '12px';
-        userInfo.style.backgroundColor = 'rgba(0,0,0,0.05)';
-        userInfo.style.padding = '8px';
-        userInfo.style.borderRadius = '4px';
-        userInfo.style.marginTop = '8px';
-        userInfo.style.maxHeight = '200px';
-        userInfo.style.overflowY = 'auto';
-        userInfo.style.display = 'none';
-        userContent.appendChild(userInfo);
-        
-        // Add tab contents to container
+        // Initial Content Setup
+        updateDetectionTab(); // Populate detection tab initially
+        requestsContent.innerHTML = '<p style="font-size:12px; color:#666;"><i>Waiting for Auth token...</i></p>';
+        userContent.innerHTML = '<p style="font-size:12px; color:#666;"><i>Waiting for profile fetch attempt...</i></p>';
+
         tabsContainer.appendChild(detectionContent);
         tabsContainer.appendChild(requestsContent);
         tabsContainer.appendChild(userContent);
         
-        // Add tabs container to widget
         widget.appendChild(tabsContainer);
         
         // Toggle widget expansion on click
         widget.addEventListener('click', function(event) {
-          if (event.target.classList && event.target.classList.contains('supacheck-tab')) {
-            // Handle tab switching
-            var tabName = event.target.getAttribute('data-tab');
-            switchTab(tabName);
-            event.stopPropagation();
-          } else {
-            // Expand/collapse widget
-            isExpanded = !isExpanded;
-            tabsContainer.style.display = isExpanded ? 'block' : 'none';
+          // Prevent toggling if a tab header was clicked
+          if (event.target.classList.contains('supacheck-tab-header')) {
+             event.stopPropagation(); 
+             return;
           }
+          
+          isExpanded = !isExpanded;
+          tabsContainer.style.display = isExpanded ? 'block' : 'none';
+          header.style.marginBottom = isExpanded ? '4px' : '0';
         });
         
         // Helper function to create tab header
         function createTabHeader(name, isActive) {
           var tab = document.createElement('div');
-          tab.className = 'supacheck-tab';
+          tab.className = 'supacheck-tab-header';
           tab.setAttribute('data-tab', name.toLowerCase());
           tab.style.padding = '6px 10px';
           tab.style.cursor = 'pointer';
           tab.style.fontSize = '13px';
           tab.style.borderBottom = isActive ? '2px solid #166534' : 'none';
-          tab.style.color = isActive ? '#166534' : '#65a30d';
+          tab.style.color = isActive ? '#166534' : '#6b7280'; // Muted color for inactive
+          tab.style.fontWeight = isActive ? 'bold' : 'normal';
           tab.textContent = name;
+          
+          // Add click listener for tab switching
+          tab.addEventListener('click', function(e) {
+            switchTab(name.toLowerCase());
+            e.stopPropagation(); // Prevent widget collapse
+          });
+          
           return tab;
         }
         
         // Function to switch between tabs
         function switchTab(tabName) {
-          // Update tab headers
-          var tabs = document.querySelectorAll('.supacheck-tab');
-          for (var i = 0; i < tabs.length; i++) {
-            var tab = tabs[i];
-            var isActive = tab.getAttribute('data-tab') === tabName;
-            tab.style.borderBottom = isActive ? '2px solid #166534' : 'none';
-            tab.style.color = isActive ? '#166534' : '#65a30d';
-          }
+          // Update tab headers appearance
+          var headers = widget.querySelectorAll('.supacheck-tab-header');
+          headers.forEach(function(h) {
+            var isActive = h.getAttribute('data-tab') === tabName;
+            h.style.borderBottom = isActive ? '2px solid #166534' : 'none';
+            h.style.color = isActive ? '#166534' : '#6b7280';
+            h.style.fontWeight = isActive ? 'bold' : 'normal';
+          });
           
-          // Update tab contents
-          var contents = document.querySelectorAll('.supacheck-tab-content');
-          for (var i = 0; i < contents.length; i++) {
-            contents[i].style.display = 'none';
-          }
-          
-          // Show the selected tab
-          if (tabName === 'detection') {
-            detectionContent.style.display = 'block';
-          } else if (tabName === 'requests') {
-            requestsContent.style.display = 'block';
-          } else if (tabName === 'user info') {
-            userContent.style.display = 'block';
-          }
+          // Update tab contents visibility
+          var contents = widget.querySelectorAll('.supacheck-tab-content');
+          contents.forEach(function(c) {
+            c.style.display = c.getAttribute('data-tab') === tabName ? 'block' : 'none';
+          });
         }
         
         document.body.appendChild(widget);
       }
       
-      // Function to update requests tab
+      // Function to update requests tab (Simplified)
       function updateRequestsTab(request) {
         if (!widget) return;
         
         var requestsList = document.getElementById('supacheck-requests-list');
         if (!requestsList) return;
         
-        // Create request item
+        requestsList.innerHTML = ''; // Clear previous content
+        
         var item = document.createElement('div');
-        item.style.padding = '8px';
-        item.style.borderBottom = '1px solid rgba(0,0,0,0.1)';
+        item.style.padding = '4px 0';
         item.style.fontSize = '12px';
         
-        var endpoint = document.createElement('div');
-        endpoint.style.fontWeight = 'bold';
-        endpoint.textContent = request.method + ' ' + extractEndpoint(request.endpoint);
+        var statusText = document.createElement('p');
+        statusText.innerHTML = '✅ <b>Auth Token Captured:</b><br>';
         
-        var details = document.createElement('div');
-        details.style.color = '#666';
-        details.style.fontSize = '11px';
-        details.style.marginTop = '2px';
-        details.textContent = formatTime(request.timestamp);
+        var tokenCode = document.createElement('code');
+        tokenCode.style.wordBreak = 'break-all';
+        tokenCode.style.color = '#555';
+        tokenCode.textContent = request.authToken ? request.authToken.substring(0, 15) + '...' : 'Error';
         
-        if (request.authToken) {
-          var authBadge = document.createElement('span');
-          authBadge.style.backgroundColor = '#f59e0b';
-          authBadge.style.color = 'white';
-          authBadge.style.padding = '1px 4px';
-          authBadge.style.borderRadius = '3px';
-          authBadge.style.fontSize = '10px';
-          authBadge.style.marginLeft = '5px';
-          authBadge.textContent = 'Auth';
-          details.appendChild(authBadge);
-        }
-        
-        if (request.userInfo) {
-          var userBadge = document.createElement('span');
-          userBadge.style.backgroundColor = '#0ea5e9';
-          userBadge.style.color = 'white';
-          userBadge.style.padding = '1px 4px';
-          userBadge.style.borderRadius = '3px';
-          userBadge.style.fontSize = '10px';
-          userBadge.style.marginLeft = '5px';
-          userBadge.textContent = 'User';
-          details.appendChild(userBadge);
-          
-          // Update user info tab
-          updateUserInfoTab(request.userInfo);
-        }
-        
-        item.appendChild(endpoint);
-        item.appendChild(details);
-        
-        // Add to the beginning of the list
-        if (requestsList.firstChild) {
-          requestsList.insertBefore(item, requestsList.firstChild);
-        } else {
-          requestsList.appendChild(item);
-        }
-        
-        // Limit the number of items to 20
-        while (requestsList.children.length > 20) {
-          requestsList.removeChild(requestsList.lastChild);
-        }
+        statusText.appendChild(tokenCode);
+        item.appendChild(statusText);
+        requestsList.appendChild(item);
       }
       
       // Function to update user info tab
-      function updateUserInfoTab(userInfo) {
+      function updateUserInfoTab(userInfo, endpoint) {
         if (!widget) return;
         
-        var userInfoElement = document.getElementById('supacheck-user-info');
-        if (!userInfoElement) return;
+        var userInfoContent = document.getElementById('supacheck-user-info-content');
+        if (!userInfoContent) return;
         
-        // Format the user info as JSON
-        userInfoElement.textContent = JSON.stringify(userInfo, null, 2);
-        userInfoElement.style.display = 'block';
-        
-        // Update the intro text
-        var userIntro = userInfoElement.previousSibling;
-        if (userIntro) {
-          userIntro.textContent = 'User information captured:';
+        userInfoContent.innerHTML = ''; // Clear previous content
+
+        if (userInfo) {
+            var successMsg = document.createElement('p');
+            successMsg.style.fontSize = '12px';
+            successMsg.style.marginBottom = '4px';
+            successMsg.innerHTML = '✅ Profile data fetched from <b>' + endpoint + '</b>:';
+            userInfoContent.appendChild(successMsg);
+            
+            var userInfoPre = document.createElement('pre');
+            userInfoPre.style.fontSize = '11px';
+            userInfoPre.style.backgroundColor = 'rgba(0,0,0,0.05)';
+            userInfoPre.style.padding = '8px';
+            userInfoPre.style.borderRadius = '4px';
+            userInfoPre.style.maxHeight = '150px';
+            userInfoPre.style.overflowY = 'auto';
+            userInfoPre.textContent = JSON.stringify(userInfo, null, 2);
+            userInfoContent.appendChild(userInfoPre);
+        } else {
+            var failureMsg = document.createElement('p');
+            failureMsg.style.fontSize = '12px';
+            failureMsg.style.color = '#b91c1c';
+            failureMsg.textContent = '❌ Failed to fetch profile data from common endpoints (/profiles, /users, /accounts).';
+            userInfoContent.appendChild(failureMsg);
         }
-        
-        // Store for later comparison
-        lastUserInfo = userInfo;
       }
       
       // Helper function to extract endpoint from URL
@@ -407,7 +292,63 @@ export async function GET(request: NextRequest) {
       }
       
       // Network request monitoring
-      function setupNetworkMonitoring() {
+      function setupNetworkMonitoring(results) {
+        var capturedAuthToken = null; // Store the captured bearer token
+        var profileFetchAttempted = false; // Ensure we only try once
+
+        // Function to attempt fetching profile data
+        async function attemptProfileFetch() {
+          if (!results.url || !capturedAuthToken || profileFetchAttempted) {
+            return; // Need URL and token, and only try once
+          }
+          
+          profileFetchAttempted = true;
+          console.log("[SupaCheck] Attempting to fetch profile data...");
+          
+          var profileEndpoints = ['/rest/v1/profiles', '/rest/v1/users', '/rest/v1/accounts'];
+          var foundProfileData = null;
+          var foundEndpoint = null;
+
+          for (var i = 0; i < profileEndpoints.length; i++) {
+            var endpoint = profileEndpoints[i];
+            var fetchUrl = 'https://' + results.url + endpoint + '?select=*';
+            
+            try {
+              var response = await fetch(fetchUrl, {
+                method: 'GET',
+                headers: {
+                  'Authorization': capturedAuthToken,
+                  'apikey': results.key, // Use the detected anon key
+                  'Accept': 'application/json'
+                }
+              });
+              
+              console.log("[SupaCheck] Profile fetch response for", endpoint, ":", response.status);
+              
+              if (response.ok) {
+                var data = await response.json();
+                console.log("[SupaCheck] Profile data found at", endpoint, ":", data);
+                
+                // Check if data is a non-empty array or an object with properties
+                if ((Array.isArray(data) && data.length > 0) || (typeof data === 'object' && data !== null && Object.keys(data).length > 0)) {
+                  foundProfileData = data;
+                  foundEndpoint = endpoint;
+                  break; // Found data, stop searching
+                }
+              } else {
+                 // Log non-OK responses for debugging
+                 var errorText = await response.text();
+                 console.log("[SupaCheck] Profile fetch failed for", endpoint, ":", response.status, errorText);
+              }
+            } catch (err) {
+              console.error("[SupaCheck] Error fetching profile data from", endpoint, ":", err);
+            }
+          }
+          
+          // Update the User Info tab
+          updateUserInfoTab(foundProfileData, foundEndpoint);
+        }
+
         // Check if fetch is available
         if (window.fetch) {
           // Store the original fetch
@@ -418,364 +359,177 @@ export async function GET(request: NextRequest) {
             var url = (resource instanceof Request) ? resource.url : resource;
             var method = (resource instanceof Request) ? resource.method : (options && options.method) || 'GET';
             
-            // Check if this is a Supabase request
-            if (url.toString().includes('supabase')) {
+            // Look for Authorization header only after initial detection
+            if (initialDetectionComplete && !capturedAuthToken) {
               var headers = {};
-              
-              // Extract headers from Request object or options
               if (resource instanceof Request) {
-                resource.headers.forEach(function(value, name) {
-                  headers[name] = value;
-                });
+                resource.headers.forEach(function(value, name) { headers[name] = value; });
               } else if (options && options.headers) {
-                if (options.headers instanceof Headers) {
-                  options.headers.forEach(function(value, name) {
-                    headers[name] = value;
-                  });
-                } else {
-                  headers = options.headers;
-                }
+                 if (options.headers instanceof Headers) {
+                   options.headers.forEach(function(value, name) { headers[name] = value; });
+                 } else {
+                   headers = options.headers;
+                 }
               }
               
-              // Look for authorization headers
-              var authToken = null;
-              if (headers.authorization || headers.Authorization) {
-                authToken = headers.authorization || headers.Authorization;
+              var authToken = headers.authorization || headers.Authorization;
+              if (authToken && authToken.toLowerCase().startsWith('bearer ')) {
+                console.log("[SupaCheck] Captured Authorization Bearer token.");
+                capturedAuthToken = authToken;
+                updateRequestsTab({ method: method, endpoint: url.toString(), timestamp: new Date().toISOString(), authToken: capturedAuthToken });
+                // Attempt to fetch profile data now that we have the token
+                attemptProfileFetch(); 
               }
-              
-              // Make the fetch call and monitor the response
-              return originalFetch.apply(this, arguments)
-                .then(function(response) {
-                  // Clone the response so we can read the body
-                  var clone = response.clone();
-                  
-                  clone.json().then(function(data) {
-                    // Process the response data
-                    var userInfo = null;
-                    
-                    // Try to extract user information from the response
-                    if (data && data.user) {
-                      userInfo = data.user;
-                    } else if (data && data.data && data.data.user) {
-                      userInfo = data.data.user;
-                    }
-                    
-                    // Create request object
-                    var requestData = {
-                      endpoint: url.toString(),
-                      method: method,
-                      headers: headers,
-                      response: data,
-                      timestamp: new Date().toISOString(),
-                      authToken: authToken,
-                      userInfo: userInfo
-                    };
-                    
-                    // Add to captured requests
-                    capturedRequests.push(requestData);
-                    
-                    // Update the UI
-                    updateRequestsTab(requestData);
-                    
-                  }).catch(function(error) {
-                    // Not JSON data, that's fine
-                  });
-                  
-                  return response; // Return the original response
-                });
             }
             
-            // Not a Supabase request, proceed normally
+            // Always call the original fetch
             return originalFetch.apply(this, arguments);
           };
         }
         
-        // Check if XMLHttpRequest is available
+        // Minimal XHR override just for capturing token
         if (window.XMLHttpRequest) {
-          var originalOpen = XMLHttpRequest.prototype.open;
           var originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
-          var originalSend = XMLHttpRequest.prototype.send;
           
-          // Store request data for each XHR instance
-          var requestData = new WeakMap();
-          
-          // Override open to capture method and URL
-          XMLHttpRequest.prototype.open = function(method, url) {
-            if (url.toString().includes('supabase')) {
-              // Initialize request data
-              requestData.set(this, {
-                method: method,
-                url: url,
-                headers: {},
-                timestamp: new Date().toISOString()
-              });
-            }
-            return originalOpen.apply(this, arguments);
-          };
-          
-          // Override setRequestHeader to capture headers
           XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-            var data = requestData.get(this);
-            if (data) {
-              data.headers[name] = value;
-              
-              // Check for authorization header
-              if (name.toLowerCase() === 'authorization') {
-                data.authToken = value;
-              }
+            if (initialDetectionComplete && !capturedAuthToken && name.toLowerCase() === 'authorization' && value.toLowerCase().startsWith('bearer ')) {
+              console.log("[SupaCheck] Captured Authorization Bearer token (XHR).");
+              capturedAuthToken = value;
+               // Note: Can't easily get method/URL here, so log minimally
+              updateRequestsTab({ method: 'N/A', endpoint: 'XHR Request', timestamp: new Date().toISOString(), authToken: capturedAuthToken });
+              attemptProfileFetch();
             }
             return originalSetRequestHeader.apply(this, arguments);
           };
-          
-          // Override send to capture the response
-          XMLHttpRequest.prototype.send = function() {
-            var xhr = this;
-            var data = requestData.get(xhr);
-            
-            if (data) {
-              var originalOnReadyStateChange = xhr.onreadystatechange;
-              
-              xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                  try {
-                    var response = JSON.parse(xhr.responseText);
-                    data.response = response;
-                    
-                    // Try to extract user information
-                    if (response && response.user) {
-                      data.userInfo = response.user;
-                    } else if (response && response.data && response.data.user) {
-                      data.userInfo = response.data.user;
-                    }
-                    
-                    // Add to captured requests
-                    capturedRequests.push({
-                      endpoint: data.url.toString(),
-                      method: data.method,
-                      headers: data.headers,
-                      response: data.response,
-                      timestamp: data.timestamp,
-                      authToken: data.authToken,
-                      userInfo: data.userInfo
-                    });
-                    
-                    // Update the UI
-                    updateRequestsTab(data);
-                    
-                  } catch (e) {
-                    // Not JSON, ignore
-                  }
-                }
-                
-                if (originalOnReadyStateChange) {
-                  originalOnReadyStateChange.apply(xhr, arguments);
-                }
-              };
-            }
-            
-            return originalSend.apply(this, arguments);
-          };
+        }
+        
+        console.log("[SupaCheck] Network monitoring setup complete.");
+      }
+      
+      // Function to update the Detection tab (called when URL/Key found after initial load)
+      function updateDetectionTab() {
+        if (!widget) return;
+        var detectionContent = widget.querySelector('.supacheck-tab-content[data-tab="detection"]');
+        if (!detectionContent) return;
+        
+        // Clear previous content
+        detectionContent.innerHTML = '';
+        
+        if (results.url) {
+            var urlEl = document.createElement('p');
+            urlEl.style.fontSize = '12px';
+            urlEl.innerHTML = '<b>URL:</b> ' + results.url;
+            detectionContent.appendChild(urlEl);
+        }
+        if (results.key) {
+            var keyEl = document.createElement('p');
+            keyEl.style.fontSize = '12px';
+            keyEl.innerHTML = '<b>Anon Key:</b> ' + results.key.substring(0, 10) + '...';
+            detectionContent.appendChild(keyEl);
+        }
+        if (!results.url && !results.key) {
+             var p = document.createElement('p');
+             p.textContent = 'Supabase URL/Key not found in static scan.';
+             detectionContent.appendChild(p);
         }
       }
       
       // Main scanner function
       function scanForSupabase() {
         try {
-          console.log("[SupaCheck] Starting Supabase scanner...");
+          console.log("[SupaCheck] Starting simplified Supabase scanner...");
           
           var results = {
-            urls: [],
-            keys: [],
+            url: null,
+            key: null,
             issues: []
           };
           
           // Pattern to match <hash>.supabase.co
-          var supabaseUrlPattern = /[a-zA-Z0-9\-_]+\.supabase\.co/g;
+          var supabaseUrlPattern = /([a-zA-Z0-9\-_]+\.supabase\.co)/g;
           
-          // Pattern to match potential Supabase keys (anon and service_role)
-          var supabaseKeyPattern = /eyJ[a-zA-Z0-9_.\-]{20,}(?:[a-zA-Z0-9+/]+=*)?/g;
+          // Pattern to match potential Supabase anon keys
+          var supabaseAnonKeyPattern = /eyJ[a-zA-Z0-9_.\-]{50,}/g; // Basic JWT pattern, adjust length as needed
           
-          // Check for common Supabase package names
-          var supabasePackages = [
-            '@supabase/supabase-js',
-            '@supabase/auth-helpers',
-            'supabase-js',
-            'SupabaseClient',
-            'createClient'
-          ];
-          
-          // Additional patterns to identify Supabase usage
-          var supabaseIdentifiers = [
-            'supabase',
-            'Supabase',
-            'SUPABASE',
-            '.from(',
-            '.auth.',
-            '.storage.',
-            '.rpc(',
-            'supabaseUrl',
-            'supabaseKey',
-            'supabaseAnonKey',
-            'SUPABASE_URL',
-            'SUPABASE_KEY',
-            'SUPABASE_ANON_KEY'
-          ];
-          
-          // Flag to track if any Supabase usage is found
-          var supabaseFound = false;
-          
-          // Function to check content for Supabase patterns
+          // Flag to track if initial detection is complete
+          var initialDetectionComplete = false;
+
+          // Function to check content for Supabase URL and Key
           function checkContentForSupabase(content) {
             if (!content) return false;
             
-            var foundIndicator = false;
+            var foundSomethingNew = false;
             
             try {
               // Check for Supabase URLs
-              var urlMatches = content.match(supabaseUrlPattern);
-              if (urlMatches) {
-                console.log("[SupaCheck] Found Supabase URLs:", urlMatches);
-                for (var j = 0; j < urlMatches.length; j++) {
-                  if (results.urls.indexOf(urlMatches[j]) === -1) {
-                    results.urls.push(urlMatches[j]);
-                    foundIndicator = true;
-                    supabaseFound = true;
-                  }
+              if (!results.url) {
+                var urlMatches = content.match(supabaseUrlPattern);
+                if (urlMatches && urlMatches[0]) {
+                  console.log("[SupaCheck] Found Supabase URL:", urlMatches[0]);
+                  results.url = urlMatches[0];
+                  foundSomethingNew = true;
                 }
               }
               
-              // Check for potential API keys
-              var keyMatches = content.match(supabaseKeyPattern);
-              if (keyMatches) {
-                console.log("[SupaCheck] Found potential Supabase keys:", keyMatches.length);
-                for (var j = 0; j < keyMatches.length; j++) {
-                  if (results.keys.indexOf(keyMatches[j]) === -1) {
-                    results.keys.push(keyMatches[j]);
-                    foundIndicator = true;
-                    supabaseFound = true;
-                    
-                    // Mark as potential issue
-                    if (results.issues.indexOf('Potentially exposed API key') === -1) {
-                      results.issues.push('Potentially exposed API key');
-                    }
+              // Check for potential Anon keys
+              if (!results.key) {
+                var keyMatches = content.match(supabaseAnonKeyPattern);
+                if (keyMatches && keyMatches[0]) {
+                  // Basic check to avoid capturing auth tokens here
+                  if (keyMatches[0].length < 500) { 
+                    console.log("[SupaCheck] Found potential Supabase Anon Key.");
+                    results.key = keyMatches[0];
+                    foundSomethingNew = true;
                   }
                 }
               }
-              
-              // Check for package imports and common patterns
-              for (var i = 0; i < supabasePackages.length; i++) {
-                if (content.includes(supabasePackages[i])) {
-                  console.log("[SupaCheck] Found Supabase package:", supabasePackages[i]);
-                  if (results.issues.indexOf('Supabase package detected: ' + supabasePackages[i]) === -1) {
-                    results.issues.push('Supabase package detected: ' + supabasePackages[i]);
-                    foundIndicator = true;
-                    supabaseFound = true;
-                  }
-                }
-              }
-              
-              // Check for common Supabase usage patterns
-              for (var i = 0; i < supabaseIdentifiers.length; i++) {
-                if (content.includes(supabaseIdentifiers[i])) {
-                  console.log("[SupaCheck] Found Supabase identifier:", supabaseIdentifiers[i]);
-                  if (results.issues.indexOf('Supabase usage pattern detected') === -1) {
-                    results.issues.push('Supabase usage pattern detected');
-                    foundIndicator = true;
-                    supabaseFound = true;
-                  }
-                  break; // One pattern is enough
-                }
-              }
+
             } catch (err) {
               console.error("[SupaCheck] Error checking content:", err);
             }
             
-            return foundIndicator;
+            return foundSomethingNew;
           }
           
           // Check <script> tags
           var scripts = document.querySelectorAll('script');
           for (var i = 0; i < scripts.length; i++) {
-            // Check inline content
-            var content = scripts[i].textContent || '';
-            checkContentForSupabase(content);
+            var scriptContent = scripts[i].textContent || '';
+            checkContentForSupabase(scriptContent);
             
-            // Check external scripts
-            var src = scripts[i].getAttribute('src');
-            if (src && src.endsWith('.js')) {
-              fetchContent(src, function(content) {
-                var updated = checkContentForSupabase(content);
-                if (updated && widget) {
-                  // Update the count badge
-                  var countBadge = widget.querySelector('.supacheck-count');
-                  if (countBadge) {
-                    countBadge.textContent = (results.urls.length + results.issues.length).toString();
+            // Check external scripts if needed
+            if (!results.url || !results.key) {
+              var src = scripts[i].getAttribute('src');
+              if (src && src.endsWith('.js')) {
+                fetchContent(src, function(externalContent) {
+                  if (checkContentForSupabase(externalContent) && widget) {
+                     updateDetectionTab(); // Update UI if something new is found
                   }
-                  
-                  // Make sure widget reflects found state
-                  var title = widget.querySelector('span');
-                  if (title && title.textContent !== 'Supabase Detected') {
-                    title.textContent = 'Supabase Detected';
-                  }
-                }
-              });
-            }
-          }
-          
-          // Also check the current page HTML for common signs of Supabase integration
-          var html = document.documentElement.innerHTML;
-          
-          // Add env variables check
-          var envVarPattern = /(VITE_|NEXT_PUBLIC_|REACT_APP_|GATSBY_)SUPABASE/i;
-          var envVarMatches = html.match(envVarPattern);
-          if (envVarMatches) {
-            if (results.issues.indexOf('Supabase environment variables detected') === -1) {
-              results.issues.push('Supabase environment variables detected');
-              supabaseFound = true;
-            }
-          }
-          
-          // Check for Supabase in HTML
-          if (checkContentForSupabase(html)) {
-            if (results.issues.indexOf('Potential Supabase usage detected in HTML') === -1) {
-              results.issues.push('Potential Supabase usage detected in HTML');
-              supabaseFound = true;
-            }
-          }
-          
-          // Check meta tags and links for Supabase references
-          var metaTags = document.querySelectorAll('meta');
-          for (var i = 0; i < metaTags.length; i++) {
-            var content = metaTags[i].getAttribute('content') || '';
-            if (content.includes('supabase') || content.includes('Supabase')) {
-              if (results.issues.indexOf('Supabase reference in meta tags') === -1) {
-                results.issues.push('Supabase reference in meta tags');
-                supabaseFound = true;
+                });
               }
-              break;
             }
+            // Stop early if both found
+            if (results.url && results.key) break;
           }
+          
+          // Check HTML if needed
+          if (!results.url || !results.key) {
+             var html = document.documentElement.innerHTML;
+             checkContentForSupabase(html);
+          }
+          
+          initialDetectionComplete = true;
+          console.log("[SupaCheck] Initial detection completed:", results);
           
           // Create initial UI
-          createIndicator(
-            supabaseFound || results.urls.length > 0 || results.keys.length > 0 || results.issues.length > 0, 
-            results
-          );
-          
-          // Log detection results
-          console.log("[SupaCheck] Detection completed:", {
-            supabaseFound: supabaseFound,
-            urls: results.urls,
-            keys: results.keys,
-            issues: results.issues
-          });
+          createIndicator(results.url || results.key, results);
           
           // Setup network monitoring
-          setupNetworkMonitoring();
+          setupNetworkMonitoring(results); // Pass initial results
           
         } catch (err) {
           logError("Error scanning for Supabase:", err);
-          createIndicator(false, {urls: [], keys: [], issues: []});
+          createIndicator(false, {url: null, key: null, issues: []});
         }
       }
       
