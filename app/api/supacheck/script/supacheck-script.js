@@ -70,6 +70,9 @@
   // Store captured response data
   const capturedResponses = new Map();
 
+  // Store captured auth tokens from requests
+  const capturedAuthTokens = new Map();
+
   // Helper function to add status item to the widget
   function addStatusItem(label, status, isOk = true) {
     const itemEl = document.createElement('div');
@@ -236,7 +239,53 @@
     // Add info message by default
     addResponseInfoMessage();
     
+    // Create complete table data section
+    createCompleteTableDataSection();
+    
     return responseContainer;
+  }
+  
+  // Create a section specifically for complete table data
+  function createCompleteTableDataSection() {
+    const sectionEl = document.createElement('div');
+    sectionEl.id = 'supabase-complete-data-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
+    
+    const titleEl = document.createElement('div');
+    titleEl.textContent = 'Complete Table Data';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
+    
+    const tableDataContainer = document.createElement('div');
+    tableDataContainer.id = 'supabase-complete-data';
+    
+    sectionEl.appendChild(titleEl);
+    sectionEl.appendChild(tableDataContainer);
+    contentEl.appendChild(sectionEl);
+    
+    // Add info message
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #EFF6FF;
+      border-radius: 4px;
+      border-left: 3px solid #3B82F6;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
+    messageEl.innerHTML = "We'll use detected authentication tokens to fetch and display complete table data.<br><br>" +
+      "When Supabase requests are detected, we'll automatically query the same tables to show all accessible columns and data.";
+    
+    tableDataContainer.appendChild(messageEl);
+    
+    return tableDataContainer;
   }
 
   // Add a table entry to the list
@@ -281,7 +330,7 @@
   }
 
   // Create a collapsible JSON viewer
-  function createJsonViewer(id, data, endpoint) {
+  function createJsonViewer(id, data, endpoint, title = null) {
     if (!data) return null;
     
     const containerEl = document.createElement('div');
@@ -297,7 +346,7 @@
     const headerEl = document.createElement('div');
     headerEl.style.cssText = `
       padding: 8px 12px;
-      background: #EBF5FF;
+      background: ${title ? '#E0F2FE' : '#EBF5FF'};
       font-weight: bold;
       font-size: 12px;
       cursor: pointer;
@@ -315,10 +364,17 @@
     } catch (e) {}
     
     const endpointText = document.createElement('div');
-    endpointText.textContent = endpointPath;
+    
+    // If we have a title, display it instead of just the endpoint
+    if (title) {
+      endpointText.innerHTML = `<span style="color: #3B82F6;">${title}</span><br><span style="font-size: 11px; color: #64748B;">${endpointPath}</span>`;
+    } else {
+      endpointText.textContent = endpointPath;
+    }
+    
     endpointText.style.overflow = 'hidden';
     endpointText.style.textOverflow = 'ellipsis';
-    endpointText.style.whiteSpace = 'nowrap';
+    endpointText.style.whiteSpace = title ? 'normal' : 'nowrap';
     
     const toggleEl = document.createElement('span');
     toggleEl.textContent = '▼';
@@ -626,18 +682,18 @@
   }
 
   // Add a response entry to the list
-  function addResponseEntry(url, data) {
+  function addResponseEntry(url, data, title = null) {
     const responsesContainer = document.getElementById('supabase-responses');
     if (!responsesContainer) return;
     
     // Remove any info message if it exists
-    const infoMessage = responsesContainer.querySelector('div[style*="background: #FEF3C7"]');
+    const infoMessage = responsesContainer.querySelector('div[style*="background: #EFF6FF"]');
     if (infoMessage) {
       responsesContainer.removeChild(infoMessage);
     }
     
     // Generate a unique ID for this response
-    const id = url.replace(/[^a-zA-Z0-9]/g, '-');
+    const id = url.replace(/[^a-zA-Z0-9]/g, '-') + (title ? `-${title.replace(/[^a-zA-Z0-9]/g, '-')}` : '');
     
     // Skip if we already have this response
     if (document.getElementById(`json-container-${id}`)) {
@@ -645,7 +701,7 @@
     }
     
     // Create the JSON viewer
-    const jsonViewer = createJsonViewer(id, data, url);
+    const jsonViewer = createJsonViewer(id, data, url, title);
     if (jsonViewer) {
       responsesContainer.appendChild(jsonViewer);
     }
@@ -977,6 +1033,33 @@
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
       const url = (typeof input === 'string') ? input : input?.url;
+      let extractedAuthToken = null;
+      let extractedTableName = null;
+      
+      // Extract auth token from request headers if available
+      if (init && init.headers) {
+        // Handle different header formats
+        if (init.headers instanceof Headers) {
+          const authHeader = init.headers.get('Authorization');
+          if (authHeader) extractedAuthToken = authHeader;
+        } else if (typeof init.headers === 'object') {
+          // Could be in either format: 'Authorization' or lowercase
+          extractedAuthToken = init.headers.Authorization || init.headers.authorization;
+        }
+        
+        // Clean up token format (remove 'Bearer ' prefix if present)
+        if (extractedAuthToken && typeof extractedAuthToken === 'string') {
+          if (extractedAuthToken.startsWith('Bearer ')) {
+            extractedAuthToken = extractedAuthToken.substring(7);
+          }
+          
+          // Extract table name if this is a data request
+          extractedTableName = extractTableNameFromUrl(url);
+          if (extractedTableName) {
+            capturedAuthTokens.set(extractedTableName, extractedAuthToken);
+          }
+        }
+      }
       
       // Call the original fetch
       const p = originalFetch.apply(this, arguments);
@@ -987,18 +1070,6 @@
         if (!isVerificationRequest(url)) {
           requestCount++;
           updateRequestCount();
-          
-          // Check for table names in the URL
-          if (url.includes('/rest/v1/')) {
-            const parts = url.split('/rest/v1/');
-            if (parts.length > 1) {
-              const pathPart = parts[1].split('?')[0].split('/')[0];
-              if (pathPart && pathPart !== 'auth') {
-                // Note: we only visually add the table - the actual existence
-                // is verified separately in verifyTablesAndCheckRLS
-              }
-            }
-          }
           
           // Intercept and capture the response
           p.then(function(response) {
@@ -1011,6 +1082,15 @@
               clonedResponse.json().then(data => {
                 capturedResponses.set(url, data);
                 addResponseEntry(url, data);
+                
+                // If we already extracted an auth token and table name, fetch complete data
+                if (extractedAuthToken && extractedTableName) {
+                  const baseUrl = extractBaseUrl(url);
+                  if (baseUrl) {
+                    // Fetch complete table data but only add it to the special section
+                    fetchCompleteTableData(baseUrl, extractedTableName, extractedAuthToken);
+                  }
+                }
               }).catch(() => {
                 // Not JSON data, ignore
               });
@@ -1025,24 +1105,20 @@
     // Intercept XMLHttpRequest
     const originalXhrOpen = XMLHttpRequest.prototype.open;
     const originalXhrSend = XMLHttpRequest.prototype.send;
+    const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
     
     XMLHttpRequest.prototype.open = function(method, url) {
       if (url && url.includes(baseUrl)) {
         this._supaRequestUrl = url;
         this._supaRequestMethod = method;
+        this._supaRequestHeaders = {};
         
         // Skip our own verification requests
         if (!isVerificationRequest(url)) {
           // Check for table names in the URL
-          if (url.includes('/rest/v1/')) {
-            const parts = url.split('/rest/v1/');
-            if (parts.length > 1) {
-              const pathPart = parts[1].split('?')[0].split('/')[0];
-              if (pathPart && pathPart !== 'auth') {
-                // Note: we only visually add the table - the actual existence
-                // is verified separately in verifyTablesAndCheckRLS
-              }
-            }
+          const tableName = extractTableNameFromUrl(url);
+          if (tableName) {
+            this._supaTableName = tableName;
           }
           
           const originalOnLoad = this.onload;
@@ -1057,6 +1133,15 @@
                 const data = JSON.parse(this.responseText);
                 capturedResponses.set(url, data);
                 addResponseEntry(url, data);
+                
+                // If we have auth token and table name, fetch complete data
+                if (this._supaTableName && this._supaRequestHeaders && this._supaRequestHeaders.authorization) {
+                  const baseUrl = extractBaseUrl(url);
+                  if (baseUrl) {
+                    // Fetch complete table data
+                    fetchCompleteTableData(baseUrl, this._supaTableName, this._supaRequestHeaders.authorization);
+                  }
+                }
               }
             } catch (e) {
               // Not JSON data, ignore
@@ -1067,6 +1152,28 @@
         }
       }
       originalXhrOpen.apply(this, arguments);
+    };
+    
+    XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+      // Capture auth token from headers
+      if (this._supaRequestUrl && (name.toLowerCase() === 'authorization')) {
+        let authToken = value;
+        
+        // Clean up token format
+        if (authToken.startsWith('Bearer ')) {
+          authToken = authToken.substring(7);
+        }
+        
+        // Store the token for this request
+        this._supaRequestHeaders.authorization = authToken;
+        
+        // If we have a table name, store the token for that table
+        if (this._supaTableName) {
+          capturedAuthTokens.set(this._supaTableName, authToken);
+        }
+      }
+      
+      originalXhrSetRequestHeader.apply(this, arguments);
     };
     
     XMLHttpRequest.prototype.send = function() {
@@ -1144,6 +1251,105 @@
     }
     
     return allTables; // Return all discovered tables
+  }
+
+  // Extract table name from URL
+  function extractTableNameFromUrl(url) {
+    if (url.includes('/rest/v1/')) {
+      const parts = url.split('/rest/v1/');
+      if (parts.length > 1) {
+        const pathPart = parts[1].split('?')[0].split('/')[0];
+        if (pathPart && pathPart !== 'auth') {
+          return pathPart;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Extract base URL from a full Supabase URL
+  function extractBaseUrl(url) {
+    if (url.includes('/rest/v1/')) {
+      return url.split('/rest/v1/')[0];
+    }
+    return null;
+  }
+
+  // Function to fetch all data from a table using the captured token
+  async function fetchCompleteTableData(baseUrl, tableName, token) {
+    try {
+      // Don't make the request if we don't have all required data
+      if (!baseUrl || !tableName || !token) return null;
+      
+      // Create the query URL to fetch all columns without filters
+      const queryUrl = `${baseUrl}/rest/v1/${tableName}?select=*&limit=50`;
+      
+      // Skip if this is a verification request
+      if (isVerificationRequest(queryUrl)) return null;
+      
+      // Add to our verification requests to avoid loops
+      ourVerificationRequests.add(queryUrl);
+      
+      // Make the request with the captured token
+      const response = await fetch(queryUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Add to complete data section
+        addCompleteTableDataEntry(queryUrl, data, tableName);
+        
+        return { url: queryUrl, data, tableName };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error fetching complete table data:', error);
+      return null;
+    }
+  }
+  
+  // Add an entry to the complete table data section
+  function addCompleteTableDataEntry(url, data, tableName) {
+    const tableDataContainer = document.getElementById('supabase-complete-data');
+    if (!tableDataContainer) return;
+    
+    // Remove any info message if it exists
+    const infoMessage = tableDataContainer.querySelector('div[style*="background: #EFF6FF"]');
+    if (infoMessage) {
+      tableDataContainer.removeChild(infoMessage);
+    }
+    
+    // Generate a unique ID for this response
+    const id = `table-data-${tableName}`;
+    
+    // Skip if we already have this response
+    if (document.getElementById(`json-container-${id}`)) {
+      // Update existing data
+      const existingContainer = document.getElementById(`json-container-${id}`);
+      if (existingContainer) {
+        tableDataContainer.removeChild(existingContainer);
+      }
+    }
+    
+    // Create a title for the viewer
+    const title = `Table: ${tableName} (${Array.isArray(data) ? data.length : 0} rows)`;
+    
+    // Create the JSON viewer
+    const jsonViewer = createJsonViewer(id, data, url, title);
+    if (jsonViewer) {
+      // Add a special class to make it more prominent
+      jsonViewer.style.border = '2px solid #3B82F6';
+      jsonViewer.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)';
+      
+      tableDataContainer.appendChild(jsonViewer);
+    }
   }
 
   // Main execution
