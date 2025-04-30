@@ -274,7 +274,7 @@ export async function GET() {
         function checkScriptContent(content, source) {
           // Pattern 1: Standard format with quotes
           // Example: "https://something.supabase.co"
-          const urlMatches = content.match(/["']https:\/\/([a-z0-9-]+)\.supabase\.co[""]/g);
+          const urlMatches = content.match(/[""]https:\/\/([a-z0-9-]+)\.supabase\.co[""]/g);
           
           // Pattern 2: Function parameter or object format
           // Example: supabaseUrl: e="https://something.supabase.co"
