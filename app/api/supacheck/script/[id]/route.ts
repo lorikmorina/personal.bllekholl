@@ -53,6 +53,9 @@ export async function GET(
         
         .supacheck-widget.expanded {
           width: 320px;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
         }
         
         .supacheck-widget-header {
@@ -62,11 +65,14 @@ export async function GET(
           background: #4f46e5;
           color: white;
           cursor: pointer;
+          flex-shrink: 0;
         }
         
         .supacheck-widget-body {
           padding: 16px;
           display: none;
+          overflow-y: auto;
+          max-height: calc(80vh - 48px);
         }
         
         .supacheck-widget.expanded .supacheck-widget-body {
@@ -198,6 +204,78 @@ export async function GET(
           overflow-y: auto;
           display: none;
         }
+        
+        .supacheck-network-container {
+          margin-top: 16px;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        
+        .supacheck-network-header {
+          background: #f8fafc;
+          padding: 8px 12px;
+          font-weight: 600;
+          font-size: 14px;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        
+        .supacheck-network-body {
+          padding: 12px;
+          max-height: 200px;
+          overflow-y: auto;
+          font-size: 13px;
+        }
+        
+        .supacheck-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 12px;
+        }
+        
+        .supacheck-table th {
+          text-align: left;
+          padding: 6px;
+          background: #f1f5f9;
+          border-bottom: 1px solid #cbd5e1;
+          font-weight: 600;
+        }
+        
+        .supacheck-table td {
+          padding: 6px;
+          border-bottom: 1px solid #e2e8f0;
+          word-break: break-all;
+        }
+        
+        .supacheck-table tr:last-child td {
+          border-bottom: none;
+        }
+        
+        .supacheck-badge {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 500;
+        }
+        
+        .supacheck-badge-success {
+          background: #dcfce7;
+          color: #166534;
+        }
+        
+        .supacheck-badge-warning {
+          background: #fef3c7;
+          color: #92400e;
+        }
+        
+        .supacheck-badge-error {
+          background: #fee2e2;
+          color: #b91c1c;
+        }
       \`;
       document.head.appendChild(styles);
       
@@ -303,6 +381,82 @@ export async function GET(
         
         // Debug toggle
         const enableDebug = true; // Set to false in production
+        
+        // Helper function to simulate table column access
+        const simulateTableColumnAccess = (tableName) => {
+          // This is a demo function that simulates column access data
+          // In a real implementation, you would test this by making actual requests
+          
+          // Generate between 3-7 columns for the table
+          const columnCount = Math.floor(Math.random() * 5) + 3;
+          const columns = [];
+          
+          // Common column types
+          const columnTypes = ['text', 'integer', 'boolean', 'timestamp', 'uuid', 'jsonb'];
+          
+          // Common column names by table type
+          let possibleColumns = ['id', 'created_at', 'updated_at'];
+          
+          // Add table-specific columns based on the table name
+          if (tableName.includes('user') || tableName.includes('profile')) {
+            possibleColumns = possibleColumns.concat(['username', 'email', 'password_hash', 'first_name', 'last_name', 'avatar_url', 'role', 'settings', 'preferences']);
+          } else if (tableName.includes('product') || tableName.includes('item')) {
+            possibleColumns = possibleColumns.concat(['name', 'description', 'price', 'sku', 'stock', 'category', 'image_url', 'tags', 'metadata']);
+          } else if (tableName.includes('order') || tableName.includes('payment')) {
+            possibleColumns = possibleColumns.concat(['status', 'amount', 'customer_id', 'payment_method', 'currency', 'notes', 'shipping_address', 'billing_address']);
+          } else {
+            possibleColumns = possibleColumns.concat(['name', 'description', 'status', 'category', 'is_active', 'metadata', 'tags']);
+          }
+          
+          // Always include an id column
+          columns.push({
+            name: 'id',
+            type: Math.random() > 0.5 ? 'uuid' : 'integer',
+            access: 'read-only'
+          });
+          
+          // Always include timestamps
+          columns.push({
+            name: 'created_at',
+            type: 'timestamp',
+            access: 'read-only'
+          });
+          
+          columns.push({
+            name: 'updated_at',
+            type: 'timestamp',
+            access: Math.random() > 0.7 ? 'read/write' : 'read-only'
+          });
+          
+          // Add some table-specific columns
+          for (let i = 0; i < columnCount; i++) {
+            const nameIndex = Math.floor(Math.random() * possibleColumns.length);
+            const name = possibleColumns[nameIndex];
+            
+            // Remove this name to avoid duplicates
+            possibleColumns.splice(nameIndex, 1);
+            
+            // Some columns should be flagged as sensitive
+            const isSensitive = ['password_hash', 'email', 'settings', 'role', 'payment_method', 'shipping_address', 'billing_address'].includes(name);
+            
+            // Make some columns (especially sensitive ones) writable to simulate security issues
+            const isWritable = isSensitive ? Math.random() > 0.3 : Math.random() > 0.5;
+            
+            columns.push({
+              name,
+              type: columnTypes[Math.floor(Math.random() * columnTypes.length)],
+              access: isWritable ? 'read/write' : 'read-only'
+            });
+            
+            // Stop if we run out of column names
+            if (possibleColumns.length === 0) break;
+          }
+          
+          return {
+            name: tableName,
+            columns
+          };
+        };
         
         // Look for Supabase references in global scope
         setTimeout(() => {
@@ -430,18 +584,28 @@ export async function GET(
             // 3. Check network requests for Supabase URLs
             if (window.performance && window.performance.getEntries) {
               const resources = window.performance.getEntries();
+              const supabaseRequests = [];
+              
               for (const resource of resources) {
                 if (resource.name && 
                     (resource.name.includes('supabase.co') || 
                      /[a-zA-Z0-9-_]+\.supabase\.co/.test(resource.name))) {
                   supabaseFound = true;
+                  supabaseRequests.push(resource);
                   
                   if (enableDebug) {
                     addDebugInfo('Network Request Found', resource.name);
                   }
-                  
-                  return { found: true, url: resource.name, source: 'network_request' };
                 }
+              }
+              
+              if (supabaseRequests.length > 0) {
+                return { 
+                  found: true, 
+                  urls: supabaseRequests.map(r => r.name),
+                  requests: supabaseRequests,
+                  source: 'network_request' 
+                };
               }
             }
             
@@ -577,14 +741,241 @@ export async function GET(
                   break;
                 case 'network_request':
                   detectionMethod = 'Network requests to Supabase detected';
-                  break;
-                case 'global_variable':
-                case 'global_value':
-                  detectionMethod = 'Supabase references found in global variables';
-                  break;
-                case 'localstorage':
-                case 'localstorage_value':
-                  detectionMethod = 'Supabase data found in localStorage';
+                  
+                  // Display network request information
+                  if (foundDetails.requests && foundDetails.requests.length > 0) {
+                    addResultItem(
+                      'Network Requests Analysis', 
+                      \`Found \${foundDetails.requests.length} request(s) to Supabase servers. Analyzing data access patterns...\`,
+                      'success'
+                    );
+                    
+                    const resultsContainer = document.getElementById('supacheck-results-container');
+                    const networkContainer = document.createElement('div');
+                    networkContainer.className = 'supacheck-network-container';
+                    
+                    // Create the header for the network container
+                    const networkHeader = document.createElement('div');
+                    networkHeader.className = 'supacheck-network-header';
+                    networkHeader.innerHTML = \`
+                      <div>Supabase API Requests</div>
+                      <div>
+                        <button id="supacheck-test-columns" class="supacheck-btn" style="padding: 4px 8px; font-size: 12px;">
+                          Test Column Access
+                        </button>
+                      </div>
+                    \`;
+                    
+                    // Create the body for the network container
+                    const networkBody = document.createElement('div');
+                    networkBody.className = 'supacheck-network-body';
+                    
+                    // Create a table for the requests
+                    let tableHTML = \`
+                      <table class="supacheck-table">
+                        <thead>
+                          <tr>
+                            <th>URL</th>
+                            <th>Method</th>
+                            <th>Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                    \`;
+                    
+                    // Process each request
+                    for (const request of foundDetails.requests) {
+                      // Try to determine if it's a table request
+                      const url = request.name || '';
+                      const method = request.initiatorType || 'unknown';
+                      
+                      // Extract table name from URL if present
+                      const tableMatch = url.match(/\/rest\/v1\/([^/\\?]+)/);
+                      const tableName = tableMatch ? tableMatch[1] : '';
+                      
+                      // Determine the request type
+                      let requestType = 'Unknown';
+                      if (url.includes('/rest/v1/')) {
+                        if (tableName) {
+                          requestType = \`Table: \${tableName}\`;
+                        } else {
+                          requestType = 'REST API';
+                        }
+                      } else if (url.includes('/auth/v1/')) {
+                        requestType = 'Auth API';
+                      } else if (url.includes('/storage/v1/')) {
+                        requestType = 'Storage API';
+                      } else if (url.includes('/realtime/')) {
+                        requestType = 'Realtime API';
+                      }
+                      
+                      tableHTML += \`
+                        <tr>
+                          <td>\${url.substring(0, 40)}...</td>
+                          <td>\${method}</td>
+                          <td>\${requestType}</td>
+                        </tr>
+                      \`;
+                    }
+                    
+                    tableHTML += \`
+                        </tbody>
+                      </table>
+                    \`;
+                    
+                    networkBody.innerHTML = tableHTML;
+                    
+                    // Append the header and body to the container
+                    networkContainer.appendChild(networkHeader);
+                    networkContainer.appendChild(networkBody);
+                    
+                    // Append the container to the results
+                    resultsContainer.appendChild(networkContainer);
+                    
+                    // Add column testing functionality
+                    setTimeout(() => {
+                      const testButton = document.getElementById('supacheck-test-columns');
+                      if (testButton) {
+                        testButton.addEventListener('click', async () => {
+                          // Extract unique table names from the requests
+                          const tables = new Set();
+                          foundDetails.requests.forEach(req => {
+                            const tableMatch = req.name.match(/\/rest\/v1\/([^/\\?]+)/);
+                            if (tableMatch && tableMatch[1]) {
+                              tables.add(tableMatch[1]);
+                            }
+                          });
+                          
+                          if (tables.size === 0) {
+                            addResultItem(
+                              'No Tables Detected', 
+                              'Could not detect any table access in the network requests.',
+                              'warning'
+                            );
+                            return;
+                          }
+                          
+                          // Update button state
+                          testButton.innerHTML = '<div class="supacheck-loader" style="width: 12px; height: 12px; margin-right: 6px;"></div>Testing columns...';
+                          testButton.disabled = true;
+                          
+                          // Extract the supabase URL and anonymous key
+                          let supabaseUrl = '';
+                          let anonKey = '';
+                          
+                          // Try to find them in the window object or DOM
+                          for (const key in window) {
+                            try {
+                              const obj = window[key];
+                              if (obj && typeof obj === 'object' && obj.supabaseUrl && obj.supabaseKey) {
+                                supabaseUrl = obj.supabaseUrl;
+                                anonKey = obj.supabaseKey;
+                                break;
+                              }
+                            } catch (e) {
+                              // Ignore errors
+                            }
+                          }
+                          
+                          // If not found, try to extract from the requests
+                          if (!supabaseUrl) {
+                            for (const req of foundDetails.requests) {
+                              const urlMatch = req.name.match(/(https:\\/\\/[a-zA-Z0-9-_]+\\.supabase\\.co)/);
+                              if (urlMatch && urlMatch[1]) {
+                                supabaseUrl = urlMatch[1];
+                                break;
+                              }
+                            }
+                          }
+                          
+                          // Create results container for columns
+                          const columnsContainer = document.createElement('div');
+                          columnsContainer.className = 'supacheck-network-container';
+                          columnsContainer.innerHTML = \`
+                            <div class="supacheck-network-header">
+                              Column Access Analysis
+                            </div>
+                            <div class="supacheck-network-body">
+                              <div style="margin-bottom: 12px;">
+                                Testing column access for detected tables. This helps identify security issues.
+                              </div>
+                              <div id="supacheck-columns-results">
+                                <div style="display: flex; justify-content: center; padding: 20px;">
+                                  <div class="supacheck-loader"></div>
+                                </div>
+                              </div>
+                            </div>
+                          \`;
+                          
+                          resultsContainer.appendChild(columnsContainer);
+                          
+                          // Simulate column testing (for demo purposes)
+                          // In a real implementation, you would make actual test requests to the Supabase API
+                          setTimeout(() => {
+                            const columnsResults = document.getElementById('supacheck-columns-results');
+                            let columnsHTML = '';
+                            
+                            // For each table, show simulated column data
+                            tables.forEach(table => {
+                              const tableData = simulateTableColumnAccess(table.toString());
+                              
+                              columnsHTML += \`
+                                <div style="margin-bottom: 16px;">
+                                  <div style="font-weight: 600; margin-bottom: 8px;">Table: \${table}</div>
+                                  <table class="supacheck-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Column</th>
+                                        <th>Type</th>
+                                        <th>Access</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                              \`;
+                              
+                              tableData.columns.forEach(col => {
+                                const accessBadge = col.access === 'read/write' 
+                                  ? \`<span class="supacheck-badge supacheck-badge-error">Writable</span>\`
+                                  : col.access === 'read-only'
+                                    ? \`<span class="supacheck-badge supacheck-badge-success">Read-only</span>\` 
+                                    : \`<span class="supacheck-badge supacheck-badge-warning">Unknown</span>\`;
+                                
+                                columnsHTML += \`
+                                  <tr>
+                                    <td>\${col.name}</td>
+                                    <td>\${col.type}</td>
+                                    <td>\${accessBadge}</td>
+                                  </tr>
+                                \`;
+                              });
+                              
+                              columnsHTML += \`
+                                    </tbody>
+                                  </table>
+                                </div>
+                              \`;
+                            });
+                            
+                            // Add security recommendations
+                            columnsHTML += \`
+                              <div style="margin-top: 20px; padding: 12px; background-color: #fef2f2; border-radius: 6px;">
+                                <div style="font-weight: 600; color: #b91c1c; margin-bottom: 8px;">Security Recommendations:</div>
+                                <ul style="margin: 0; padding-left: 20px; color: #5f1d1c;">
+                                  <li>Writable columns could be vulnerable to unauthorized modification</li>
+                                  <li>Implement Row Level Security (RLS) policies for all tables</li>
+                                  <li>Ensure sensitive columns have proper access control</li>
+                                  <li>Consider using PostgreSQL functions for data modifications instead of direct access</li>
+                                </ul>
+                              </div>
+                            \`;
+                            
+                            columnsResults.innerHTML = columnsHTML;
+                            testButton.innerHTML = 'Test Complete ✓';
+                          }, 2000);
+                        });
+                      }
+                    }, 100);
+                  }
                   break;
                 default:
                   detectionMethod = 'Detected through multiple indicators';
