@@ -138,15 +138,14 @@
     messageEl.style.cssText = `
       margin-top: 10px;
       padding: 10px;
-      background: #FEF3C7;
+      background: #EFF6FF;
       border-radius: 4px;
-      border-left: 3px solid #F59E0B;
+      border-left: 3px solid #3B82F6;
       font-size: 13px;
       line-height: 1.4;
     `;
-    messageEl.innerHTML = "Due to CORS limitations, we can only show responses captured in real-time.<br><br>" +
-      "Cross-origin restrictions may prevent viewing responses from different domains. " +
-      "Refresh the page and use the app to see response data from new requests.";
+    messageEl.innerHTML = "Response data will be captured and displayed here in real-time as requests are made.<br><br>" +
+      "Interact with the application to generate new Supabase requests and see their responses.";
     
     const responsesContainer = document.getElementById('supabase-responses');
     if (responsesContainer && responsesContainer.children.length === 0) {
@@ -1156,9 +1155,6 @@
     
     // Clear loading indicator
     hideLoading();
-    
-    // Show CORS information message
-    addCorsInfoMessage();
     
     // Display Supabase status
     if (supabaseUrl && supabaseKey) {
