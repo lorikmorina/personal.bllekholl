@@ -40,6 +40,11 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
 
+        <Script src="https://securevibing.com/api/supacheck/script/supacheck_febjbe576ov_ma3ql8yk" 
+        id="supacheck_febjbe576ov_ma3ql8yk" 
+        async
+        />
+        
         {/* Hotjar Tracking Code */}
         <Script id="hotjar-tracking" strategy="afterInteractive">
           {`
@@ -53,6 +58,8 @@ export default function RootLayout({
             })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
           `}
         </Script>
+
+        
         
         <meta name="apple-mobile-web-app-title" content="SecureVibing" />
         <meta property="og:title" content="Pass the Security Vibe Check" />
