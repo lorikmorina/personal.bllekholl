@@ -27,9 +27,8 @@ const nextConfig = {
         source: "/(.*)",
         headers: [
           {
-            key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.supabase.co; connect-src 'self' *.supabase.co data:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self';",
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.paddle.com https://public.profitwell.com https://securevibing.com/api/supacheck/script https://www.googletagmanager.com https://static.hotjar.com https://script.hotjar.com https://*.securevibing.com; style-src 'self' 'unsafe-inline' https://*.paddle.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; font-src 'self'; connect-src 'self' https://*.supabase.co https://*.paddle.com https://www.google-analytics.com https://metrics.hotjar.io https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://*.paddle.com; "
           },
           {
             key: "X-Frame-Options",
