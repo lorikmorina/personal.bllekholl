@@ -63,6 +63,9 @@
   }
 
   const contentEl = createWidget();
+  
+  // Keep track of our own verification requests so we don't display them
+  const ourVerificationRequests = new Set();
 
   // Helper function to add status item to the widget
   function addStatusItem(label, status, isOk = true) {
@@ -233,6 +236,21 @@
     if (loadingEl) loadingEl.remove();
   }
 
+  // Helper function to check if a URL contains any of our verification patterns
+  function isVerificationRequest(url) {
+    // Check if this is one of our verification requests
+    if (ourVerificationRequests.has(url)) {
+      return true;
+    }
+    
+    // Check if it contains our verification pattern
+    if (url.includes('select=*&limit=10')) {
+      return true;
+    }
+    
+    return false;
+  }
+
   // Analyze the Performance API entries to find prior Supabase requests
   function analyzePerformanceEntries(supabaseUrl) {
     if (!window.performance || !window.performance.getEntriesByType) {
@@ -249,8 +267,13 @@
     for (const resource of resources) {
       if (resource.name && resource.name.includes(baseUrl)) {
         const url = resource.name;
-        let method = 'GET'; // Default, since Performance API doesn't provide the method
         
+        // Skip if this is one of our verification requests
+        if (isVerificationRequest(url)) {
+          continue;
+        }
+        
+        let method = 'GET'; // Default, since Performance API doesn't provide the method
         requests.push({ method, url });
         
         // Try to extract the table name from the URL
@@ -261,8 +284,6 @@
             const pathPart = parts[1].split('?')[0].split('/')[0];
             if (pathPart && pathPart !== 'auth') {
               tableNames.add(pathPart);
-              // These tables from performance entries actually exist
-              addTableEntry(pathPart, url);
             }
           }
         }
@@ -343,8 +364,13 @@
     
     try {
       for (const table of tablesToCheck) {
+        const verificationUrl = `${supabaseUrl}/rest/v1/${table}?select=*&limit=10`;
+        
+        // Track this as our verification request
+        ourVerificationRequests.add(verificationUrl);
+        
         try {
-          const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=*&limit=10`, {
+          const response = await fetch(verificationUrl, {
             method: 'GET',
             headers: {
               'apikey': supabaseKey,
@@ -352,11 +378,12 @@
             }
           });
           
-          if (response.ok) {
+          // Only consider table exists if status is 200
+          if (response.status === 200) {
             const data = await response.json();
             // This table exists - add it to our UI
             existingTables.add(table);
-            addTableEntry(table, `${supabaseUrl}/rest/v1/${table}?select=*&limit=10`);
+            addTableEntry(table, verificationUrl);
             
             // Check RLS while we're at it
             if (Array.isArray(data) && data.length > 1) {
@@ -509,26 +536,30 @@
       // Check if this is a Supabase request
       const url = (typeof input === 'string') ? input : input?.url;
       if (url && url.includes(baseUrl)) {
-        requestCount++;
-        updateRequestCount();
-        
-        // Check for table names in the URL
-        if (url.includes('/rest/v1/')) {
-          const parts = url.split('/rest/v1/');
-          if (parts.length > 1) {
-            const pathPart = parts[1].split('?')[0].split('/')[0];
-            if (pathPart && pathPart !== 'auth') {
-              addTableEntry(pathPart, url);
+        // Skip our own verification requests
+        if (!isVerificationRequest(url)) {
+          requestCount++;
+          updateRequestCount();
+          
+          // Check for table names in the URL
+          if (url.includes('/rest/v1/')) {
+            const parts = url.split('/rest/v1/');
+            if (parts.length > 1) {
+              const pathPart = parts[1].split('?')[0].split('/')[0];
+              if (pathPart && pathPart !== 'auth') {
+                // Note: we only visually add the table - the actual existence
+                // is verified separately in verifyTablesAndCheckRLS
+              }
             }
           }
+          
+          p.then(function(response) {
+            try {
+              const method = (init && init.method) ? init.method : 'GET';
+              addRequestEntry(method, url);
+            } catch (e) {}
+          });
         }
-        
-        p.then(function(response) {
-          try {
-            const method = (init && init.method) ? init.method : 'GET';
-            addRequestEntry(method, url);
-          } catch (e) {}
-        });
       }
       
       return p;
@@ -541,30 +572,39 @@
         this._supaRequestUrl = url;
         this._supaRequestMethod = method;
         
-        // Check for table names in the URL
-        if (url.includes('/rest/v1/')) {
-          const parts = url.split('/rest/v1/');
-          if (parts.length > 1) {
-            const pathPart = parts[1].split('?')[0].split('/')[0];
-            if (pathPart && pathPart !== 'auth') {
-              addTableEntry(pathPart, url);
+        // Skip our own verification requests
+        if (!isVerificationRequest(url)) {
+          // Check for table names in the URL
+          if (url.includes('/rest/v1/')) {
+            const parts = url.split('/rest/v1/');
+            if (parts.length > 1) {
+              const pathPart = parts[1].split('?')[0].split('/')[0];
+              if (pathPart && pathPart !== 'auth') {
+                // Note: we only visually add the table - the actual existence
+                // is verified separately in verifyTablesAndCheckRLS
+              }
             }
           }
+          
+          const originalOnLoad = this.onload;
+          this.onload = function() {
+            requestCount++;
+            updateRequestCount();
+            addRequestEntry(method, url);
+            if (originalOnLoad) originalOnLoad.apply(this, arguments);
+          };
         }
-        
-        const originalOnLoad = this.onload;
-        this.onload = function() {
-          requestCount++;
-          updateRequestCount();
-          addRequestEntry(method, url);
-          if (originalOnLoad) originalOnLoad.apply(this, arguments);
-        };
       }
       originalXhrOpen.apply(this, arguments);
     };
     
     // Add a request entry to the list
     function addRequestEntry(method, url) {
+      // Skip our own verification requests
+      if (isVerificationRequest(url)) {
+        return;
+      }
+      
       const endpoint = url.split('/').slice(3).join('/');
       
       const requestEl = document.createElement('div');
