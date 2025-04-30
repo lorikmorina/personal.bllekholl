@@ -25,14 +25,15 @@ export async function GET(
       if (window.__SUPACHECK_INITIALIZED__) return;
       window.__SUPACHECK_INITIALIZED__ = true;
       
+      // Use older var syntax for better browser compatibility
       // Configuration with script ID
-      const config = {
+      var config = {
         scriptId: "${id}",
         apiEndpoint: "${process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin}/api/supacheck/verify",
       };
       
       // Create styles for the widget
-      const styles = document.createElement('style');
+      var styles = document.createElement('style');
       styles.textContent = \`
         .supacheck-widget {
           position: fixed;
@@ -280,7 +281,7 @@ export async function GET(
       document.head.appendChild(styles);
       
       // Create the widget container
-      const widget = document.createElement('div');
+      var widget = document.createElement('div');
       widget.className = 'supacheck-widget';
       widget.innerHTML = \`
         <div class="supacheck-widget-header">
@@ -310,17 +311,17 @@ export async function GET(
       document.body.appendChild(widget);
       
       // Toggle widget expansion when clicking on the header
-      const header = widget.querySelector('.supacheck-widget-header');
-      header.addEventListener('click', () => {
+      var header = widget.querySelector('.supacheck-widget-header');
+      header.addEventListener('click', function() {
         widget.classList.toggle('expanded');
       });
       
       // Function to update widget status
-      const updateStatus = (type, message) => {
-        const statusDiv = widget.querySelector('.supacheck-status');
+      function updateStatus(type, message) {
+        var statusDiv = widget.querySelector('.supacheck-status');
         statusDiv.className = 'supacheck-status supacheck-status-' + type;
         
-        const iconHtml = type === 'scanning' 
+        var iconHtml = type === 'scanning' 
           ? '<div class="supacheck-loader"></div>' 
           : type === 'success' 
             ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
@@ -334,16 +335,16 @@ export async function GET(
             \${message}
           </div>
         \`;
-      };
+      }
       
       // Function to add a result item
-      const addResultItem = (title, description, type) => {
-        const resultsContainer = document.getElementById('supacheck-results-container');
+      function addResultItem(title, description, type) {
+        var resultsContainer = document.getElementById('supacheck-results-container');
         
-        const itemDiv = document.createElement('div');
+        var itemDiv = document.createElement('div');
         itemDiv.className = 'supacheck-result-item';
         
-        let iconHtml = '';
+        var iconHtml = '';
         if (type === 'success') {
           iconHtml = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
         } else if (type === 'warning') {
@@ -362,17 +363,17 @@ export async function GET(
         \`;
         
         resultsContainer.appendChild(itemDiv);
-      };
+      }
       
       // Helper function to add debug information
-      const addDebugInfo = (title, info) => {
-        const debugContainer = document.getElementById('supacheck-debug-info');
+      function addDebugInfo(title, info) {
+        var debugContainer = document.getElementById('supacheck-debug-info');
         debugContainer.style.display = 'block';
         debugContainer.innerHTML += \`<div><strong>\${title}:</strong> \${info}</div>\`;
-      };
+      }
       
       // Function to detect Supabase usage
-      const detectSupabase = () => {
+      function detectSupabase() {
         // Open the widget on initialization
         widget.classList.add('expanded');
         
@@ -380,22 +381,22 @@ export async function GET(
         updateStatus('scanning', 'Scanning for Supabase configuration...');
         
         // Debug toggle
-        const enableDebug = true; // Set to false in production
+        var enableDebug = true; // Set to false in production
         
         // Helper function to simulate table column access
-        const simulateTableColumnAccess = (tableName) => {
+        function simulateTableColumnAccess(tableName) {
           // This is a demo function that simulates column access data
           // In a real implementation, you would test this by making actual requests
           
           // Generate between 3-7 columns for the table
-          const columnCount = Math.floor(Math.random() * 5) + 3;
-          const columns = [];
+          var columnCount = Math.floor(Math.random() * 5) + 3;
+          var columns = [];
           
           // Common column types
-          const columnTypes = ['text', 'integer', 'boolean', 'timestamp', 'uuid', 'jsonb'];
+          var columnTypes = ['text', 'integer', 'boolean', 'timestamp', 'uuid', 'jsonb'];
           
           // Common column names by table type
-          let possibleColumns = ['id', 'created_at', 'updated_at'];
+          var possibleColumns = ['id', 'created_at', 'updated_at'];
           
           // Add table-specific columns based on the table name
           if (tableName.includes('user') || tableName.includes('profile')) {
@@ -429,21 +430,21 @@ export async function GET(
           });
           
           // Add some table-specific columns
-          for (let i = 0; i < columnCount; i++) {
-            const nameIndex = Math.floor(Math.random() * possibleColumns.length);
-            const name = possibleColumns[nameIndex];
+          for (var i = 0; i < columnCount; i++) {
+            var nameIndex = Math.floor(Math.random() * possibleColumns.length);
+            var name = possibleColumns[nameIndex];
             
             // Remove this name to avoid duplicates
             possibleColumns.splice(nameIndex, 1);
             
             // Some columns should be flagged as sensitive
-            const isSensitive = ['password_hash', 'email', 'settings', 'role', 'payment_method', 'shipping_address', 'billing_address'].includes(name);
+            var isSensitive = ['password_hash', 'email', 'settings', 'role', 'payment_method', 'shipping_address', 'billing_address'].includes(name);
             
             // Make some columns (especially sensitive ones) writable to simulate security issues
-            const isWritable = isSensitive ? Math.random() > 0.3 : Math.random() > 0.5;
+            var isWritable = isSensitive ? Math.random() > 0.3 : Math.random() > 0.5;
             
             columns.push({
-              name,
+              name: name,
               type: columnTypes[Math.floor(Math.random() * columnTypes.length)],
               access: isWritable ? 'read/write' : 'read-only'
             });
@@ -454,21 +455,21 @@ export async function GET(
           
           return {
             name: tableName,
-            columns
+            columns: columns
           };
-        };
+        }
         
         // Look for Supabase references in global scope
-        setTimeout(() => {
-          let supabaseFound = false;
-          let insecureAnonymousKeyFound = false;
-          let foundDetails = {};
+        setTimeout(function() {
+          var supabaseFound = false;
+          var insecureAnonymousKeyFound = false;
+          var foundDetails = {};
           
           // Check if the SupabaseClient is available in the window object
-          const findSupabaseInWindow = () => {
-            for (const key in window) {
+          function findSupabaseInWindow() {
+            for (var key in window) {
               try {
-                const obj = window[key];
+                var obj = window[key];
                 // Check if the object might be a Supabase client
                 if (obj && 
                     typeof obj === 'object' && 
@@ -480,8 +481,8 @@ export async function GET(
                   supabaseFound = true;
                   // Try to extract the key if possible
                   if (obj.supabaseKey || obj.restUrl || obj.url) {
-                    const supabaseKey = obj.supabaseKey || '';
-                    const supabaseUrl = obj.restUrl || obj.url || '';
+                    var supabaseKey = obj.supabaseKey || '';
+                    var supabaseUrl = obj.restUrl || obj.url || '';
                     
                     // Check if it's likely an anonymous key (starts with eyJ or contains anon)
                     if (supabaseKey && (supabaseKey.startsWith('eyJ') || supabaseKey.includes('anon'))) {
@@ -489,7 +490,7 @@ export async function GET(
                     }
                     
                     if (enableDebug) {
-                      addDebugInfo('Window Object Found', \`Key: \${key}, URL: \${supabaseUrl.substring(0, 20)}...\`);
+                      addDebugInfo('Window Object Found', 'Key: ' + key + ', URL: ' + supabaseUrl.substring(0, 20) + '...');
                     }
                     
                     return {
@@ -506,41 +507,51 @@ export async function GET(
               }
             }
             return { found: false };
-          };
+          }
           
           // Look for Supabase URLs or keys in DOM (scripts, attributes, etc.)
-          const findSupabaseInDOM = () => {
+          function findSupabaseInDOM() {
             // 1. Check for supabase in all script tags
-            const scripts = document.querySelectorAll('script');
-            for (const script of scripts) {
-              const content = script.textContent || '';
-              const src = script.getAttribute('src') || '';
+            var scripts = document.querySelectorAll('script');
+            for (var i = 0; i < scripts.length; i++) {
+              var script = scripts[i];
+              var content = script.textContent || '';
+              var src = script.getAttribute('src') || '';
               
               // Check for Supabase URL patterns - including <hash>.supabase.co
-              const supabaseUrlPattern = /[a-zA-Z0-9-_]+\.supabase\.co/;
-              const supabaseTerms = ['supabase', 'createClient', 'SUPABASE_URL', 'SUPABASE_KEY'];
+              var supabaseUrlPattern = /[a-zA-Z0-9-_]+\.supabase\.co/;
+              var supabaseTerms = ['supabase', 'createClient', 'SUPABASE_URL', 'SUPABASE_KEY'];
               
-              const hasSupabaseUrl = supabaseUrlPattern.test(content) || supabaseUrlPattern.test(src);
-              const hasSupabaseTerms = supabaseTerms.some(term => content.includes(term) || src.includes(term));
+              var hasSupabaseUrl = supabaseUrlPattern.test(content) || supabaseUrlPattern.test(src);
+              var hasSupabaseTerms = false;
+              
+              // Check if any terms are present
+              for (var j = 0; j < supabaseTerms.length; j++) {
+                if (content.includes(supabaseTerms[j]) || src.includes(supabaseTerms[j])) {
+                  hasSupabaseTerms = true;
+                  break;
+                }
+              }
               
               if (hasSupabaseUrl || hasSupabaseTerms) {
                 supabaseFound = true;
                 
                 // Look for potential API keys - including anon-anon-key pattern
-                const keyPatterns = [
+                var keyPatterns = [
                   /(['"\`])([a-zA-Z0-9_.-]{20,})(\\1)/g, // Standard long API keys
                   /(['"\`])(anon[^'"\`]{2,})(\\1)/g,     // anon keys
                   /(['"\`])(eyJ[^'"\`]{2,})(\\1)/g,      // JWT format keys
                   /(['"\`])([a-zA-Z0-9_-]+\.?anon-?[a-zA-Z0-9_-]*\.?[a-zA-Z0-9_-]*)(\\1)/g // anon-anon-key pattern
                 ];
                 
-                for (const pattern of keyPatterns) {
-                  const matches = content.match(pattern);
+                for (var k = 0; k < keyPatterns.length; k++) {
+                  var pattern = keyPatterns[k];
+                  var matches = content.match(pattern);
                   if (matches && matches.length > 0) {
                     insecureAnonymousKeyFound = true;
                     
                     if (enableDebug) {
-                      addDebugInfo('Script Content Key Found', \`Pattern: \${pattern}, First match: \${matches[0].substring(0, 15)}...\`);
+                      addDebugInfo('Script Content Key Found', 'Pattern: ' + pattern + ', First match: ' + matches[0].substring(0, 15) + '...');
                     }
                     
                     return { 
@@ -552,7 +563,7 @@ export async function GET(
                 }
                 
                 // Capture the URL if found
-                const urlMatch = content.match(supabaseUrlPattern);
+                var urlMatch = content.match(supabaseUrlPattern);
                 if (urlMatch && urlMatch[0]) {
                   if (enableDebug) {
                     addDebugInfo('Supabase URL Found', urlMatch[0]);
@@ -570,12 +581,12 @@ export async function GET(
             }
             
             // 2. Look for Supabase in other DOM elements (data attributes, etc.)
-            const allElements = document.querySelectorAll('*[data-supabase], *[data-sb], *[data-supa]');
+            var allElements = document.querySelectorAll('*[data-supabase], *[data-sb], *[data-supa]');
             if (allElements.length > 0) {
               supabaseFound = true;
               
               if (enableDebug) {
-                addDebugInfo('Supabase Data Attributes Found', \`Count: \${allElements.length}\`);
+                addDebugInfo('Supabase Data Attributes Found', 'Count: ' + allElements.length);
               }
               
               return { found: true, source: 'dom_attributes' };
@@ -583,10 +594,11 @@ export async function GET(
             
             // 3. Check network requests for Supabase URLs
             if (window.performance && window.performance.getEntries) {
-              const resources = window.performance.getEntries();
-              const supabaseRequests = [];
+              var resources = window.performance.getEntries();
+              var supabaseRequests = [];
               
-              for (const resource of resources) {
+              for (var m = 0; m < resources.length; m++) {
+                var resource = resources[m];
                 if (resource.name && 
                     (resource.name.includes('supabase.co') || 
                      /[a-zA-Z0-9-_]+\.supabase\.co/.test(resource.name))) {
@@ -602,7 +614,7 @@ export async function GET(
               if (supabaseRequests.length > 0) {
                 return { 
                   found: true, 
-                  urls: supabaseRequests.map(r => r.name),
+                  urls: supabaseRequests.map(function(r) { return r.name; }),
                   requests: supabaseRequests,
                   source: 'network_request' 
                 };
@@ -610,19 +622,20 @@ export async function GET(
             }
             
             return { found: false };
-          };
+          }
           
           // Look for Supabase in environment variables or globals
-          const findSupabaseInEnv = () => {
+          function findSupabaseInEnv() {
             // Check for common Supabase-related globals
-            const supabaseVarPatterns = [
+            var supabaseVarPatterns = [
               'SUPABASE', 'supa', 'supabase', 
               'NEXT_PUBLIC_SUPABASE', 'VITE_SUPABASE', 'REACT_APP_SUPABASE'
             ];
             
-            for (const key in window) {
+            for (var key in window) {
               if (typeof key === 'string') {
-                for (const pattern of supabaseVarPatterns) {
+                for (var i = 0; i < supabaseVarPatterns.length; i++) {
+                  var pattern = supabaseVarPatterns[i];
                   if (key.includes(pattern)) {
                     supabaseFound = true;
                     
@@ -637,13 +650,13 @@ export async function GET(
               
               // Check if the value is a string containing Supabase URL
               try {
-                const val = window[key];
+                var val = window[key];
                 if (typeof val === 'string' && 
                     (/[a-zA-Z0-9-_]+\.supabase\.co/.test(val) || val.includes('anon-'))) {
                   supabaseFound = true;
                   
                   if (enableDebug) {
-                    addDebugInfo('Global Value Found', \`Key: \${key}, Value: \${val.substring(0, 30)}...\`);
+                    addDebugInfo('Global Value Found', 'Key: ' + key + ', Value: ' + val.substring(0, 30) + '...');
                   }
                   
                   if (val.includes('anon-')) {
@@ -659,8 +672,8 @@ export async function GET(
             
             // Check localStorage for Supabase
             try {
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
+              for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
                 if (key && key.includes('supabase')) {
                   supabaseFound = true;
                   
@@ -672,7 +685,7 @@ export async function GET(
                 }
                 
                 try {
-                  const value = localStorage.getItem(key);
+                  var value = localStorage.getItem(key);
                   if (value && 
                       (value.includes('supabase.co') || 
                        value.includes('anon-') || 
@@ -680,7 +693,7 @@ export async function GET(
                     supabaseFound = true;
                     
                     if (enableDebug) {
-                      addDebugInfo('LocalStorage Value Found', \`Key: \${key}, Value contains Supabase reference\`);
+                      addDebugInfo('LocalStorage Value Found', 'Key: ' + key + ', Value contains Supabase reference');
                     }
                     
                     if (value.includes('anon-')) {
@@ -698,12 +711,12 @@ export async function GET(
             }
             
             return { found: false };
-          };
+          }
           
           // Execute the detection functions
-          const windowResult = findSupabaseInWindow();
-          const domResult = !windowResult.found ? findSupabaseInDOM() : { found: false };
-          const envResult = !windowResult.found && !domResult.found ? findSupabaseInEnv() : { found: false };
+          var windowResult = findSupabaseInWindow();
+          var domResult = !windowResult.found ? findSupabaseInDOM() : { found: false };
+          var envResult = !windowResult.found && !domResult.found ? findSupabaseInEnv() : { found: false };
           
           // Combine the detection results
           foundDetails = windowResult.found ? windowResult : 
@@ -711,7 +724,7 @@ export async function GET(
                         envResult.found ? envResult : { found: false };
           
           // Summary of findings
-          const supabaseDetected = windowResult.found || domResult.found || envResult.found;
+          var supabaseDetected = windowResult.found || domResult.found || envResult.found;
           
           // Update widget with results
           if (supabaseDetected) {
@@ -725,7 +738,7 @@ export async function GET(
             
             // Add details about how Supabase was detected
             if (foundDetails.source) {
-              let detectionMethod = '';
+              var detectionMethod = '';
               switch(foundDetails.source) {
                 case 'window_object':
                   detectionMethod = 'Supabase client found in global scope';
@@ -746,16 +759,16 @@ export async function GET(
                   if (foundDetails.requests && foundDetails.requests.length > 0) {
                     addResultItem(
                       'Network Requests Analysis', 
-                      \`Found \${foundDetails.requests.length} request(s) to Supabase servers. Analyzing data access patterns...\`,
+                      'Found ' + foundDetails.requests.length + ' request(s) to Supabase servers. Analyzing data access patterns...',
                       'success'
                     );
                     
-                    const resultsContainer = document.getElementById('supacheck-results-container');
-                    const networkContainer = document.createElement('div');
+                    var resultsContainer = document.getElementById('supacheck-results-container');
+                    var networkContainer = document.createElement('div');
                     networkContainer.className = 'supacheck-network-container';
                     
                     // Create the header for the network container
-                    const networkHeader = document.createElement('div');
+                    var networkHeader = document.createElement('div');
                     networkHeader.className = 'supacheck-network-header';
                     networkHeader.innerHTML = \`
                       <div>Supabase API Requests</div>
@@ -767,11 +780,11 @@ export async function GET(
                     \`;
                     
                     // Create the body for the network container
-                    const networkBody = document.createElement('div');
+                    var networkBody = document.createElement('div');
                     networkBody.className = 'supacheck-network-body';
                     
                     // Create a table for the requests
-                    let tableHTML = \`
+                    var tableHTML = \`
                       <table class="supacheck-table">
                         <thead>
                           <tr>
@@ -784,20 +797,21 @@ export async function GET(
                     \`;
                     
                     // Process each request
-                    for (const request of foundDetails.requests) {
+                    for (var i = 0; i < foundDetails.requests.length; i++) {
+                      var request = foundDetails.requests[i];
                       // Try to determine if it's a table request
-                      const url = request.name || '';
-                      const method = request.initiatorType || 'unknown';
+                      var url = request.name || '';
+                      var method = request.initiatorType || 'unknown';
                       
                       // Extract table name from URL if present
-                      const tableMatch = url.match(/\/rest\/v1\/([^/\\?]+)/);
-                      const tableName = tableMatch ? tableMatch[1] : '';
+                      var tableMatch = url.match(/\/rest\/v1\/([^/\\?]+)/);
+                      var tableName = tableMatch ? tableMatch[1] : '';
                       
                       // Determine the request type
-                      let requestType = 'Unknown';
+                      var requestType = 'Unknown';
                       if (url.includes('/rest/v1/')) {
                         if (tableName) {
-                          requestType = \`Table: \${tableName}\`;
+                          requestType = 'Table: ' + tableName;
                         } else {
                           requestType = 'REST API';
                         }
@@ -833,20 +847,27 @@ export async function GET(
                     resultsContainer.appendChild(networkContainer);
                     
                     // Add column testing functionality
-                    setTimeout(() => {
-                      const testButton = document.getElementById('supacheck-test-columns');
+                    setTimeout(function() {
+                      var testButton = document.getElementById('supacheck-test-columns');
                       if (testButton) {
-                        testButton.addEventListener('click', async () => {
+                        testButton.addEventListener('click', function() {
                           // Extract unique table names from the requests
-                          const tables = new Set();
-                          foundDetails.requests.forEach(req => {
-                            const tableMatch = req.name.match(/\/rest\/v1\/([^/\\?]+)/);
+                          var tables = new Set();
+                          for (var i = 0; i < foundDetails.requests.length; i++) {
+                            var req = foundDetails.requests[i];
+                            var tableMatch = req.name.match(/\/rest\/v1\/([^/\\?]+)/);
                             if (tableMatch && tableMatch[1]) {
                               tables.add(tableMatch[1]);
                             }
+                          }
+                          
+                          // Convert Set to Array for older browsers
+                          var tablesArray = [];
+                          tables.forEach(function(table) {
+                            tablesArray.push(table);
                           });
                           
-                          if (tables.size === 0) {
+                          if (tablesArray.length === 0) {
                             addResultItem(
                               'No Tables Detected', 
                               'Could not detect any table access in the network requests.',
@@ -860,13 +881,13 @@ export async function GET(
                           testButton.disabled = true;
                           
                           // Extract the supabase URL and anonymous key
-                          let supabaseUrl = '';
-                          let anonKey = '';
+                          var supabaseUrl = '';
+                          var anonKey = '';
                           
                           // Try to find them in the window object or DOM
-                          for (const key in window) {
+                          for (var key in window) {
                             try {
-                              const obj = window[key];
+                              var obj = window[key];
                               if (obj && typeof obj === 'object' && obj.supabaseUrl && obj.supabaseKey) {
                                 supabaseUrl = obj.supabaseUrl;
                                 anonKey = obj.supabaseKey;
@@ -879,8 +900,9 @@ export async function GET(
                           
                           // If not found, try to extract from the requests
                           if (!supabaseUrl) {
-                            for (const req of foundDetails.requests) {
-                              const urlMatch = req.name.match(/(https:\\/\\/[a-zA-Z0-9-_]+\\.supabase\\.co)/);
+                            for (var j = 0; j < foundDetails.requests.length; j++) {
+                              var req = foundDetails.requests[j];
+                              var urlMatch = req.name.match(/(https:\\/\\/[a-zA-Z0-9-_]+\\.supabase\\.co)/);
                               if (urlMatch && urlMatch[1]) {
                                 supabaseUrl = urlMatch[1];
                                 break;
@@ -889,7 +911,7 @@ export async function GET(
                           }
                           
                           // Create results container for columns
-                          const columnsContainer = document.createElement('div');
+                          var columnsContainer = document.createElement('div');
                           columnsContainer.className = 'supacheck-network-container';
                           columnsContainer.innerHTML = \`
                             <div class="supacheck-network-header">
@@ -911,13 +933,14 @@ export async function GET(
                           
                           // Simulate column testing (for demo purposes)
                           // In a real implementation, you would make actual test requests to the Supabase API
-                          setTimeout(() => {
-                            const columnsResults = document.getElementById('supacheck-columns-results');
-                            let columnsHTML = '';
+                          setTimeout(function() {
+                            var columnsResults = document.getElementById('supacheck-columns-results');
+                            var columnsHTML = '';
                             
                             // For each table, show simulated column data
-                            tables.forEach(table => {
-                              const tableData = simulateTableColumnAccess(table.toString());
+                            for (var k = 0; k < tablesArray.length; k++) {
+                              var table = tablesArray[k];
+                              var tableData = simulateTableColumnAccess(table.toString());
                               
                               columnsHTML += \`
                                 <div style="margin-bottom: 16px;">
@@ -933,8 +956,9 @@ export async function GET(
                                     <tbody>
                               \`;
                               
-                              tableData.columns.forEach(col => {
-                                const accessBadge = col.access === 'read/write' 
+                              for (var l = 0; l < tableData.columns.length; l++) {
+                                var col = tableData.columns[l];
+                                var accessBadge = col.access === 'read/write' 
                                   ? \`<span class="supacheck-badge supacheck-badge-error">Writable</span>\`
                                   : col.access === 'read-only'
                                     ? \`<span class="supacheck-badge supacheck-badge-success">Read-only</span>\` 
@@ -947,14 +971,14 @@ export async function GET(
                                     <td>\${accessBadge}</td>
                                   </tr>
                                 \`;
-                              });
+                              }
                               
                               columnsHTML += \`
                                     </tbody>
                                   </table>
                                 </div>
                               \`;
-                            });
+                            }
                             
                             // Add security recommendations
                             columnsHTML += \`
@@ -1005,18 +1029,18 @@ export async function GET(
             }
             
             // Add a verification button
-            const resultsContainer = document.getElementById('supacheck-results-container');
-            const verifyButton = document.createElement('button');
+            var resultsContainer = document.getElementById('supacheck-results-container');
+            var verifyButton = document.createElement('button');
             verifyButton.className = 'supacheck-btn';
             verifyButton.textContent = 'Send Verification to Dashboard';
             verifyButton.style.marginTop = '16px';
-            verifyButton.onclick = () => {
+            verifyButton.onclick = function() {
               // In a real implementation, this would send data to your server
               verifyButton.innerHTML = '<div class="supacheck-loader"></div>Verifying...';
               verifyButton.disabled = true;
               
               // Simulate sending verification data
-              setTimeout(() => {
+              setTimeout(function() {
                 verifyButton.innerHTML = 'Verification Complete ✓';
                 updateStatus('success', 'Verification sent successfully');
               }, 1500);
@@ -1032,21 +1056,21 @@ export async function GET(
             );
             
             // Add debug toggle button in case detection failed incorrectly
-            const resultsContainer = document.getElementById('supacheck-results-container');
-            const debugButton = document.createElement('button');
+            var resultsContainer = document.getElementById('supacheck-results-container');
+            var debugButton = document.createElement('button');
             debugButton.className = 'supacheck-btn';
             debugButton.style.backgroundColor = '#64748b';
             debugButton.style.marginTop = '16px';
             debugButton.textContent = 'Show Technical Details';
-            debugButton.onclick = () => {
-              const debugInfo = document.getElementById('supacheck-debug-info');
+            debugButton.onclick = function() {
+              var debugInfo = document.getElementById('supacheck-debug-info');
               debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
               debugButton.textContent = debugInfo.style.display === 'none' ? 'Show Technical Details' : 'Hide Technical Details';
             };
             resultsContainer.appendChild(debugButton);
           }
         }, 1500); // Add a slight delay to allow for page load
-      };
+      }
       
       // Initialize the detection
       detectSupabase();
