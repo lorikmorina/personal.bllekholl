@@ -80,7 +80,7 @@ export default function CreateAccountCTA() {
                     size="lg"
                     className="w-full rounded-full"
                   >
-                    Start 7 day free trial
+                    Scan Your Website
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -88,7 +88,7 @@ export default function CreateAccountCTA() {
             </div>
             {!session && (
               <p className="text-sm text-center text-muted-foreground">
-                $0.00 due today, cancel anytime
+                Unlimited scans
               </p>
             )}
           </div>

@@ -375,9 +375,6 @@ const calculateScore = (
   return score;
 };
 
-// Constants for rate limiting
-const FREE_SCAN_LIMIT = 2;
-
 // Function to identify auth pages and check for CAPTCHA presence
 const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<{
   authPagesFound: string[];
@@ -516,51 +513,37 @@ export async function POST(request: Request) {
     // Get the user session correctly
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Extract IP address for anonymous users
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    
-    // Check if user has unlimited scans (paid plan)
-    let isUnlimitedUser = false;
-    
-    if (session?.user) {
-      // Fetch profile using the same server-side client instance
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('subscription_plan')
-        .eq('id', session.user.id)
-        .single();
-
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        // Decide how to handle profile fetch error - maybe allow scan or return error?
-        // For now, let's assume they are not unlimited if profile fails
-      } else if (profile && profile.subscription_plan !== 'free') {
-        // Correctly identify users with non-free plans
-        isUnlimitedUser = true;
-        console.log(`User ${session.user.id} identified as unlimited.`);
-      } else {
-        console.log(`User ${session.user.id} identified as free or profile issue.`);
-      }
-    } else {
-      console.log("No active session found for rate limiting check.");
+    // Require authentication for scanning
+    if (!session?.user) {
+      return NextResponse.json({
+        error: "unauthorized",
+        message: "Authentication required to scan websites",
+        redirectTo: "/signup"
+      }, { status: 401 });
     }
     
-    // Apply rate limiting for non-unlimited users
-    if (!isUnlimitedUser) {
-      console.log(`Applying rate limit check for identifier: ${session?.user?.id || ip}`);
-      // Check and update scan usage
-      const result = await checkAndUpdateScanUsage(ip, session?.user?.id);
-      
-      if (result.limitExceeded) {
-        console.log(`Rate limit exceeded for identifier: ${session?.user?.id || ip}`);
-        return NextResponse.json({
-          error: "no_scans_remaining",
-          message: "You've reached your scan limit. Please upgrade your plan for more scans.",
-          redirectTo: "/signup"
-        }, { status: 429 });
-      }
-    } else {
-      console.log(`Skipping rate limit check for unlimited user: ${session?.user?.id}`);
+    // Fetch user profile to check subscription
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('subscription_plan')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError) {
+      console.error("Error fetching profile:", profileError);
+      return NextResponse.json({
+        error: "profile_error",
+        message: "Error checking subscription status",
+      }, { status: 500 });
+    }
+    
+    // Check if user has an active subscription (non-free plan)
+    if (!profile || profile.subscription_plan === 'free') {
+      return NextResponse.json({
+        error: "subscription_required",
+        message: "A paid subscription is required to perform scans",
+        redirectTo: "/pricing"
+      }, { status: 403 });
     }
     
     // Continue with the actual scan logic
@@ -794,78 +777,4 @@ export async function POST(request: Request) {
       message: error instanceof Error ? error.message : "An unknown error occurred" 
     }, { status: 500 });
   }
-}
-
-// Helper function to check and update scan usage
-async function checkAndUpdateScanUsage(ip: string, userId?: string) {
-  try {
-    // Create an admin Supabase client to bypass RLS policies
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
-    
-    // Create a unique identifier (user ID or hashed IP)
-    const identifier = userId || hashIpAddress(ip);
-    const type = userId ? 'authenticated' : 'anonymous';
-    
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Check current usage
-    const { data, error } = await supabase
-      .from('scan_usage')
-      .select('count')
-      .eq('identifier', identifier)
-      .eq('date', today)
-      .maybeSingle();
-    
-    if (error) {
-      console.error('Error checking scan usage:', error);
-      return { limitExceeded: false }; // Let them scan if we can't check
-    }
-    
-    const currentCount = data?.count || 0;
-    
-    // Check if limit exceeded
-    if (currentCount >= FREE_SCAN_LIMIT) {
-      return { limitExceeded: true };
-    }
-    
-    // Update usage count - properly handle the upsert with onConflict
-    const { error: updateError } = await supabase
-      .from('scan_usage')
-      .upsert(
-        {
-          identifier,
-          type,
-          date: today,
-          count: currentCount + 1,
-          last_scan: new Date().toISOString()
-        },
-        {
-          onConflict: 'identifier,date',
-          update: { 
-            count: currentCount + 1,
-            last_scan: new Date().toISOString()
-          }
-        }
-      );
-    
-    if (updateError) {
-      console.error('Error updating scan usage:', updateError);
-    }
-    
-    console.log(`Scan count updated for ${identifier}: ${currentCount + 1}/${FREE_SCAN_LIMIT}`);
-    return { limitExceeded: false };
-  } catch (error) {
-    console.error('Unexpected error in scan rate limiting:', error);
-    return { limitExceeded: false }; // Let them scan if there's an error
-  }
-}
-
-// Helper to hash IP addresses for privacy
-function hashIpAddress(ip: string): string {
-  return createHash('sha256').update(ip + process.env.IP_SALT || 'secure-viber-salt').digest('hex');
 } 
