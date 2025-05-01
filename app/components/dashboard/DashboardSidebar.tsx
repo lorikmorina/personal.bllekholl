@@ -178,7 +178,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
               </button>
               
               {/* Supabase Check Tool - New button */}
-              <button 
+              {/* <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
                   activeTool === 'supabase-check' 
                     ? 'bg-primary text-primary-foreground' 
@@ -191,7 +191,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                   <span>Supabase Check</span>
                 </div>
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </button> */}
               
               {/* AI-assisted scan button - disabled and greyed out */}
               <div className="relative">
@@ -201,7 +201,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 >
                   <div className="flex items-center">
                     <Shield className="w-5 h-5 mr-3" />
-                    <span>AI-assisted Scan</span>
+                    <span>SupabaseDeep Scan</span>
                   </div>
                   <ChevronRight className="w-4 h-4" />
                 </button>
