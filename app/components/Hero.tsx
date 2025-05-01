@@ -182,7 +182,7 @@ export default function Hero() {
                 onClick={() => router.push('/signup')}
               >
                 <Shield className="mr-2 h-5 w-5" />
-                Start Now
+                Secure now
               </Button>
             </motion.div>
           </motion.div>
