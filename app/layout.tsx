@@ -40,9 +40,9 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
 
-        <Script src="https://securevibing.com/api/supacheck/script?userId=509cbd79-2730-46ed-bfcd-af4cb853eb4e" 
+        {/* <Script src="https://securevibing.com/api/supacheck/script?userId=509cbd79-2730-46ed-bfcd-af4cb853eb4e" 
         async
-        />
+        /> */}
         
 
         
