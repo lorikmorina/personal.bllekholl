@@ -10,17 +10,57 @@
     const urlPattern = /(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/gi;
     const urlMatches = content.match(urlPattern) || [];
     
-    if (urlMatches.length > 0) {
-      foundUrl = urlMatches[0];
-      
-      // If we found a URL, look for API keys near it
-      const keyPattern = /([a-zA-Z0-9]{40,})/g;
-      const keyMatches = content.match(keyPattern) || [];
-      
-      if (keyMatches.length > 0) {
-        foundKey = keyMatches[0];
-        return { url: foundUrl, key: foundKey };
+    // Updated Regex for Supabase Anon Key (JWT format)
+    // Looks for patterns like: eyJ... or variable assignments
+    const keyPattern = /(['"]?(?:supabaseKey|apiKey)['"]?\s*[:=]\s*['"]|['"])(eyJ[a-zA-Z0-9._-]+)['"]/gi;
+    
+    let keyMatch;
+    while ((keyMatch = keyPattern.exec(content)) !== null) {
+      // The actual key is in the second capture group
+      if (keyMatch[2] && keyMatch[2].length > 50) { // Basic length check for JWT
+        foundKey = keyMatch[2];
+        // If we already found a URL, we can return now
+        if (foundUrl) {
+          return { url: foundUrl, key: foundKey };
+        }
+        // Keep searching in case we find the URL later
+        break; // Found a key, stop looking for more keys for now
       }
+    }
+
+    // If we found a URL but not a key yet, search near the URL again with a simpler pattern
+    if (urlMatches.length > 0 && !foundKey) {
+      foundUrl = urlMatches[0];
+      // Look for JWT keys potentially near the URL (broader search)
+      const nearbyKeyPattern = /(eyJ[a-zA-Z0-9._-]{40,})/g; // Simpler JWT search
+      const nearbyKeyMatches = content.match(nearbyKeyPattern) || [];
+      
+      if (nearbyKeyMatches.length > 0) {
+        // Find the key closest to the URL? For now, just take the first valid one.
+        foundKey = nearbyKeyMatches.find(key => key.split('.').length === 3); // Ensure it looks like JWT
+      }
+    }
+    
+    // Return if we found both URL and Key
+    if (foundUrl && foundKey) {
+      return { url: foundUrl, key: foundKey };
+    }
+    
+    // If only key found so far, keep searching for URL if not found yet
+    if (foundKey && !foundUrl && urlMatches.length > 0) {
+       return { url: urlMatches[0], key: foundKey };
+    }
+
+    // Fallback: If only URL was found, return null for key
+    if (urlMatches.length > 0 && !foundKey) {
+      return { url: urlMatches[0], key: null }; // Indicate URL found, but no key
+    }
+
+    // Fallback: If only Key was found, but no URL
+    if (foundKey && !foundUrl) {
+      // We cannot proceed without a URL, so treat as not found
+      // Or should we try a default URL? For now, return null.
+      return null;
     }
     
     return null; // No credentials found
@@ -40,7 +80,7 @@
 
     const header = document.createElement('div');
     header.style.cssText = 'padding: 10px 15px; background: #3182ce; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
-    header.textContent = 'Supabase Security Check';
+    header.textContent = 'SecureVibing Supacheck';
     header.onclick = () => {
       const content = document.getElementById('supabase-check-content');
       content.style.display = content.style.display === 'none' ? 'block' : 'none';
@@ -78,6 +118,11 @@
 
   // Store captured auth tokens from requests
   const capturedAuthTokens = new Map();
+
+  // ---> NEW: Global storage for JWT and discovered tables
+  window._currentUserJwt = null;
+  window._discoveredTableNames = new Set();
+  // <--- END NEW
 
   // Helper function to add status item to the widget
   function addStatusItem(label, status, isOk = true) {
@@ -139,27 +184,6 @@
       "For complete testing, run this check directly on your deployed application.";
     
     contentEl.appendChild(messageEl);
-  }
-
-  // Update the existing addResponseInfoMessage function
-  function addResponseInfoMessage() {
-    const messageEl = document.createElement('div');
-    messageEl.style.cssText = `
-      margin-top: 10px;
-      padding: 10px;
-      background: #EFF6FF;
-      border-radius: 4px;
-      border-left: 3px solid #3B82F6;
-      font-size: 13px;
-      line-height: 1.4;
-    `;
-    messageEl.innerHTML = "Response data will be captured and displayed here in real-time as requests are made.<br><br>" +
-      "Interact with the application to generate new Supabase requests and see their responses.";
-    
-    const responsesContainer = document.getElementById('supabase-responses');
-    if (responsesContainer && responsesContainer.children.length === 0) {
-      responsesContainer.appendChild(messageEl);
-    }
   }
 
   // Create a section for network requests
@@ -304,6 +328,16 @@
       return; // Already added
     }
     
+    // ---> NEW: Add to global set and check for existing JWT
+    window._discoveredTableNames.add(tableName);
+    console.log(`[Discovery] Added '${tableName}' to discovered tables.`);
+    if (window._currentUserJwt) {
+      console.log(`[Discovery] JWT already known. Triggering auth fetch for '${tableName}'...`);
+      const supabaseUrl = endpoint.split('/rest/v1/')[0]; // Extract base URL
+      fetchAndDisplayAuthData(supabaseUrl, tableName, window._currentUserJwt, window._supabaseAnonKey);
+    }
+    // <--- END NEW
+    
     const tableEl = document.createElement('div');
     tableEl.id = `table-${tableName}`;
     tableEl.style.cssText = `
@@ -333,6 +367,86 @@
     tableEl.appendChild(tableNameEl);
     tableEl.appendChild(endpointEl);
     tablesContainer.appendChild(tableEl);
+  }
+
+  // Create a section for Authenticated Data
+  function createAuthDataSection() {
+    const sectionEl = document.createElement('div');
+    sectionEl.id = 'supabase-auth-data-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
+    
+    const titleEl = document.createElement('div');
+    titleEl.textContent = 'Authenticated Data Access';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
+    
+    const authDataContainer = document.createElement('div');
+    authDataContainer.id = 'supabase-auth-data';
+    
+    sectionEl.appendChild(titleEl);
+    sectionEl.appendChild(authDataContainer);
+    contentEl.appendChild(sectionEl);
+
+    // Add info message by default
+    const messageEl = document.createElement('div');
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #EFF6FF;
+      border-radius: 4px;
+      border-left: 3px solid #3B82F6;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
+    messageEl.innerHTML = "When authenticated requests are detected, we'll try to fetch data using the user's token and display it here.";
+    authDataContainer.appendChild(messageEl);
+    
+    return authDataContainer;
+  }
+
+  // Add an entry to the authenticated data section
+  function addAuthDataEntry(url, data, tableName) {
+    const authDataContainer = document.getElementById('supabase-auth-data');
+    if (!authDataContainer) return;
+    
+    // Remove any info message if it exists
+    const infoMessage = authDataContainer.querySelector('div[style*="background: #EFF6FF"]');
+    if (infoMessage) {
+      authDataContainer.removeChild(infoMessage);
+    }
+    
+    // Generate a unique ID for this table's auth data
+    const id = `auth-data-${tableName}`;
+    
+    // Remove existing entry for this table if present (to update)
+    const existingViewer = document.getElementById(`json-container-${id}`);
+    if (existingViewer) {
+      authDataContainer.removeChild(existingViewer);
+    }
+    
+    // Create a title for the viewer
+    let title = `Auth Data: ${tableName}`;
+    if (Array.isArray(data)) {
+      title += ` (${data.length} row${data.length !== 1 ? 's' : ''})`;
+    } else if (data && (data.error || data.code || data.message)) {
+      title += ` (Error)`;
+    }
+    
+    // Create the JSON viewer
+    const jsonViewer = createJsonViewer(id, data, url, title);
+    if (jsonViewer) {
+       // Add a different style to distinguish it
+      jsonViewer.style.border = '2px solid #10B981'; // Green border
+      jsonViewer.style.boxShadow = '0 4px 6px rgba(16, 185, 129, 0.1)';
+      
+      authDataContainer.appendChild(jsonViewer);
+    }
   }
 
   // Create a collapsible JSON viewer
@@ -395,13 +509,108 @@
     contentEl.id = `json-content-${id}`;
     contentEl.style.cssText = `
       padding: 0;
-      max-height: 300px;
+      max-height: 250px; /* Slightly shorter */
       overflow-y: auto;
-      background: #F8FAFC;
+      background: #ffffff; /* White background */
     `;
     
-    // Handle error responses specially
-    if (data.error || data.code || (data.message && (data.statusCode || data.status))) {
+    // ---> NEW: Handle Authenticated Data View differently
+    const isAuthDataView = id.startsWith('auth-data-');
+    let primaryKeyColumn = 'id'; // Assume 'id' is the primary key
+    let primaryKeyValue = null;
+
+    // Extract the first data object if it's an array (common for RLS queries)
+    const dataObject = Array.isArray(data) ? (data.length > 0 ? data[0] : null) : data;
+
+    if (isAuthDataView && dataObject && typeof dataObject === 'object') {
+        primaryKeyValue = dataObject[primaryKeyColumn];
+        // Clear default padding and background for table rows
+        contentEl.style.padding = '0';
+        contentEl.style.background = '#ffffff';
+        
+        const tableEl = document.createElement('table');
+        tableEl.style.cssText = `
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        `;
+
+        // Get Base URL from endpoint for PATCH requests
+        const baseUrl = extractBaseUrl(endpoint);
+        const tableName = title ? title.split(': ')[1]?.split(' (')[0] : null;
+
+        if (!primaryKeyValue) {
+           console.warn("[Auth View] Could not determine primary key value for table:", tableName);
+        }
+
+        Object.entries(dataObject).forEach(([key, value]) => {
+            const rowEl = document.createElement('tr');
+            rowEl.style.borderBottom = '1px solid #f3f4f6';
+
+            const keyEl = document.createElement('td');
+            keyEl.style.cssText = `
+                padding: 8px 10px;
+                font-weight: 500;
+                width: 40%;
+                word-break: break-all;
+                vertical-align: middle;
+                border-right: 1px solid #f3f4f6;
+            `;
+            keyEl.textContent = key;
+
+            const valueCellEl = document.createElement('td');
+            valueCellEl.style.cssText = 'padding: 8px 10px; word-break: break-all; display: flex; justify-content: space-between; align-items: center;';
+            
+            const valueText = document.createElement('span');
+            valueText.textContent = formatValueForDisplay(value); // Use helper for display
+            valueText.style.flexGrow = '1';
+            valueText.style.marginRight = '10px';
+            
+            valueCellEl.appendChild(valueText);
+
+            // Add Test button for updatable fields if we have necessary info
+            const nonUpdatableFields = [primaryKeyColumn, 'email', 'created_at', 'updated_at', 'user_id']; // Fields to exclude from testing
+            if (baseUrl && tableName && primaryKeyValue && !nonUpdatableFields.includes(key)) {
+                const buttonEl = document.createElement('button');
+                buttonEl.textContent = 'Test';
+                buttonEl.style.cssText = `
+                    padding: 2px 6px; 
+                    font-size: 10px; 
+                    cursor: pointer; 
+                    border: 1px solid #9ca3af;
+                    background: #f9fafb;
+                    border-radius: 4px;
+                    color: #374151;
+                    margin-left: auto; /* Push to the right */
+                    flex-shrink: 0;
+                `;
+                buttonEl.dataset.baseUrl = baseUrl;
+                buttonEl.dataset.tableName = tableName;
+                buttonEl.dataset.primaryKeyColumn = primaryKeyColumn;
+                buttonEl.dataset.primaryKeyValue = primaryKeyValue;
+                buttonEl.dataset.columnName = key;
+                buttonEl.dataset.originalValue = JSON.stringify(value); // Store original value as string
+                
+                buttonEl.onclick = handleTestUpdateClick;
+
+                const statusEl = document.createElement('span'); // Placeholder for results
+                statusEl.id = `test-status-${tableName}-${key}-${primaryKeyValue}`;
+                statusEl.style.cssText = 'font-size: 10px; margin-left: 5px; flex-shrink: 0;';
+
+                valueCellEl.appendChild(buttonEl);
+                valueCellEl.appendChild(statusEl);
+            }
+
+            rowEl.appendChild(keyEl);
+            rowEl.appendChild(valueCellEl);
+            tableEl.appendChild(rowEl);
+        });
+
+        contentEl.appendChild(tableEl);
+
+    } 
+    // ---> Default rendering for non-auth data or errors
+    else if (data.error || data.code || (data.message && (data.statusCode || data.status))) {
       const errorEl = document.createElement('div');
       errorEl.style.cssText = `
         padding: 12px;
@@ -426,249 +635,6 @@
       errorEl.appendChild(errorMessage);
       
       contentEl.appendChild(errorEl);
-    }
-    // Create table representation of JSON
-    else {
-      const tableEl = document.createElement('table');
-      tableEl.style.cssText = `
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-      `;
-      
-      // If data is an array, create a table for each item
-      if (Array.isArray(data)) {
-        if (data.length > 0) {
-          // Add count header
-          const countRow = document.createElement('tr');
-          const countCell = document.createElement('td');
-          countCell.style.cssText = `
-            padding: 8px;
-            background: #F1F5F9;
-            color: #475569;
-            font-style: italic;
-            text-align: center;
-            border-bottom: 1px solid #e2e8f0;
-          `;
-          countCell.textContent = `${data.length} item${data.length !== 1 ? 's' : ''} in array`;
-          countRow.appendChild(countCell);
-          tableEl.appendChild(countRow);
-          
-          for (let i = 0; i < Math.min(data.length, 5); i++) {
-            const item = data[i];
-            const rowEl = document.createElement('tr');
-            
-            const cellEl = document.createElement('td');
-            cellEl.style.cssText = `
-              padding: 8px;
-              border-bottom: 1px solid #e2e8f0;
-            `;
-            
-            // Display objects in a readable format
-            if (typeof item === 'object' && item !== null) {
-              const keys = Object.keys(item);
-              
-              // For items with more than 4 keys, show a summary
-              if (keys.length > 4) {
-                const summaryDiv = document.createElement('div');
-                summaryDiv.style.cssText = `
-                  display: flex;
-                  flex-wrap: wrap;
-                  gap: 4px;
-                `;
-                
-                // Show ID or key properties prominently
-                const idKeys = keys.filter(k => 
-                  ['id', 'uuid', 'key', 'name', 'title'].includes(k.toLowerCase()));
-                
-                if (idKeys.length > 0) {
-                  const idKey = idKeys[0];
-                  const idValue = String(item[idKey]);
-                  
-                  const idBadge = document.createElement('span');
-                  idBadge.style.cssText = `
-                    background: #E0F2FE;
-                    color: #0369A1;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                  `;
-                  idBadge.textContent = `${idKey}: ${idValue}`;
-                  summaryDiv.appendChild(idBadge);
-                }
-                
-                // Show additional key info in badges
-                for (let j = 0; j < Math.min(3, keys.length); j++) {
-                  const key = keys[j];
-                  if (idKeys.includes(key)) continue; // Skip keys we already showed
-                  
-                  const value = item[key];
-                  if (value === null || value === undefined) continue;
-                  
-                  const badge = document.createElement('span');
-                  badge.style.cssText = `
-                    background: #F1F5F9;
-                    color: #475569;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                  `;
-                  
-                  // Format value based on type
-                  let displayValue = String(value);
-                  if (typeof value === 'object') {
-                    displayValue = Array.isArray(value) ? 
-                      `[${value.length} items]` : 
-                      '{...}';
-                  } else if (displayValue.length > 20) {
-                    displayValue = displayValue.substring(0, 20) + '...';
-                  }
-                  
-                  badge.textContent = `${key}: ${displayValue}`;
-                  summaryDiv.appendChild(badge);
-                }
-                
-                // Add expand button
-                const expandBtn = document.createElement('button');
-                expandBtn.style.cssText = `
-                  background: #F8FAFC;
-                  border: 1px solid #CBD5E1;
-                  border-radius: 4px;
-                  padding: 2px 6px;
-                  font-size: 11px;
-                  cursor: pointer;
-                  margin-left: auto;
-                `;
-                expandBtn.textContent = 'View Full';
-                
-                expandBtn.onclick = (e) => {
-                  e.stopPropagation();
-                  const pre = document.createElement('pre');
-                  pre.style.cssText = `
-                    margin: 8px 0;
-                    padding: 8px;
-                    background: #F1F5F9;
-                    border-radius: 4px;
-                    overflow-x: auto;
-                    font-family: monospace;
-                    font-size: 11px;
-                  `;
-                  pre.textContent = JSON.stringify(item, null, 2);
-                  
-                  if (summaryDiv.nextElementSibling?.tagName === 'PRE') {
-                    summaryDiv.nextElementSibling.remove();
-                    expandBtn.textContent = 'View Full';
-                  } else {
-                    summaryDiv.parentNode.insertBefore(pre, summaryDiv.nextElementSibling);
-                    expandBtn.textContent = 'Collapse';
-                  }
-                };
-                
-                summaryDiv.appendChild(expandBtn);
-                cellEl.appendChild(summaryDiv);
-              } else {
-                // For simple objects, just stringify
-                cellEl.textContent = JSON.stringify(item, null, 2);
-              }
-            } else {
-              // For primitives, just display as text
-              cellEl.textContent = String(item);
-            }
-            
-            rowEl.appendChild(cellEl);
-            tableEl.appendChild(rowEl);
-          }
-          
-          if (data.length > 5) {
-            const rowEl = document.createElement('tr');
-            const cellEl = document.createElement('td');
-            cellEl.style.cssText = `
-              padding: 8px;
-              color: #6B7280;
-              font-style: italic;
-              text-align: center;
-            `;
-            cellEl.textContent = `+ ${data.length - 5} more items`;
-            rowEl.appendChild(cellEl);
-            tableEl.appendChild(rowEl);
-          }
-        } else {
-          const rowEl = document.createElement('tr');
-          const cellEl = document.createElement('td');
-          cellEl.style.cssText = `
-            padding: 8px;
-            color: #6B7280;
-            font-style: italic;
-          `;
-          cellEl.textContent = 'Empty array';
-          rowEl.appendChild(cellEl);
-          tableEl.appendChild(rowEl);
-        }
-      } else {
-        // Object representation as key-value pairs
-        Object.entries(data).forEach(([key, value]) => {
-          const rowEl = document.createElement('tr');
-          rowEl.style.borderBottom = '1px solid #e2e8f0';
-          
-          const keyEl = document.createElement('td');
-          keyEl.style.cssText = `
-            padding: 6px 8px;
-            font-weight: bold;
-            width: 40%;
-            word-break: break-all;
-            vertical-align: top;
-            border-right: 1px solid #e2e8f0;
-          `;
-          keyEl.textContent = key;
-          
-          const valueEl = document.createElement('td');
-          valueEl.style.cssText = `
-            padding: 6px 8px;
-            word-break: break-all;
-          `;
-          
-          if (value === null) {
-            valueEl.textContent = 'null';
-            valueEl.style.fontStyle = 'italic';
-            valueEl.style.color = '#6B7280';
-          } else if (typeof value === 'object') {
-            const nestedJsonString = JSON.stringify(value, null, 2);
-            if (nestedJsonString.length < 100) {
-              valueEl.textContent = nestedJsonString;
-            } else {
-              valueEl.textContent = `Object with ${Object.keys(value).length} properties`;
-              valueEl.style.color = '#3B82F6';
-              valueEl.style.cursor = 'pointer';
-              valueEl.onclick = () => {
-                const details = document.createElement('pre');
-                details.style.cssText = `
-                  margin: 8px 0 0;
-                  padding: 8px;
-                  background: #F1F5F9;
-                  border-radius: 4px;
-                  overflow-x: auto;
-                  white-space: pre-wrap;
-                  font-family: monospace;
-                  font-size: 11px;
-                `;
-                details.textContent = nestedJsonString;
-                if (valueEl.querySelector('pre')) {
-                  valueEl.removeChild(valueEl.querySelector('pre'));
-                } else {
-                  valueEl.appendChild(details);
-                }
-              };
-            }
-          } else {
-            valueEl.textContent = String(value);
-          }
-          
-          rowEl.appendChild(keyEl);
-          rowEl.appendChild(valueEl);
-          tableEl.appendChild(rowEl);
-        });
-      }
-      
-      contentEl.appendChild(tableEl);
     }
     
     containerEl.appendChild(contentEl);
@@ -895,17 +861,22 @@
           
           // Only consider table exists if status is 200
           if (response.status === 200) {
+            console.log(`[Verification] Table '${table}' exists (Status 200). Checking RLS...`); // Log success
             const data = await response.json();
             // This table exists - add it to our UI
             existingTables.add(table);
             addTableEntry(table, verificationUrl);
             
             // Check RLS while we're at it
-            if (Array.isArray(data) && data.length > 1) {
+            if (Array.isArray(data) && data.length > 0) { // Changed from data.length > 1
               anyTableWithDisabledRLS = true;
+              console.log(`[Verification] RLS potentially NOT configured for '${table}'. Anon key fetched ${data.length} rows.`); // Log potential issue
             }
+          } else {
+             console.log(`[Verification] Table '${table}' check failed (Status ${response.status})`); // Log failure
           }
         } catch (tableError) {
+           console.error(`[Verification] Error checking table '${table}':`, tableError); // Log error
           // Table doesn't exist or other error, don't add to UI
           continue;
         }
@@ -1006,11 +977,13 @@
   function monitorNetworkRequests(supabaseUrl) {
     let requestCount = 0;
     const requestsContainer = createNetworkSection();
-    const responseContainer = createResponseSection();
     const baseUrl = supabaseUrl.replace(/^https?:\/\//, '');
     
     // Create the tables section
     createTablesSection();
+
+    // Create the authenticated data section
+    createAuthDataSection();
     
     // Create counter for requests
     const requestCountEl = document.createElement('div');
@@ -1054,80 +1027,52 @@
     window.fetch = function(input, init) {
       const url = (typeof input === 'string') ? input : input?.url;
       let extractedAuthToken = null;
+      let extractedApiKey = window._supabaseAnonKey; // Start with global key
       let extractedTableName = null;
       
-      // Extract auth token from request headers if available
-      if (init && init.headers) {
-        // Store original headers for this URL if it's a table request
-        const tableName = extractTableNameFromUrl(url);
-        if (tableName) {
-          originalRequests.set(tableName, {...init});
-        }
+      // Extract auth token and apikey from request headers if available
+      if (url && url.includes(baseUrl) && url.includes('/rest/v1/')) {
+        extractedTableName = extractTableNameFromUrl(url);
         
-        // Handle different header formats
-        if (init.headers instanceof Headers) {
-          const authHeader = init.headers.get('Authorization');
-          if (authHeader) {
-            // Extract token from Authorization header
-            if (authHeader.startsWith('Bearer ')) {
-              extractedAuthToken = authHeader.substring(7);
-            } else {
-              extractedAuthToken = authHeader;
-            }
-            
-            // Verify it looks like a JWT token
-            if (!looksLikeJWT(extractedAuthToken)) {
-              console.warn("Captured Authorization header doesn't look like a JWT token:", 
-                          extractedAuthToken.length > 50 ? 
-                          extractedAuthToken.substring(0, 10) + '...' : 
-                          extractedAuthToken);
-            }
-          }
-          
-          // Also capture the apikey if present
-          const apiKey = init.headers.get('apikey');
-          if (apiKey) window._supabaseAnonKey = apiKey;
-        } else if (typeof init.headers === 'object') {
-          // Could be in either format: 'Authorization' or lowercase
-          const authHeader = init.headers.Authorization || init.headers.authorization;
-          if (authHeader) {
-            // Extract token from Authorization header
-            if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-              extractedAuthToken = authHeader.substring(7);
-            } else {
-              extractedAuthToken = authHeader;
-            }
-            
-            // Verify it looks like a JWT token
-            if (!looksLikeJWT(extractedAuthToken)) {
-              console.warn("Captured Authorization header doesn't look like a JWT token:", 
-                          typeof extractedAuthToken === 'string' && extractedAuthToken.length > 50 ? 
-                          extractedAuthToken.substring(0, 10) + '...' : 
-                          extractedAuthToken);
-            }
-          }
-          
-          // Also capture the apikey if present
-          const apiKey = init.headers.apikey || init.headers.ApiKey || init.headers.APIKEY;
-          if (apiKey) window._supabaseAnonKey = apiKey;
-        }
-        
-        // Clean up token format (remove 'Bearer ' prefix if present)
-        if (extractedAuthToken && typeof extractedAuthToken === 'string') {
-          if (extractedAuthToken.startsWith('Bearer ')) {
-            extractedAuthToken = extractedAuthToken.substring(7);
-          }
-          
-          // Extract table name if this is a data request
-          extractedTableName = extractTableNameFromUrl(url);
+        if (init && init.headers) {
+          // Store original headers for this URL if it's a table request
           if (extractedTableName) {
-            capturedAuthTokens.set(extractedTableName, extractedAuthToken);
-            // Log the token length to verify we have the complete token while still keeping it secure
-            console.log(`Captured auth token for table '${extractedTableName}'`, {
-              tokenLength: extractedAuthToken.length,
-              tokenPreview: extractedAuthToken.substring(0, 5) + '...' + extractedAuthToken.substring(extractedAuthToken.length - 5),
-              message: "Full token captured (showing only beginning/end for security)"
-            });
+            originalRequests.set(extractedTableName, {...init});
+          }
+          
+          // Handle different header formats
+          let headersToCheck = {};
+          if (init.headers instanceof Headers) {
+             init.headers.forEach((value, key) => {
+               headersToCheck[key.toLowerCase()] = value;
+             });
+          } else if (typeof init.headers === 'object') {
+             Object.entries(init.headers).forEach(([key, value]) => {
+               headersToCheck[key.toLowerCase()] = value;
+             });
+          }
+
+          const authHeader = headersToCheck['authorization'];
+          if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+            extractedAuthToken = authHeader.substring(7);
+            // ---> NEW: Log captured token
+            console.log("[Intercept Fetch] Raw extracted token:", extractedAuthToken);
+            // <--- END NEW
+            // Verify it looks like a JWT token
+            if (!looksLikeJWT(extractedAuthToken)) {
+               console.warn("Captured Authorization header doesn't look like a JWT token:", extractedAuthToken.substring(0, 10) + '...');
+               // Don't nullify here, let comparison logic handle it
+            } else if (extractedAuthToken === window._supabaseAnonKey) {
+               console.log("[Intercept Fetch] Authorization header contains the anon key. Ignoring for user auth data.");
+               // Don't nullify here, just prevents setting _currentUserJwt later
+            }
+          }
+          
+          // Capture the apikey if present in this specific request
+          const apiKeyHeader = headersToCheck['apikey'];
+          if (apiKeyHeader) {
+             extractedApiKey = apiKeyHeader;
+             window._supabaseAnonKey = apiKeyHeader; // Update global key too
           }
         }
       }
@@ -1137,6 +1082,7 @@
       
       // Check if this is a Supabase request
       if (url && url.includes(baseUrl)) {
+        console.log(`[Intercept Fetch] Detected Supabase URL: ${url}`); // Log detected URL
         // Skip our own verification requests
         if (!isVerificationRequest(url)) {
           requestCount++;
@@ -1146,26 +1092,34 @@
           p.then(function(response) {
             try {
               const method = (init && init.method) ? init.method : 'GET';
-              addRequestEntry(method, url);
+              addRequestEntry(method, url); // Add to network list
               
-              // Clone the response and extract the JSON data
+              // Clone the response to read data without consuming it
               const clonedResponse = response.clone();
               clonedResponse.json().then(data => {
-                capturedResponses.set(url, data);
-                addResponseEntry(url, data);
-                
-                // If we already extracted an auth token and table name, fetch complete data
-                if (extractedAuthToken && extractedTableName) {
-                  const baseUrl = extractBaseUrl(url);
-                  if (baseUrl) {
-                    // Fetch complete table data but only add it to the special section
-                    fetchCompleteTableData(baseUrl, extractedTableName, extractedAuthToken);
+                // ---> REFINED LOGIC: Only trigger fetch if we have a *user* JWT (different from anon key)
+                if (extractedAuthToken && extractedAuthToken !== window._supabaseAnonKey && extractedApiKey) {
+                  // Check if this is a *new* user JWT we haven't seen
+                  if (window._currentUserJwt !== extractedAuthToken) {
+                     console.log(`[Intercept Fetch] Captured valid NEW USER JWT via header. Storing globally.`);
+                     window._currentUserJwt = extractedAuthToken;
+                     
+                     // Now try fetching for all known discovered tables with this NEW token
+                     console.log(`[Intercept Fetch] Triggering auth fetch for all discovered tables (${Array.from(window._discoveredTableNames).join(', ') || 'none'})...`);
+                     const requestBaseUrl = extractBaseUrl(url) || (window._supabaseUrl ? window._supabaseUrl.split('/rest/v1/')[0] : null); // Get base URL reliably
+                     if (requestBaseUrl) {
+                         window._discoveredTableNames.forEach(discoveredTable => {
+                           fetchAndDisplayAuthData(requestBaseUrl, discoveredTable, window._currentUserJwt, extractedApiKey);
+                         });
+                     }
+                  } else {
+                     console.log("[Intercept Fetch] Captured JWT via header matches existing _currentUserJwt. No new fetch triggered.")
                   }
                 }
               }).catch(() => {
                 // Not JSON data, ignore
               });
-            } catch (e) {}
+            } catch (e) { console.error("Error in fetch intercept:", e); }
           });
         }
       }
@@ -1179,86 +1133,91 @@
     const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
     
     XMLHttpRequest.prototype.open = function(method, url) {
-      if (url && url.includes(baseUrl)) {
-        this._supaRequestUrl = url;
-        this._supaRequestMethod = method;
-        this._supaRequestHeaders = {};
-        
+      this._supaRequestUrl = null; // Reset flags
+      this._supaRequestMethod = null;
+      this._supaRequestHeaders = {};
+      this._supaTableName = null;
+
+      if (url && url.includes(baseUrl) && url.includes('/rest/v1/')) {
         // Skip our own verification requests
         if (!isVerificationRequest(url)) {
+          this._supaRequestUrl = url;
+          this._supaRequestMethod = method;
           // Check for table names in the URL
-          const tableName = extractTableNameFromUrl(url);
-          if (tableName) {
-            this._supaTableName = tableName;
-          }
-          
-          const originalOnLoad = this.onload;
-          this.onload = function() {
-            requestCount++;
-            updateRequestCount();
-            addRequestEntry(method, url);
-            
-            // Try to parse the response as JSON
-            try {
-              if (this.responseType === '' || this.responseType === 'text') {
-                const data = JSON.parse(this.responseText);
-                capturedResponses.set(url, data);
-                addResponseEntry(url, data);
-                
-                // If we have auth token and table name, fetch complete data
-                if (this._supaTableName && this._supaRequestHeaders && this._supaRequestHeaders.authorization) {
-                  const baseUrl = extractBaseUrl(url);
-                  if (baseUrl) {
-                    // Fetch complete table data
-                    fetchCompleteTableData(baseUrl, this._supaTableName, this._supaRequestHeaders.authorization);
-                  }
-                }
-              }
-            } catch (e) {
-              // Not JSON data, ignore
-            }
-            
-            if (originalOnLoad) originalOnLoad.apply(this, arguments);
-          };
+          this._supaTableName = extractTableNameFromUrl(url);
         }
       }
       originalXhrOpen.apply(this, arguments);
     };
     
     XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-      // Capture auth token from headers
-      if (this._supaRequestUrl && (name.toLowerCase() === 'authorization')) {
-        let authToken = value;
-        
-        // Clean up token format
-        if (authToken.startsWith('Bearer ')) {
-          authToken = authToken.substring(7);
-        }
-        
-        // Store the token for this request
-        this._supaRequestHeaders.authorization = authToken;
-        
-        // If we have a table name, store the token for that table
-        if (this._supaTableName) {
-          capturedAuthTokens.set(this._supaTableName, authToken);
-          console.log(`XHR: Captured auth token for table '${this._supaTableName}'`, {
-            tokenLength: authToken.length,
-            tokenPreview: authToken.substring(0, 5) + '...' + authToken.substring(authToken.length - 5),
-            message: "Full token captured (showing only beginning/end for security)"
-          });
-        }
+      // Capture auth token and apikey from headers if this is a tracked Supabase request
+      if (this._supaRequestUrl) {
+         const lowerCaseName = name.toLowerCase();
+         if (lowerCaseName === 'authorization') {
+            if (value && typeof value === 'string' && value.toLowerCase().startsWith('bearer ')) {
+              const token = value.substring(7);
+              // ---> NEW: Log captured token
+              console.log("[Intercept XHR] Raw extracted token:", token);
+              // <--- END NEW
+              if (looksLikeJWT(token)) {
+                 if (token === window._supabaseAnonKey) {
+                    console.log("[Intercept XHR] Authorization header contains the anon key. Ignoring for user auth data.");
+                    // Clear the potential token for this request
+                    delete this._supaRequestHeaders.authorization; 
+                 } else {
+                    // It's a valid JWT and NOT the anon key - assume it's the user token
+                    this._supaRequestHeaders.authorization = token;
+                 }
+              } else {
+                 console.warn("Captured XHR Authorization header doesn't look like a JWT token:", token.substring(0, 10) + '...');
+              }
+            }
+         } else if (lowerCaseName === 'apikey') {
+            this._supaRequestHeaders.apikey = value;
+            window._supabaseAnonKey = value; // Update global key too
+         }
       }
-      
-      // Also capture apikey header
-      if (this._supaRequestUrl && name.toLowerCase() === 'apikey') {
-        this._supaRequestHeaders.apikey = value;
-        window._supabaseAnonKey = value;
-      }
-      
       originalXhrSetRequestHeader.apply(this, arguments);
     };
     
     XMLHttpRequest.prototype.send = function() {
+       // Add listener just before sending, if this is a tracked request
+      if (this._supaRequestUrl && this._supaTableName) {
+          const originalOnLoad = this.onload;
+          this.onload = function() {
+            requestCount++;
+            updateRequestCount();
+            addRequestEntry(this._supaRequestMethod || 'GET', this._supaRequestUrl); // Add to network list
+            
+            // Try to parse the response as JSON
+            try {
+              if (this.responseType === '' || this.responseType === 'text') {
+                 // We have table, check if we captured headers
+                 const authToken = this._supaRequestHeaders.authorization;
+                 const apiKey = this._supaRequestHeaders.apikey || window._supabaseAnonKey; // Use specific or global fallback
+                 
+                 if (authToken && apiKey && this._supaTableName) {
+                     // ---> REFINED LOGIC: authToken here should already be vetted (not anon key)
+                     console.log(`[Intercept XHR] Captured valid USER JWT. Storing globally.`);
+                     window._currentUserJwt = authToken;
+                     
+                     // Now try fetching for all known discovered tables
+                     console.log(`[Intercept XHR] Triggering auth fetch for all discovered tables (${Array.from(window._discoveredTableNames).join(', ') || 'none'})...`);
+                     const requestBaseUrl = extractBaseUrl(this._supaRequestUrl);
+                     if (requestBaseUrl) {
+                         window._discoveredTableNames.forEach(discoveredTable => {
+                           fetchAndDisplayAuthData(requestBaseUrl, discoveredTable, window._currentUserJwt, apiKey);
+                         });
+                     }
+                    // <--- END REFINED LOGIC
+                 }
+              }
+            } catch (e) { console.error("Error in XHR intercept:", e); }
+            
+            if (originalOnLoad) originalOnLoad.apply(this, arguments);
+          };
+      }
       originalXhrSend.apply(this, arguments);
     };
     
@@ -1357,273 +1316,123 @@
     return null;
   }
 
-  // Function to fetch all data from a table using the captured token
-  async function fetchCompleteTableData(baseUrl, tableName, token) {
+  // Function to fetch data from a table using captured user credentials
+  async function fetchAndDisplayAuthData(baseUrl, tableName, token, apikey) {
+    // Ensure we have all necessary parts
+    if (!baseUrl || !tableName || !token || !apikey) {
+      console.warn("Attempted fetchAndDisplayAuthData with missing parameters:", { baseUrl, tableName, token_present: !!token, apikey_present: !!apikey });
+      return;
+    }
+    
+    // Construct query URL (fetch limited rows initially)
+    const queryUrl = `${baseUrl}/rest/v1/${tableName}?select=*&limit=20`; 
+    
+    // Skip if this is a verification request we initiated
+    if (isVerificationRequest(queryUrl)) return; 
+    
+    // Add to our verification requests to avoid potential loops
+    ourVerificationRequests.add(queryUrl);
+    
+    console.log(`Attempting to fetch authenticated data for '${tableName}'...`);
+    
     try {
-      // Don't make the request if we don't have all required data
-      if (!baseUrl || !tableName || !token) return null;
-      
-      // Create the query URL to fetch all columns without filters
-      const queryUrl = `${baseUrl}/rest/v1/${tableName}?select=*&limit=50`;
-      
-      // Skip if this is a verification request
-      if (isVerificationRequest(queryUrl)) return null;
-      
-      // Add to our verification requests to avoid loops
-      ourVerificationRequests.add(queryUrl);
-      
-      // Find the anon key (we may have captured it during verification)
-      const supabaseKey = findSupabaseAnonKey();
-      
-      // Display an error if we can't find the apikey
-      if (!supabaseKey) {
-        console.error(`Error fetching table '${tableName}': No apikey found`);
-        addCompleteTableDataEntry(queryUrl, { 
-          error: "Can't find the apikey needed to fetch data",
-          hint: "Make sure your Supabase client includes the apikey header in requests"
-        }, tableName);
-        return null;
-      }
-      
-      // Format the token correctly - ensure it doesn't have 'Bearer ' prefix
-      let formattedToken = token;
-      if (formattedToken.startsWith('Bearer ')) {
-        formattedToken = formattedToken.substring(7);
-      }
-      
-      console.log(`Fetching complete data for '${tableName}' using:`, {
-        url: queryUrl,
+      const response = await fetch(queryUrl, {
+        method: 'GET',
         headers: {
-          apikey: supabaseKey ? 
-            `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (length: ${supabaseKey.length})` : 
-            'not found',
-          token: formattedToken ? 
-            `${formattedToken.substring(0, 5)}...${formattedToken.substring(formattedToken.length - 5)} (length: ${formattedToken.length})` : 
-            'not found'
-        },
-        message: "Using full credentials (showing only beginning/end for security)"
+          'apikey': apikey,
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json' // Ensure we ask for JSON
+        }
       });
       
-      // Try the two different ways of authentication to maximize chances of success
-      
-      // First try: Using just the apikey in both headers
-      try {
-        const headers1 = {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json'
+      let responseData;
+      if (response.ok) {
+        responseData = await response.json();
+        console.log(`✅ SUCCESS: Fetched authenticated data for '${tableName}' (${Array.isArray(responseData) ? responseData.length : 1} item(s))`);
+      } else {
+        // Try to get error message from response body
+        let errorBody = `Status ${response.status}: ${response.statusText}`;
+        try {
+          const errorJson = await response.json();
+          errorBody = errorJson.message || JSON.stringify(errorJson);
+        } catch (e) { /* Ignore if response body is not JSON */ }
+        
+        console.error(`❌ FAILED: Fetching authenticated data for '${tableName}' failed. ${errorBody}`);
+        responseData = { 
+          error: `Failed to fetch data (Status ${response.status})`, 
+          message: errorBody,
+          details: `Ensure RLS policy allows access for the logged-in user with token: ${token.substring(0,5)}...`
         };
-        
-        console.log(`First attempt (${tableName}): Using apikey in both headers`, {
-          method: "GET",
-          url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : ''),
-          headers: {
-            apikey: `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (${supabaseKey.length} chars)`,
-          }
-        });
-        
-        const response1 = await fetch(queryUrl, {
-          method: 'GET',
-          headers: headers1
-        });
-        
-        if (response1.ok) {
-          const data = await response1.json();
-          console.log(`✅ SUCCESS: Fetched table '${tableName}' using apikey method (${data.length} rows)`);
-          addCompleteTableDataEntry(queryUrl, data, tableName);
-          return { url: queryUrl, data, tableName };
-        } else {
-          console.log(`❌ FAILED: First attempt (Status ${response1.status})`);
-        }
-      } catch (err) {
-        console.error('❌ FAILED: First attempt with error:', err);
       }
       
-      // Second try: Using the captured token
-      try {
-        const headers2 = {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${formattedToken}`,
-          'Content-Type': 'application/json'
-        };
-        
-        console.log(`Second attempt (${tableName}): Using captured token`, {
-          method: "GET",
-          url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : ''),
-          headers: {
-            apikey: `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)} (${supabaseKey.length} chars)`,
-            token: `${formattedToken.substring(0, 5)}...${formattedToken.substring(formattedToken.length - 5)} (${formattedToken.length} chars)`
-          }
-        });
-        
-        const response2 = await fetch(queryUrl, {
-          method: 'GET',
-          headers: headers2
-        });
-        
-        if (response2.ok) {
-          const data = await response2.json();
-          console.log(`✅ SUCCESS: Fetched table '${tableName}' using token method (${data.length} rows)`);
-          addCompleteTableDataEntry(queryUrl, data, tableName);
-          return { url: queryUrl, data, tableName };
-        }
-      } catch (error) {
-        console.error('❌ FAILED: Second attempt with error:', error);
-      }
+      // Display the result (success or error)
+      addAuthDataEntry(queryUrl, responseData, tableName);
       
-      // Third try: Using the original request headers if we have them
-      try {
-        // Check if we have the original request saved
-        const originalRequest = originalRequests.get(tableName);
-        if (originalRequest && originalRequest.headers) {
-          console.log(`Third attempt (${tableName}): Using original request headers`, {
-            method: "GET",
-            url: queryUrl.substring(0, 60) + (queryUrl.length > 60 ? '...' : '')
-          });
-          
-          // Create headers using original request format
-          let headers3;
-          if (originalRequest.headers instanceof Headers) {
-            headers3 = new Headers(originalRequest.headers);
-          } else {
-            headers3 = {...originalRequest.headers};
-          }
-          
-          const response3 = await fetch(queryUrl, {
-            method: 'GET',
-            headers: headers3,
-            credentials: originalRequest.credentials || 'same-origin'
-          });
-          
-          if (response3.ok) {
-            const data = await response3.json();
-            console.log(`✅ SUCCESS: Fetched table '${tableName}' using original headers (${data.length} rows)`);
-            addCompleteTableDataEntry(queryUrl, data, tableName);
-            return { url: queryUrl, data, tableName };
-          } else {
-            console.error(`❌ FAILED: Third attempt (Status ${response3.status})`);
-          }
-        } else {
-          console.log(`Third attempt (${tableName}): Skipped - no original headers available`);
-        }
-      } catch (error) {
-        console.error('❌ FAILED: Third attempt with error:', error);
-      }
-      
-      // If all attempts failed, try a fourth approach with just the API key
-      try {
-        // Just try with the API key alone
-        const response4 = await fetch(queryUrl, {
-          method: 'GET',
-          headers: {
-            'apikey': supabaseKey
-          }
-        });
-        
-        if (response4.ok) {
-          const data = await response4.json();
-          console.log(`✅ SUCCESS: Fetched table '${tableName}' using apikey-only method (${data.length} rows)`);
-          addCompleteTableDataEntry(queryUrl, data, tableName);
-          return { url: queryUrl, data, tableName };
-        } else {
-          console.error(`❌ FAILED: Fourth attempt (Status ${response4.status})`);
-        }
-      } catch (error) {
-        console.error('❌ FAILED: Fourth attempt with error:', error);
-      }
-      
-      // If all attempts failed, show an error
-      console.error(`All attempts failed for table '${tableName}'`);
-      addCompleteTableDataEntry(queryUrl, { 
-        error: `Failed to load data after multiple attempts`,
-        hint: "Check that your RLS policies allow access to this table and your auth tokens are valid"
-      }, tableName);
-      
-      return null;
     } catch (error) {
-      console.error('Error fetching complete table data:', error);
-      return null;
+      console.error(`❌ FAILED: Network error fetching authenticated data for '${tableName}':`, error);
+      addAuthDataEntry(queryUrl, { 
+        error: "Network error during fetch", 
+        message: String(error) 
+      }, tableName);
+    } finally {
+      // Remove from verification set after completion/failure
+      ourVerificationRequests.delete(queryUrl);
     }
   }
-  
-  // Helper function to find the Supabase anon key
-  function findSupabaseAnonKey() {
-    // First try to use the last known verification headers
-    if (window._lastVerificationHeaders && window._lastVerificationHeaders.apikey) {
-      return window._lastVerificationHeaders.apikey;
-    }
-    
-    // Next check if we have the global variable
-    if (window._supabaseAnonKey) {
-      return window._supabaseAnonKey;
-    }
-    
-    // Try to find it in the verification functions
-    for (const url of ourVerificationRequests) {
-      // Look for apikey in query params
-      const match = /apikey=([a-zA-Z0-9.]+)/.exec(url);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-    
-    // Check if we have it in the script somewhere
-    const scripts = document.querySelectorAll('script');
-    for (const script of scripts) {
-      if (script.textContent) {
-        const keyMatch = /supabaseKey\s*=\s*['"]([a-zA-Z0-9.]+)['"]/.exec(script.textContent);
-        if (keyMatch && keyMatch[1]) {
-          return keyMatch[1];
-        }
-      }
-    }
-    
-    // Fallback to a default
-    return '';
-  }
-  
+
   // Helper function to determine if a string looks like a JWT token
   function looksLikeJWT(str) {
     // Check if string matches JWT format (three base64 sections separated by dots)
     return typeof str === 'string' && /^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*$/.test(str);
   }
 
-  // Add an entry to the complete table data section
-  function addCompleteTableDataEntry(url, data, tableName) {
-    const tableDataContainer = document.getElementById('supabase-complete-data');
-    if (!tableDataContainer) return;
-    
-    // Remove any info message if it exists
-    const infoMessage = tableDataContainer.querySelector('div[style*="background: #EFF6FF"]');
-    if (infoMessage) {
-      tableDataContainer.removeChild(infoMessage);
-    }
-    
-    // Generate a unique ID for this response
-    const id = `table-data-${tableName}`;
-    
-    // Skip if we already have this response
-    if (document.getElementById(`json-container-${id}`)) {
-      // Update existing data
-      const existingContainer = document.getElementById(`json-container-${id}`);
-      if (existingContainer) {
-        tableDataContainer.removeChild(existingContainer);
+  // ---> NEW: Function to find user JWT in cookies
+  function findUserJwtInCookies() {
+    try {
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [name, value] = cookie.split('=').map(c => c.trim());
+        // Look for patterns like sb-...-auth-token or supabase.auth.token
+        if (name.startsWith('sb-') && name.endsWith('-auth-token') || name === 'supabase.auth.token') {
+          // Parse the cookie value if it's JSON
+          try {
+            const parsedValue = JSON.parse(decodeURIComponent(value));
+            // ---> UPDATED: Check if it's an array and get the first element
+            if (Array.isArray(parsedValue) && parsedValue.length > 0 && typeof parsedValue[0] === 'string') {
+              const potentialToken = parsedValue[0];
+              if (looksLikeJWT(potentialToken)) {
+                // Compare against anon key to ensure it's the user JWT
+                if (potentialToken !== window._supabaseAnonKey) {
+                   console.log("[Cookies] Found user JWT in cookie array:", name);
+                   return potentialToken;
+                } else {
+                   console.log("[Cookies] Found anon key in auth cookie array. Skipping.");
+                }
+              } else {
+                 console.log("[Cookies] First element of auth cookie array is not a JWT:", name);
+              }
+            } else {
+               console.log("[Cookies] Parsed auth cookie is not an array or first element isn't a string:", name);
+            }
+            // <--- END UPDATED
+          } catch (e) {
+            // Handle cases where the cookie value is just the token string (not JSON)
+            // This path is less likely given the example, but keep as fallback
+            const decodedValue = decodeURIComponent(value); // Decode first
+            if (typeof decodedValue === 'string' && looksLikeJWT(decodedValue) && decodedValue !== window._supabaseAnonKey) {
+               console.log("[Cookies] Found raw user JWT string in cookie (after decode):", name);
+               return decodedValue;
+            }
+          }
+        }
       }
+    } catch (error) {
+      console.error("[Cookies] Error reading cookies:", error);
     }
-    
-    // Create a title for the viewer
-    const title = `Table: ${tableName} (${Array.isArray(data) ? data.length : 0} rows)`;
-    
-    // Create the JSON viewer
-    const jsonViewer = createJsonViewer(id, data, url, title);
-    if (jsonViewer) {
-      // Add a special class to make it more prominent
-      jsonViewer.style.border = '2px solid #3B82F6';
-      jsonViewer.style.boxShadow = '0 4px 6px rgba(59, 130, 246, 0.1)';
-      
-      tableDataContainer.appendChild(jsonViewer);
-    }
+    console.log("[Cookies] No user JWT found in cookies.");
+    return null;
   }
+  // <--- END NEW
 
   // Main execution
   async function runChecks() {
@@ -1632,6 +1441,10 @@
     // Find Supabase credentials
     const { supabaseUrl, supabaseKey } = await findSupabaseCredentials();
     
+    // Store globally for reference
+    window._supabaseUrl = supabaseUrl;
+    window._supabaseAnonKey = supabaseKey; 
+
     // Clear loading indicator
     hideLoading();
     
@@ -1639,16 +1452,177 @@
     if (supabaseUrl && supabaseKey) {
       addStatusItem('Supabase', 'Found', false);
       
+      // ---> NEW: Attempt to find user JWT from cookies early
+      const jwtFromCookies = findUserJwtInCookies();
+      if (jwtFromCookies) {
+        window._currentUserJwt = jwtFromCookies;
+        console.log("[Startup] User JWT found in cookies and stored globally.");
+      }
+      // <--- END NEW
+      
       // Start monitoring network requests and discover tables
       const discoveredTables = monitorNetworkRequests(supabaseUrl);
       
       // Verify tables and check RLS
       const { rlsConfigured, existingTables } = await verifyTablesAndCheckRLS(supabaseUrl, supabaseKey, discoveredTables);
-      addStatusItem('Row Level Security', rlsConfigured ? 'Configured' : 'Not Configured', rlsConfigured);
+      addStatusItem('Row Level Security', 
+                     rlsConfigured ? 'Potentially Configured (Anon Limited)' : '⚠️ Not Configured (Anon Access Detected)', 
+                     rlsConfigured);
+
+      // ---> NEW: After checks, if we have JWT from cookies & discovered tables, ensure fetches happened
+      if (window._currentUserJwt && window._discoveredTableNames.size > 0) {
+         console.log("[Startup] Re-checking discovered tables against cookie JWT...");
+         window._discoveredTableNames.forEach(tableName => {
+            // Check if auth data already exists for this table to avoid duplicate fetches
+            if (!document.getElementById(`json-container-auth-data-${tableName}`)) {
+                console.log(`[Startup] Triggering auth fetch for discovered table '${tableName}' using cookie JWT.`);
+                fetchAndDisplayAuthData(supabaseUrl, tableName, window._currentUserJwt, supabaseKey);
+            }
+         });
+      }
+      // <--- END NEW
+
     } else {
       addStatusItem('Supabase', 'Not Found', true);
     }
   }
 
   runChecks();
+
+  // ---> NEW: Helper to format values for display
+  function formatValueForDisplay(value) {
+      if (value === null) return 'null';
+      if (typeof value === 'string' && value.length > 50) return value.substring(0, 50) + '...';
+      if (typeof value === 'object') return JSON.stringify(value);
+      return String(value);
+  }
+  // <--- END NEW
+
+  // ---> NEW: Helper function to generate modified test values
+  function getModifiedValue(originalValue) {
+    if (typeof originalValue === 'string') {
+        // Append _test, or remove if already present
+        return originalValue.endsWith('_test') ? originalValue.slice(0, -5) : originalValue + '_test';
+    } else if (typeof originalValue === 'number') {
+        return originalValue + 1;
+    } else if (typeof originalValue === 'boolean') {
+        return !originalValue;
+    } else {
+        // For objects/arrays or other types, attempt to stringify and modify
+        try {
+            const str = JSON.stringify(originalValue);
+            return JSON.parse(str + ' "test": true }'); // Poor man's modification
+        } catch (e) {
+            return originalValue; // Return original if modification fails
+        }
+    }
+  }
+  // <--- END NEW
+
+  // ---> NEW: Handler for the Test Update button click
+  async function handleTestUpdateClick(event) {
+    const button = event.target;
+    const { baseUrl, tableName, primaryKeyColumn, primaryKeyValue, columnName, originalValue: originalValueStr } = button.dataset;
+    const statusEl = document.getElementById(`test-status-${tableName}-${columnName}-${primaryKeyValue}`);
+
+    if (!statusEl || !window._currentUserJwt || !window._supabaseAnonKey) {
+        console.error("[Test Update] Missing context for update test:", button.dataset);
+        if (statusEl) statusEl.textContent = 'Error: Missing context';
+        return;
+    }
+
+    let originalValue;
+    try {
+      originalValue = JSON.parse(originalValueStr);
+    } catch (e) {
+      console.error("[Test Update] Failed to parse original value:", originalValueStr, e);
+      statusEl.textContent = 'Error: Bad original value';
+      return;
+    }
+
+    const modifiedValue = getModifiedValue(originalValue);
+    const patchUrl = `${baseUrl}/rest/v1/${tableName}?${primaryKeyColumn}=eq.${primaryKeyValue}`;
+    const apiKey = window._supabaseAnonKey;
+    const userToken = window._currentUserJwt;
+
+    console.log(`[Test Update] Testing PATCH for ${tableName}.${columnName} (ID: ${primaryKeyValue})`);
+    statusEl.textContent = 'Testing...';
+    statusEl.style.color = '#6b7280';
+    button.disabled = true;
+
+    let updateSuccess = false;
+    let errorMessage = '';
+
+    // --- First PATCH: Attempt to update with modified value ---
+    try {
+      const patchBody = { [columnName]: modifiedValue };
+      console.log("[Test Update] PATCH 1 Body:", patchBody);
+
+      const response = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal' // We don't need the data back
+        },
+        body: JSON.stringify(patchBody)
+      });
+
+      if (response.ok && response.status === 204) { // 204 No Content is success for PATCH
+        console.log(`✅ [Test Update] PATCH 1 successful for ${tableName}.${columnName}. Column is updatable.`);
+        updateSuccess = true;
+      } else {
+        console.error(`❌ [Test Update] PATCH 1 failed for ${tableName}.${columnName} (Status: ${response.status})`);
+        errorMessage = `Status ${response.status}`;
+        try {
+           const errJson = await response.json();
+           errorMessage += `: ${errJson.message || 'Unknown error'}`;
+        } catch(e) { /* ignore */ }
+      }
+    } catch (error) {
+      console.error(`❌ [Test Update] Network error during PATCH 1 for ${tableName}.${columnName}:`, error);
+      errorMessage = 'Network Error';
+      updateSuccess = false;
+    }
+
+    // --- Second PATCH: Revert to original value (always attempt) ---
+    try {
+      const revertBody = { [columnName]: originalValue };
+      console.log("[Test Update] PATCH 2 (Revert) Body:", revertBody);
+
+      const revertResponse = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${userToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(revertBody)
+      });
+
+      if (!revertResponse.ok) {
+        console.error(`⚠️ [Test Update] PATCH 2 (Revert) failed for ${tableName}.${columnName} (Status: ${revertResponse.status})! Manual check needed.`);
+        // Optionally update UI to indicate revert failure
+        errorMessage += ' (Revert Failed!)'; 
+      } else {
+        console.log(`[Test Update] PATCH 2 (Revert) successful for ${tableName}.${columnName}.`);
+      }
+    } catch (error) {
+      console.error(`⚠️ [Test Update] Network error during PATCH 2 (Revert) for ${tableName}.${columnName}:`, error);
+      errorMessage += ' (Revert Network Error!)';
+    }
+
+    // --- Update UI ---
+    if (updateSuccess) {
+      statusEl.textContent = '✅ Updatable';
+      statusEl.style.color = '#15803d'; // Dark green
+    } else {
+      statusEl.textContent = `❌ Not Updatable (${errorMessage})`;
+      statusEl.style.color = '#b91c1c'; // Dark red
+    }
+    button.disabled = false;
+  }
+  // <--- END NEW
 })(); 
