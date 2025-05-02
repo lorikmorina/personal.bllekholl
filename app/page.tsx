@@ -1,5 +1,6 @@
 import Hero from "./components/Hero"
 import FeatureCarousel from "./components/FeatureCarousel"
+import VideoGuide from "./components/VideoGuide"
 import SecurityEducation from "./components/SecurityEducation"
 //import Timeline from "./components/Timeline"
 import Marquee from "./components/Marquee"
@@ -11,6 +12,7 @@ export default function Home() {
     <>
       <Hero />
       <FeatureCarousel />
+      <VideoGuide />
       <SecurityEducation />
       {/* <PortfolioGrid /> */}
       {/* <Timeline /> */}
