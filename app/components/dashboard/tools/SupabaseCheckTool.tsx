@@ -295,7 +295,7 @@ export default function SupabaseCheckTool() {
                        onClick={() => setIsPaywallOpen(true)}
                        disabled={isSaving}
                      >
-                       Upgrade to activate (7-day free trial available).
+                       Upgrade to activate.
                      </Button>
                    </AlertDescription>
                  </Alert>

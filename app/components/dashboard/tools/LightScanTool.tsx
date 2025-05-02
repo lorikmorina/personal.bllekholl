@@ -872,7 +872,7 @@ export default function LightScanTool() {
               <Shield className="h-4 w-4" />
               <AlertTitle>Free Plan Limitation</AlertTitle>
               <AlertDescription>
-                Upgrade to unlock unlimited scans and detailed reports. Start a 7-day free trial on our monthly plan!
+                Upgrade to unlock unlimited scans and detailed reports. Start using all tools with our monthly plan!
                 <Button 
                   variant="link" 
                   className="p-0 h-auto font-semibold ml-1"

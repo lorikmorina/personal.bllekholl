@@ -43,10 +43,7 @@ export default function TermsOfService() {
           <li><strong>Yearly Plan ($99/year):</strong> Full access to all features, billed annually with better value compared to the monthly plan.</li>
         </ul>
         
-        <h2>5. Free Trial Period</h2>
-        <p>
-          Both our Monthly and Yearly subscription plans come with a 7-day free trial period. During this period, you can access all features of the respective plan without being charged. You can cancel your subscription at any time during the trial period without incurring any fees.
-        </p>
+        
         <p>
           After the trial period ends, your selected payment method will be automatically charged according to the plan you chose (monthly or yearly). You can cancel your subscription at any time to prevent future billing cycles.
         </p>

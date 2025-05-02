@@ -21,7 +21,7 @@ export default function PricingPlans() {
         "Security header analysis",
         "Fast Processing",
       ],
-      cta: "Start 7 day free trial",
+      cta: "Secure Now",
       mostPopular: false,
     },
     {
@@ -36,7 +36,7 @@ export default function PricingPlans() {
         "Security header analysis",
         "Priority support",
       ],
-      cta: "Start 7 day free trial",
+      cta: "Secure Now",
       mostPopular: true,
     },
   ]
@@ -125,7 +125,7 @@ export default function PricingPlans() {
                     </Link>
                   </Button>
                   <p className="text-center text-sm text-muted-foreground mt-2">
-                    $0 now, cancel anytime
+                    Access all tools now
                   </p>
                 </CardFooter>
               </Card>

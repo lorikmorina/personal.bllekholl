@@ -228,7 +228,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
               <div className="mb-4">
                 <span className="text-3xl font-bold">$14</span>
                 <span className="text-muted-foreground">/month</span>
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">Includes a 7-day free trial</p>
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">Includes all tools</p>
               </div>
               
               <ul className="space-y-2 mb-6">
@@ -276,7 +276,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
           </div>
           
           <div className="text-center text-sm text-muted-foreground mt-4">
-            Start with a 7-day free trial on the monthly plan. Cancel anytime before the trial ends, and you won't be charged.
+            Start with a subscription on the monthly plan.
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
