@@ -27,6 +27,36 @@ const normalizeDomain = (url: string | null): string | null => {
   }
 };
 
+// --- Function to Generate Error Widget Script ---
+const createErrorWidgetScript = (message: string): string => {
+  // Simple HTML/CSS for the error widget
+  const widgetHTML = `
+    <div id="supacheck-error-widget" style="position: fixed; bottom: 20px; right: 20px; width: 280px; background: #FFFBEB; border: 1px solid #FBBF24; border-left: 4px solid #F59E0B; border-radius: 6px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: sans-serif; z-index: 9998; padding: 12px; color: #92400E; font-size: 13px; line-height: 1.4;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <strong style="color: #B45309;">Supacheck Error</strong>
+        <button onclick="document.getElementById('supacheck-error-widget').remove();" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #B45309; padding: 0 4px;">&times;</button>
+      </div>
+      <p>${message.replace(/\"/g, '\\"').replace(/`/g, '\\`')}</p> 
+      <p style="margin-top: 8px; font-size: 11px; color: #B45309;">Check console/dashboard for details.</p>
+    </div>
+  `;
+
+  // JavaScript to inject the widget
+  return `
+    (function() {
+      // Remove existing error widget if present
+      var existingWidget = document.getElementById('supacheck-error-widget');
+      if (existingWidget) existingWidget.remove();
+      
+      // Create and inject the new widget
+      var errorDiv = document.createElement('div');
+      errorDiv.innerHTML = \`${widgetHTML.replace(/`/g, '\\`')}\`; // Escape backticks in HTML string
+      document.body.appendChild(errorDiv.firstElementChild);
+      console.error(\`Supacheck Error: ${message.replace(/`/g, '\\`')}\`);\n    })();
+  `;
+};
+// --- End Error Widget Function ---
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
@@ -35,17 +65,25 @@ export async function GET(request: NextRequest) {
   // Fallback to Referer if Origin is null (less common for cross-origin script requests)
   const referer = request.headers.get('Referer'); 
   const requestDomain = normalizeDomain(origin || referer);
+  const errorHeaders = { 
+    'Content-Type': 'application/javascript', 
+    'Access-Control-Allow-Origin': '*', // Allow all origins to display the error
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  };
 
   // --- Authorization Checks ---
   if (!userId) {
     console.warn('Supacheck Script: Missing userId parameter.');
-    return new NextResponse('console.error("Supacheck Error: Missing user identification.");', { status: 400, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+    const message = "Missing user identification in script URL.";
+    return new NextResponse(createErrorWidgetScript(message), { status: 400, headers: errorHeaders });
   }
 
   if (!requestDomain) {
     console.warn(`Supacheck Script (User: ${userId}): Missing or invalid Origin/Referer header.`);
-    // Potentially allow if origin/referer is missing in some valid cases? For now, let's block.
-    return new NextResponse('console.error("Supacheck Error: Could not verify request origin.");', { status: 403, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+    const message = "Could not verify request origin. Ensure the script is loaded from a valid webpage.";
+    return new NextResponse(createErrorWidgetScript(message), { status: 403, headers: errorHeaders });
   }
 
   try {
@@ -58,12 +96,14 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error(`Supacheck Script (User: ${userId}): Error fetching profile:`, error.message);
-      return new NextResponse('console.error("Supacheck Error: Failed to verify user.");', { status: 500, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+      const message = "Failed to verify user due to a server error.";
+      return new NextResponse(createErrorWidgetScript(message), { status: 500, headers: errorHeaders });
     }
 
     if (!profile) {
       console.warn(`Supacheck Script (User: ${userId}): Profile not found.`);
-      return new NextResponse('console.error("Supacheck Error: User not found.");', { status: 404, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+      const message = "User profile not found. Ensure the userId is correct.";
+      return new NextResponse(createErrorWidgetScript(message), { status: 404, headers: errorHeaders });
     }
 
     // --- Verification Logic ---
@@ -74,12 +114,14 @@ export async function GET(request: NextRequest) {
 
     if (requestDomain !== registeredDomain) {
       console.warn(`Supacheck Script (User: ${userId}): Request domain '${requestDomain}' does not match registered domain '${registeredDomain}'.`);
-      return new NextResponse(`console.error("Supacheck Error: Request origin mismatch.");`, { status: 403, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+      const message = `Request domain ('${requestDomain}') does not match the registered domain ('${registeredDomain || 'not set'}').`;
+      return new NextResponse(createErrorWidgetScript(message), { status: 403, headers: errorHeaders });
     }
 
     if (!hasPremiumPlan || !isActive) {
        console.warn(`Supacheck Script (User: ${userId}): Access denied. Plan: ${profile.subscription_plan}, Status: ${profile.subscription_status}.`);
-      return new NextResponse(`console.error("Supacheck Error: Access denied for current subscription plan/status.");`, { status: 403, headers: { 'Content-Type': 'application/javascript', 'Access-Control-Allow-Origin': '*' } });
+       const message = `Access denied. Current subscription plan ('${profile.subscription_plan || 'N/A'}') or status ('${profile.subscription_status || 'N/A'}') is not sufficient.`;
+      return new NextResponse(createErrorWidgetScript(message), { status: 403, headers: errorHeaders });
     }
     
     // --- User Authorized: Serve the script ---
@@ -95,31 +137,21 @@ export async function GET(request: NextRequest) {
     scriptContent = scriptContent.replace('// VERSION: Will be replaced dynamically', 
                                          `// VERSION: ${new Date().toISOString()}`);
     
-    // Return the script with appropriate headers
-    // Crucially, set the Allow-Origin to the *verified* requesting origin
+    // Return the main script with appropriate headers
     return new NextResponse(scriptContent, {
       headers: {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
         'Pragma': 'no-cache',
         'Expires': '0',
-        'Access-Control-Allow-Origin': origin || '*', // Use the verified Origin header
-        'Cross-Origin-Resource-Policy': 'cross-origin', // Keep this for script integrity
-        // Note: Allow-Methods/Headers are more relevant for the OPTIONS request below
+        'Access-Control-Allow-Origin': origin || '*', // Allow the specific verified origin
+        'Cross-Origin-Resource-Policy': 'cross-origin',
       },
     });
   } catch (error: any) { // Catch all errors during the auth/serve process
     console.error(`Supacheck Script (User: ${userId}): Unexpected error serving script:`, error);
-    return new NextResponse(
-      `console.error('Supacheck Error: Internal server error.', ${JSON.stringify(String(error?.message || error))});`,
-      {
-        status: 500,
-        headers: { 
-          'Content-Type': 'application/javascript',
-          'Access-Control-Allow-Origin': '*' // Allow origin for error message display
-        },
-      }
-    );
+    const message = 'An internal server error occurred. Please try again later.';
+    return new NextResponse(createErrorWidgetScript(message), { status: 500, headers: errorHeaders });
   }
 }
 
