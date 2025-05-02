@@ -11,7 +11,6 @@ import { Loader2, Shield, ShieldCheck, Copy, ExternalLink, Database, Check, Key,
 import { createClient } from "@/lib/supabase/client"
 import { useDashboard } from "../DashboardProvider"
 import PaywallModal from "../PaywallModal"
-import SupabaseNetworkMonitor from "./SupabaseNetworkMonitor"
 
 // Helper function to normalize domain names (similar to API route)
 const normalizeDomain = (inputUrl: string | null): string | null => {
@@ -429,7 +428,6 @@ export default function SupabaseCheckTool() {
         </CardContent>
       </Card>
 
-      <SupabaseNetworkMonitor />
 
       <PaywallModal
         isOpen={isPaywallOpen}
