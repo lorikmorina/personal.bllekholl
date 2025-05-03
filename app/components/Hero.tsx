@@ -30,7 +30,7 @@ const TwitterPostMarquee = () => {
         name: "Chatbit",
         handle: "@ChatbitAI",
         avatar: "/Xprofiles/ChatbitAI.jpg",
-        verified: false
+        verified: true
       },
       content: "Thanks, @lorikmor! Now I can sleep at night knowing my website isn't secretly a bug hotel. 🐞🏨",
       date: "1d"
@@ -38,10 +38,21 @@ const TwitterPostMarquee = () => {
     {
       id: 3,
       author: {
+        name: "jack friks",
+        handle: "@jackfriks",
+        avatar: "/Xprofiles/jackfriks.jpg",
+        verified: true
+      },
+      content: "this guy could have just said nothing and let himself have free access forever too \n\n go try his tool and secure your apps!!! @SecureVibing",
+      date: "1d"
+    },
+    {
+      id: 4,
+      author: {
         name: "laod",
         handle: "@laoddev",
         avatar: "/Xprofiles/laoddev.jpg",
-        verified: false
+        verified: true
       },
       content: "thanks to @SecureVibing I was able to make my app @waitlaunch much more secure.",
       date: "1d"
@@ -182,7 +193,7 @@ export default function Hero() {
                 onClick={() => router.push('/signup')}
               >
                 <Shield className="mr-2 h-5 w-5" />
-                Secure now
+                Secure Now
               </Button>
             </motion.div>
           </motion.div>
