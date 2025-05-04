@@ -319,6 +319,16 @@ export default function SupabaseCheckTool() {
                     <li>The script automatically scans, monitors network requests, and analyzes user data.</li>
                     <li>Results appear in an interactive widget directly on your site.</li>
                   </ol>
+                  <div className="mt-3 flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => window.open('https://x.com/securevibing', '_blank')}
+                    >
+                      Don't see the widget? <ExternalLink className="ml-1 h-3 w-3" />
+                    </Button>
+                  </div>
                 </AlertDescription>
               </Alert>
 
