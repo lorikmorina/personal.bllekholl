@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
-  ResponsiveContainer, ReferenceLine, Label 
+  ResponsiveContainer, ReferenceLine, Label
 } from "recharts"
 import { format, parseISO } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -166,6 +166,7 @@ export default function SecurityScoreTrend({ urlToAnalyze }: { urlToAnalyze: str
               <Tooltip 
                 formatter={(value) => [`Score: ${value}`, 'Security Score']}
                 labelFormatter={(label) => `Date: ${label}`}
+                labelStyle={{ color: '#1f2937' }}
                 contentStyle={{ 
                   borderRadius: '8px', 
                   border: '1px solid #e2e8f0',
@@ -181,9 +182,9 @@ export default function SecurityScoreTrend({ urlToAnalyze }: { urlToAnalyze: str
               <Line 
                 type="monotone" 
                 dataKey="score" 
-                stroke="var(--primary)" 
+                stroke="#3b82f6"
                 strokeWidth={3}
-                dot={{ r: 6, strokeWidth: 2 }}
+                dot={false}
                 activeDot={{ r: 8, strokeWidth: 2 }}
               />
             </LineChart>
