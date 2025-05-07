@@ -354,7 +354,7 @@ export default function Hero() {
               <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
                 <h3 className="text-lg font-semibold mb-3 flex items-center">
                   <Shield className="mr-2 h-5 w-5 text-primary" />
-                  Free Security Scanner
+                  Free Security Scanner (Beta)
                 </h3>
                 <div className="flex gap-2 mb-2">
                   <Input
