@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 
 interface TurnstileWidgetProps {
   siteKey: string
-  onSuccess: (token: string) => void
+  onSuccess: (token: string, widgetId?: string) => void
   theme?: "light" | "dark" | "auto"
 }
 
@@ -15,17 +15,30 @@ export default function TurnstileWidget({
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
+  const widgetId = useRef<string | null>(null)
 
   useEffect(() => {
     // Only initialize once
     if (initialized.current || !containerRef.current || !window.turnstile) return;
     
     // Render the widget
-    window.turnstile.render(containerRef.current, {
+    const widgetIdValue = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
-      callback: onSuccess,
+      callback: (token: string) => {
+        // Store the widget ID
+        if (widgetIdValue) {
+          widgetId.current = widgetIdValue;
+        }
+        // Call the callback with token and widget ID
+        onSuccess(token, widgetId.current || undefined);
+      },
       theme: theme
     });
+    
+    // Store the widget ID
+    if (widgetIdValue) {
+      widgetId.current = widgetIdValue;
+    }
     
     initialized.current = true;
     

@@ -1,13 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input" 
 import { useRouter } from "next/navigation"
 import { 
   Shield, Globe, Zap, Lock, Lightbulb, User,
-  AlertCircle, Gauge, Heart, Repeat, MessageSquare, Share, VerifiedIcon
+  AlertCircle, Gauge, Heart, Repeat, MessageSquare, Share, VerifiedIcon, 
+  CheckCircle, XCircle, BarChart4
 } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import axios from "axios"
+
+// Add Card component
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Twitter Post Marquee Component
 const TwitterPostMarquee = () => {
@@ -148,8 +155,165 @@ const TwitterPostMarquee = () => {
   );
 };
 
+// Free security scan result component
+const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
+  if (isLoading) {
+    return (
+      <Card className="w-full mt-6 mb-8 bg-card/50 backdrop-blur-sm">
+        <CardContent className="pt-6 pb-4 flex flex-col items-center justify-center">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Scanning your website for security vulnerabilities...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!result) return null;
+
+  // Handle error case
+  if (result.error) {
+    return (
+      <Alert variant="destructive" className="mt-6 mb-8">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error</AlertTitle>
+        <AlertDescription>{result.error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  const { hasCriticalIssues, hasMediumIssues, hasLowIssues, securityScore, message } = result;
+  
+  // Determine the severity level
+  let severity = 'success';
+  if (hasCriticalIssues) {
+    severity = 'critical';
+  } else if (hasMediumIssues) {
+    severity = 'warning';
+  } else if (hasLowIssues) {
+    severity = 'low';
+  }
+
+  return (
+    <Card className={`w-full mt-6 mb-8 border-${severity === 'critical' ? 'red-500/50' : severity === 'warning' ? 'yellow-500/50' : severity === 'low' ? 'blue-500/50' : 'green-500/50'}`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center text-lg">
+          {severity === 'critical' ? (
+            <><XCircle className="mr-2 h-5 w-5 text-red-500" /> Critical Security Risk</>
+          ) : severity === 'warning' ? (
+            <><AlertCircle className="mr-2 h-5 w-5 text-yellow-500" /> Medium Security Risk</>
+          ) : severity === 'low' ? (
+            <><AlertCircle className="mr-2 h-5 w-5 text-blue-500" /> Low Security Risk</>
+          ) : (
+            <><CheckCircle className="mr-2 h-5 w-5 text-green-500" /> Good Security</>
+          )}
+        </CardTitle>
+        <CardDescription>
+          Security Score: {securityScore}/100
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="w-full bg-muted rounded-full h-2.5">
+            <div 
+              className={`h-2.5 rounded-full ${
+                securityScore > 80 ? 'bg-green-500' : 
+                securityScore > 60 ? 'bg-blue-500' : 
+                securityScore > 40 ? 'bg-yellow-500' : 'bg-red-500'
+              }`} 
+              style={{ width: `${securityScore}%` }}
+            ></div>
+          </div>
+          <p className="text-sm text-muted-foreground mt-4">{message}</p>
+        </div>
+      </CardContent>
+      <CardFooter>
+        {(hasCriticalIssues || hasMediumIssues || hasLowIssues) && (
+          <Button
+            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:to-primary text-white"
+            onClick={onSignup}
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            Upgrade Now
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+};
+
+// Add import for TurnstileWidget and useRef
+import TurnstileWidget from "@/app/components/TurnstileWidget"
+
 export default function Hero() {
-  const router = useRouter()
+  const router = useRouter();
+  const [url, setUrl] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  // Add state for the turnstile token
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Add ref for turnstile widget ID
+  const turnstileWidgetId = useRef<string | null>(null);
+
+  const handleScan = async () => {
+    if (!url) return;
+    
+    // Check for turnstile token
+    if (!turnstileToken) {
+      setScanError('Please complete the security verification');
+      setScanResult({ error: 'Please complete the security verification' });
+      return;
+    }
+
+    setIsScanning(true);
+    setScanResult(null);
+    setScanError(null);
+
+    try {
+      // Include the turnstile token in the request
+      const response = await axios.post('/api/free-scan', { 
+        url,
+        turnstileToken 
+      });
+      setScanResult(response.data);
+      // Reset the turnstile after successful scan
+      if (typeof window !== 'undefined' && window.turnstile && turnstileWidgetId.current) {
+        window.turnstile.reset(turnstileWidgetId.current);
+      }
+      setTurnstileToken(null);
+    } catch (error: any) {
+      console.error('Scan error:', error);
+      setScanError(error.response?.data?.error || 'Failed to scan website');
+      setScanResult({ error: error.response?.data?.error || 'Failed to scan website' });
+      // Reset the turnstile on error too
+      if (typeof window !== 'undefined' && window.turnstile && turnstileWidgetId.current) {
+        window.turnstile.reset(turnstileWidgetId.current);
+      }
+      setTurnstileToken(null);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Add handler for turnstile success with widget ID
+  const handleTurnstileSuccess = (token: string, widgetId?: string) => {
+    setTurnstileToken(token);
+    if (widgetId) {
+      turnstileWidgetId.current = widgetId;
+    }
+    if (scanError === 'Please complete the security verification') {
+      setScanError(null);
+      setScanResult(null);
+    }
+  };
+
+  const handleSignup = () => {
+    router.push('/signup');
+  };
 
   return (
     <div className="relative isolate overflow-hidden bg-background">
@@ -180,21 +344,63 @@ export default function Hero() {
               missing security headers, and other common vulnerabilities.
             </motion.p>
             
-            {/* Simple CTA */}
+            {/* Free Security Scan */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
-              className="mt-8 w-full flex justify-center sm:justify-start"
+              className="mt-8 w-full"
             >
-              <Button 
-                size="lg" 
-                className="bg-gradient-to-r from-primary to-primary/80 hover:to-primary text-white font-medium"
-                onClick={() => router.push('/signup')}
-              >
-                <Shield className="mr-2 h-5 w-5" />
-                Secure Now
-              </Button>
+              <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <Shield className="mr-2 h-5 w-5 text-primary" />
+                  Free Security Scanner
+                </h3>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    placeholder="Enter your website URL (e.g., example.com)"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="flex-1"
+                    disabled={isScanning}
+                  />
+                  <Button 
+                    onClick={handleScan} 
+                    disabled={!url || isScanning || !turnstileToken}
+                    className="bg-primary text-white hover:bg-primary/90"
+                  >
+                    {isScanning ? (
+                      <>
+                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-background border-b-transparent rounded-full"></div>
+                        Scanning
+                      </>
+                    ) : (
+                      <>Scan</>
+                    )}
+                  </Button>
+                </div>
+                
+                {/* Add Turnstile Widget before the scan result */}
+                <div className="my-4 flex justify-center">
+                  <TurnstileWidget 
+                    siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ''}
+                    onSuccess={handleTurnstileSuccess}
+                    theme="auto"
+                  />
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Our free scanner checks for vulnerabilities without revealing details. 
+                  Signup and Upgrade to complete results and fixes.
+                </p>
+                
+                {/* Scan Result Card */}
+                <ScanResultCard
+                  result={scanResult}
+                  isLoading={isScanning}
+                  onSignup={handleSignup}
+                />
+              </div>
             </motion.div>
           </motion.div>
           

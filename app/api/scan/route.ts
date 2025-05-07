@@ -513,8 +513,11 @@ export async function POST(request: Request) {
     // Get the user session correctly
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Require authentication for scanning
-    if (!session?.user) {
+    // Check if this is an internal call from the free scan endpoint
+    const isInternalFreeScan = body._internal_free_scan === true;
+    
+    // Require authentication for scanning unless it's an internal call
+    if (!session?.user && !isInternalFreeScan) {
       return NextResponse.json({
         error: "unauthorized",
         message: "Authentication required to scan websites",
@@ -522,28 +525,31 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Fetch user profile to check subscription
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('subscription_plan')
-      .eq('id', session.user.id)
-      .single();
+    // Skip subscription check for internal calls
+    if (!isInternalFreeScan) {
+      // Fetch user profile to check subscription
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_plan')
+        .eq('id', session.user.id)
+        .single();
 
-    if (profileError) {
-      console.error("Error fetching profile:", profileError);
-      return NextResponse.json({
-        error: "profile_error",
-        message: "Error checking subscription status",
-      }, { status: 500 });
-    }
-    
-    // Check if user has an active subscription (non-free plan)
-    if (!profile || profile.subscription_plan === 'free') {
-      return NextResponse.json({
-        error: "subscription_required",
-        message: "A paid subscription is required to perform scans",
-        redirectTo: "/pricing"
-      }, { status: 403 });
+      if (profileError) {
+        console.error("Error fetching profile:", profileError);
+        return NextResponse.json({
+          error: "profile_error",
+          message: "Error checking subscription status",
+        }, { status: 500 });
+      }
+      
+      // Check if user has an active subscription (non-free plan)
+      if (!profile || profile.subscription_plan === 'free') {
+        return NextResponse.json({
+          error: "subscription_required",
+          message: "A paid subscription is required to perform scans",
+          redirectTo: "/pricing"
+        }, { status: 403 });
+      }
     }
     
     // Continue with the actual scan logic
