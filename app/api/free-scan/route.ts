@@ -160,7 +160,7 @@ export async function POST(request: Request) {
       }
 
       // Create appropriate message based on findings
-      let message = "No significant issues detected. Sign up for comprehensive security monitoring.";
+      let message = "No significant issues detected. Note: This is only a light scan, sign up to test all aspects including database.";
       
       if (freeScanResults.hasCriticalIssues) {
         message = `Critical security issues detected! ${freeScanResults.criticalIssuesCount} critical vulnerabilities found. Sign up to see details and fix them.`;
