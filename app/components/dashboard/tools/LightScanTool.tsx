@@ -1055,10 +1055,10 @@ export default function LightScanTool() {
                       <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800">
                         <div className="flex items-center mb-1">
                           <ShieldCheck className="w-4 h-4 mr-2 text-green-500" />
-                          <span className="font-medium">Database Security Check Passed</span>
+                          <span className="font-medium">Supabase Database Detected</span>
                         </div>
                         <p className="text-sm ml-6">
-                          Database connection details were detected, but Row Level Security (RLS) appears to be properly configured. No tables were accessible without proper authentication.
+                          Supabase db found - RLS is enabled - it's recommended to use our tool Supacheck to see if further vulnerabilities exist when a user is signed in.
                         </p>
                       </div>
                     )}

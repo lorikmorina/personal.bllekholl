@@ -185,7 +185,7 @@ const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
     );
   }
 
-  const { hasCriticalIssues, hasMediumIssues, hasLowIssues, securityScore, message } = result;
+  const { hasCriticalIssues, hasMediumIssues, hasLowIssues, securityScore, message, rlsMessage } = result;
   
   // Determine the severity level
   let severity = 'success';
@@ -228,6 +228,15 @@ const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
             ></div>
           </div>
           <p className="text-sm text-muted-foreground mt-4">{message}</p>
+          
+          {rlsMessage && (
+            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
+              <div className="flex">
+                <Lightbulb className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                <span>{rlsMessage}</span>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
       <CardFooter>

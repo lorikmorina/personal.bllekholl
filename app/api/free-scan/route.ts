@@ -159,6 +159,15 @@ export async function POST(request: Request) {
         freeScanResults.rlsMessage = `CRITICAL: Your Supabase database has ${fullScanResults.rlsVulnerability.vulnerableTables.length} tables without proper Row Level Security (RLS)! Sign up to see which tables are at risk.`;
       }
 
+      // Check if Supabase was detected (with or without vulnerabilities)
+      const hasSupabase = fullScanResults.leaks.some(leak => 
+        leak.type.includes('Supabase')
+      );
+      
+      if (hasSupabase && !freeScanResults.rlsMessage) {
+        freeScanResults.rlsMessage = "Supabase detected - to test common Supabase vulnerabilities we suggest you signup and use our tool Supacheck";
+      }
+
       // Create appropriate message based on findings
       let message = "No significant issues detected. Note: This is only a light scan, sign up to test all aspects including database.";
       
