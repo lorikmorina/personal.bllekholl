@@ -649,6 +649,8 @@ export default function LightScanTool() {
     }
     
     // Filter out database keys with properly configured security
+    // We still want to show Supabase with secure severity in a separate section
+    // so we need to filter them out from the risk categories
     const filteredLeaks = leaks.filter(leak => 
       !(leak.type.includes('Supabase') && leak.severity === 'secure')
     );
@@ -1049,8 +1051,7 @@ export default function LightScanTool() {
                     {/* If RLS is properly configured, show note about Supabase being checked */}
                     {result.leaks.some(leak => 
                         leak.type.includes('Supabase') && 
-                        leak.severity === 'secure' && 
-                        leak.details?.includes('RLS appears to be properly configured')
+                        leak.severity === 'secure'
                     ) && (
                       <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 rounded-md border border-green-200 dark:border-green-800">
                         <div className="flex items-center mb-1">
@@ -1059,6 +1060,25 @@ export default function LightScanTool() {
                         </div>
                         <p className="text-sm ml-6">
                           Supabase db found - RLS is enabled - it's recommended to use our tool Supacheck to see if further vulnerabilities exist when a user is signed in.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* If Supabase is found but not with secure severity, show a warning */}
+                    {!result.leaks.some(leak => 
+                        leak.type.includes('Supabase') && 
+                        leak.severity === 'secure'
+                    ) && 
+                     result.leaks.some(leak => 
+                        leak.type.includes('Supabase')
+                     ) && (
+                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-md border border-red-200 dark:border-red-800">
+                        <div className="flex items-center mb-1">
+                          <AlertCircle className="w-4 h-4 mr-2 text-red-500" />
+                          <span className="font-medium">Supabase Database Detected</span>
+                        </div>
+                        <p className="text-sm ml-6">
+                          Supabase db found - We recommend using our tool Supacheck to thoroughly test for vulnerabilities when users are signed in.
                         </p>
                       </div>
                     )}

@@ -230,9 +230,9 @@ const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
           <p className="text-sm text-muted-foreground mt-4">{message}</p>
           
           {rlsMessage && (
-            <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded text-sm text-blue-700 dark:text-blue-300">
+            <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
               <div className="flex">
-                <Lightbulb className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5 text-red-500" />
                 <span>{rlsMessage}</span>
               </div>
             </div>
