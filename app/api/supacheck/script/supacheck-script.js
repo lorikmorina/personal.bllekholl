@@ -460,8 +460,38 @@ ${conditions}
     const columnsContainer = document.getElementById('supacheck-columns-container');
     columnsContainer.innerHTML = '<div style="text-align: center;">Loading columns...</div>';
     
+    // Try first with JWT if available
+    if (window._currentUserJwt) {
+      try {
+        console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using JWT token...`);
+        const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+        const response = await fetch(sampleUrl, {
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${window._currentUserJwt}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`[Column Discovery] Successfully retrieved columns using JWT for '${tableName}'`);
+            const columns = Object.keys(data[0]);
+            displayColumns(columns);
+            return; // Success with JWT, exit function
+          }
+        }
+        // If we get here, the JWT approach failed - continue to API key approach
+        console.log(`[Column Discovery] JWT approach failed for '${tableName}', trying API key approach...`);
+      } catch (e) {
+        console.error(`[Column Discovery] Error with JWT approach for '${tableName}':`, e);
+        // Continue to API key approach
+      }
+    }
+    
+    // Original approach - try with API key as bearer token
     try {
-      // First, try to get column info from a single row
+      console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using API key...`);
       const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
       const response = await fetch(sampleUrl, {
         headers: {
@@ -471,6 +501,7 @@ ${conditions}
       });
       
       if (!response.ok) {
+        console.error(`[Column Discovery] API key approach failed with status ${response.status} for '${tableName}'`);
         throw new Error(`Failed to fetch sample data: ${response.status}`);
       }
       
@@ -478,18 +509,28 @@ ${conditions}
       
       if (Array.isArray(data) && data.length > 0) {
         // We have a row, get columns from it
+        console.log(`[Column Discovery] Successfully retrieved columns using API key for '${tableName}'`);
         const columns = Object.keys(data[0]);
         displayColumns(columns);
       } else {
         // No data, try to introspect using Supabase's introspection API
         // This is a fallback and might not work depending on API configuration
+        console.error(`[Column Discovery] No data available for column extraction from '${tableName}'`);
         throw new Error('No data available to extract columns');
       }
     } catch (error) {
-      console.error('Error fetching columns:', error);
+      console.error(`[Column Discovery] Final error fetching columns for '${tableName}':`, error);
       columnsContainer.innerHTML = `
         <div style="color: #ef4444; padding: 10px;">
           Could not retrieve columns automatically. Please enter them manually:
+        </div>
+        <div style="margin-top: 10px; color: #6b7280; font-size: 12px;">
+          <p>This may happen if:</p>
+          <ul style="list-style-type: disc; margin-left: 20px; margin-top: 5px;">
+            <li>The table is empty (no rows to analyze)</li>
+            <li>Row Level Security (RLS) is blocking access</li>
+            <li>The table exists but you don't have permission to view it</li>
+          </ul>
         </div>
         <div style="margin-top: 10px;">
           <textarea id="columns-manual-input" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;" 
