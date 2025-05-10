@@ -318,6 +318,279 @@
     return tableDataContainer;
   }
 
+  // Create modal for the Fix Table feature
+  function createFixTableModal() {
+    const modalOverlay = document.createElement('div');
+    modalOverlay.id = 'supacheck-modal-overlay';
+    modalOverlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5); z-index: 10000; display: none;
+      align-items: center; justify-content: center;
+    `;
+    
+    const modal = document.createElement('div');
+    modal.id = 'supacheck-fix-modal';
+    modal.style.cssText = `
+      background: white; border-radius: 8px; width: 90%; max-width: 600px;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+      display: flex; flex-direction: column; position: relative;
+    `;
+    
+    const modalHeader = document.createElement('div');
+    modalHeader.style.cssText = `
+      padding: 16px; border-bottom: 1px solid #e2e8f0; background: #3182ce;
+      color: white; font-weight: bold; display: flex; justify-content: space-between;
+      align-items: center; border-top-left-radius: 8px; border-top-right-radius: 8px;
+    `;
+    
+    const modalTitle = document.createElement('div');
+    modalTitle.id = 'supacheck-modal-title';
+    modalTitle.textContent = 'Restrict Columns Updates';
+    
+    const closeButton = document.createElement('span');
+    closeButton.textContent = '×';
+    closeButton.style.cssText = 'cursor: pointer; font-size: 24px;';
+    closeButton.onclick = () => {
+      modalOverlay.style.display = 'none';
+    };
+    
+    modalHeader.appendChild(modalTitle);
+    modalHeader.appendChild(closeButton);
+    
+    const modalContent = document.createElement('div');
+    modalContent.id = 'supacheck-modal-content';
+    modalContent.style.cssText = 'padding: 16px; flex-grow: 1;';
+    
+    const columnsContainer = document.createElement('div');
+    columnsContainer.id = 'supacheck-columns-container';
+    columnsContainer.style.cssText = 'margin-bottom: 16px;';
+    
+    const instructionsEl = document.createElement('div');
+    instructionsEl.style.cssText = 'margin-bottom: 16px; color: #4b5563;';
+    instructionsEl.innerHTML = 'Check the columns you want to limit users from updating:';
+    
+    const modalFooter = document.createElement('div');
+    modalFooter.style.cssText = 'padding: 16px; border-top: 1px solid #e2e8f0; text-align: right;';
+    
+    const generateButton = document.createElement('button');
+    generateButton.id = 'supacheck-generate-button';
+    generateButton.textContent = 'Show me the fix';
+    generateButton.style.cssText = `
+      background: #3182ce; color: white; padding: 8px 16px; border: none;
+      border-radius: 4px; cursor: pointer; font-weight: bold;
+    `;
+    generateButton.onclick = generateRLSPolicy;
+    
+    modalContent.appendChild(instructionsEl);
+    modalContent.appendChild(columnsContainer);
+    
+    const resultContainer = document.createElement('div');
+    resultContainer.id = 'supacheck-result-container';
+    resultContainer.style.display = 'none';
+    modalContent.appendChild(resultContainer);
+    
+    modalFooter.appendChild(generateButton);
+    
+    modal.appendChild(modalHeader);
+    modal.appendChild(modalContent);
+    modal.appendChild(modalFooter);
+    
+    modalOverlay.appendChild(modal);
+    document.body.appendChild(modalOverlay);
+    
+    return modalOverlay;
+  }
+  
+  // Store current table data for the modal
+  let currentFixTableData = {
+    tableName: null,
+    columns: []
+  };
+  
+  // Generate RLS Policy based on selected columns
+  function generateRLSPolicy() {
+    const columnsContainer = document.getElementById('supacheck-columns-container');
+    const resultContainer = document.getElementById('supacheck-result-container');
+    const tableName = currentFixTableData.tableName;
+    
+    // Get checked columns
+    const checkboxes = columnsContainer.querySelectorAll('input[type="checkbox"]:checked');
+    const selectedColumns = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedColumns.length === 0) {
+      alert('Please select at least one column to restrict');
+      return;
+    }
+    
+    // Build policy
+    const conditions = selectedColumns.map(column => 
+      `    ${column} = (SELECT ${column} FROM public.${tableName} WHERE id = auth.uid())`
+    ).join(' AND\n');
+    
+    const policy = `CREATE POLICY "Users can update non-sensitive ${tableName} fields"
+  ON public.${tableName}
+  FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (
+${conditions}
+  );`;
+    
+    // Display results
+    resultContainer.style.display = 'block';
+    resultContainer.innerHTML = `
+      <div style="margin: 20px 0; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+        <h3 style="font-weight: bold; margin-bottom: 10px;">Follow these steps:</h3>
+        <ol style="margin-left: 20px; line-height: 1.5;">
+          <li>Go to your Supabase project</li>
+          <li>Go to SQL Editor</li>
+          <li>Run this auth policy for your table:</li>
+        </ol>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 4px; margin-top: 10px; overflow-x: auto;">
+          <pre style="margin: 0; white-space: pre-wrap; font-family: monospace;">${policy}</pre>
+        </div>
+      </div>
+    `;
+    
+    // Scroll to the result
+    resultContainer.scrollIntoView({ behavior: 'smooth' });
+  }
+  
+  // Fetch columns for a table
+  async function fetchTableColumns(baseUrl, tableName, apiKey) {
+    const columnsContainer = document.getElementById('supacheck-columns-container');
+    columnsContainer.innerHTML = '<div style="text-align: center;">Loading columns...</div>';
+    
+    try {
+      // First, try to get column info from a single row
+      const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+      const response = await fetch(sampleUrl, {
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sample data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // We have a row, get columns from it
+        const columns = Object.keys(data[0]);
+        displayColumns(columns);
+      } else {
+        // No data, try to introspect using Supabase's introspection API
+        // This is a fallback and might not work depending on API configuration
+        throw new Error('No data available to extract columns');
+      }
+    } catch (error) {
+      console.error('Error fetching columns:', error);
+      columnsContainer.innerHTML = `
+        <div style="color: #ef4444; padding: 10px;">
+          Could not retrieve columns automatically. Please enter them manually:
+        </div>
+        <div style="margin-top: 10px;">
+          <textarea id="columns-manual-input" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;" 
+            placeholder="Enter column names, one per line"></textarea>
+        </div>
+        <div style="margin-top: 10px;">
+          <button id="add-manual-columns" style="background: #3182ce; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer;">
+            Add Columns
+          </button>
+        </div>
+      `;
+      
+      // Set up button for manual column entry
+      document.getElementById('add-manual-columns').onclick = () => {
+        const manualInput = document.getElementById('columns-manual-input').value;
+        const columns = manualInput.split('\n')
+          .map(col => col.trim())
+          .filter(col => col.length > 0);
+        
+        if (columns.length > 0) {
+          displayColumns(columns);
+        } else {
+          alert('Please enter at least one column name');
+        }
+      };
+    }
+  }
+  
+  // Display columns as checkboxes
+  function displayColumns(columns) {
+    const columnsContainer = document.getElementById('supacheck-columns-container');
+    columnsContainer.innerHTML = '';
+    
+    const nonUpdatableFields = ['id', 'created_at', 'updated_at'];
+    currentFixTableData.columns = columns;
+    
+    columns.forEach(column => {
+      const isNonUpdatable = nonUpdatableFields.includes(column);
+      
+      const checkboxContainer = document.createElement('div');
+      checkboxContainer.style.cssText = 'margin-bottom: 8px; display: flex; align-items: center;';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `column-${column}`;
+      checkbox.value = column;
+      checkbox.style.marginRight = '8px';
+      
+      // Pre-check common sensitive fields
+      const sensitiveFields = ['email', 'password', 'credits', 'role', 'subscription_tier', 'is_admin'];
+      if (sensitiveFields.includes(column)) {
+        checkbox.checked = true;
+      }
+      
+      // Disable checkbox for non-updatable fields
+      if (isNonUpdatable) {
+        checkbox.disabled = true;
+        checkbox.checked = false;
+      }
+      
+      const label = document.createElement('label');
+      label.htmlFor = `column-${column}`;
+      label.textContent = column;
+      if (isNonUpdatable) {
+        label.style.color = '#9ca3af';
+        label.title = 'This field is typically not updatable';
+      }
+      
+      checkboxContainer.appendChild(checkbox);
+      checkboxContainer.appendChild(label);
+      columnsContainer.appendChild(checkboxContainer);
+    });
+    
+    // Reset result container
+    const resultContainer = document.getElementById('supacheck-result-container');
+    resultContainer.style.display = 'none';
+    resultContainer.innerHTML = '';
+  }
+  
+  // Show modal with table columns
+  function showFixTableModal(tableName, baseUrl, apiKey) {
+    const modalOverlay = document.getElementById('supacheck-modal-overlay') || createFixTableModal();
+    const modalTitle = document.getElementById('supacheck-modal-title');
+    
+    modalTitle.textContent = `Restrict Column Updates for "${tableName}"`;
+    modalOverlay.style.display = 'flex';
+    
+    // Store current table
+    currentFixTableData.tableName = tableName;
+    
+    // Reset the result container
+    const resultContainer = document.getElementById('supacheck-result-container');
+    if (resultContainer) {
+      resultContainer.style.display = 'none';
+      resultContainer.innerHTML = '';
+    }
+    
+    // Fetch columns for the table
+    fetchTableColumns(baseUrl, tableName, apiKey);
+  }
+
   // Add a table entry to the list
   function addTableEntry(tableName, endpoint) {
     const tablesContainer = document.getElementById('supabase-tables');
@@ -347,7 +620,13 @@
       border-radius: 4px;
       font-size: 12px;
       border-left: 3px solid #22C55E;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     `;
+    
+    const tableInfoEl = document.createElement('div');
+    tableInfoEl.style.flexGrow = '1';
     
     const tableNameEl = document.createElement('div');
     tableNameEl.style.cssText = `
@@ -364,8 +643,32 @@
     `;
     endpointEl.textContent = endpoint;
     
-    tableEl.appendChild(tableNameEl);
-    tableEl.appendChild(endpointEl);
+    // Add Fix Table button
+    const fixTableBtn = document.createElement('button');
+    fixTableBtn.textContent = 'Fix Table';
+    fixTableBtn.style.cssText = `
+      background-color: #22C55E;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      margin-left: 8px;
+      white-space: nowrap;
+    `;
+    
+    // Set up click handler
+    fixTableBtn.onclick = (e) => {
+      e.stopPropagation(); // Prevent event bubbling
+      const baseUrl = endpoint.split('/rest/v1/')[0];
+      showFixTableModal(tableName, baseUrl, window._supabaseAnonKey);
+    };
+    
+    tableInfoEl.appendChild(tableNameEl);
+    tableInfoEl.appendChild(endpointEl);
+    tableEl.appendChild(tableInfoEl);
+    tableEl.appendChild(fixTableBtn);
     tablesContainer.appendChild(tableEl);
   }
 
