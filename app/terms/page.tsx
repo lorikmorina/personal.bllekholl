@@ -100,7 +100,7 @@ export default function TermsOfService() {
         
         <h2>14. Contact Us</h2>
         <p>
-          If you have any questions about these Terms, please contact us at bllekhollsolutions@gmail.com.
+          If you have any questions about these Terms, please contact us at lorik@securevibing.com.
         </p>
       </div>
     </div>

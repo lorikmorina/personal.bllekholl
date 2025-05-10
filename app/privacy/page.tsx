@@ -89,7 +89,7 @@ export default function PrivacyPolicy() {
           <li>The right to data portability</li>
         </ul>
         <p>
-          To exercise these rights, please contact us at bllekhollsolutions@gmail.com.
+          To exercise these rights, please contact us at lorik@securevibing.com.
         </p>
         
         <h2>8. Cookies and Tracking</h2>
@@ -105,7 +105,7 @@ export default function PrivacyPolicy() {
         
         <h2>10. Contact Us</h2>
         <p>
-          If you have any questions about this privacy policy, please contact us at bllekhollsolutions@gmail.com.
+          If you have any questions about this privacy policy, please contact us at lorik@securevibing.com.
         </p>
       </div>
     </div>

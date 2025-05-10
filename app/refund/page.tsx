@@ -25,7 +25,7 @@ export default function RefundPolicy() {
         
         <h2 className="text-xl font-semibold mb-4 mt-8">How to Request a Refund</h2>
         <p>
-          If you believe you qualify for a refund under the exceptions mentioned above, please contact us at bllekhollsolutions@gmail.com with details of your purchase and the reason for your refund request.
+          If you believe you qualify for a refund under the exceptions mentioned above, please contact us at lorik@securevibing.com with details of your purchase and the reason for your refund request.
         </p>
         
         <h2 className="text-xl font-semibold mb-4 mt-8">Processing Time</h2>
