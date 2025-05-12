@@ -39,8 +39,8 @@ export default function TermsOfService() {
         <p>We offer the following subscription plans:</p>
         <ul>
           <li><strong>Free Plan:</strong> Limited scanning capabilities with basic features.</li>
-          <li><strong>Monthly Plan ($14/month):</strong> Full access to all features, billed monthly.</li>
-          <li><strong>Yearly Plan ($99/year):</strong> Full access to all features, billed annually with better value compared to the monthly plan.</li>
+          <li><strong>Monthly Plan ($19/month):</strong> Full access to all features, billed monthly.</li>
+          <li><strong>Yearly Plan ($159/year):</strong> Full access to all features, billed annually with better value compared to the monthly plan.</li>
         </ul>
         
         

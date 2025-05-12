@@ -78,9 +78,9 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
             <div className="font-medium mb-1">Current Plan: {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</div>
             <div className="text-sm text-muted-foreground">
               {currentPlan === 'monthly' 
-                ? 'You are on the monthly subscription plan ($14/month).'
+                ? 'You are on the monthly subscription plan ($19/month).'
                 : currentPlan === 'yearly'
-                ? 'You are on the yearly subscription plan ($99/year).'
+                ? 'You are on the yearly subscription plan ($159/year).'
                 : 'You are on the free plan.'}
             </div>
           </div>

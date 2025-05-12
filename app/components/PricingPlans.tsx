@@ -10,7 +10,7 @@ export default function PricingPlans() {
   const plans = [
     {
       name: "Monthly",
-      price: "$14",
+      price: "$19",
       description: "Perfect for individuals who need regular website scanning",
       billingPeriod: "per month",
       annualPrice: "",
@@ -26,7 +26,7 @@ export default function PricingPlans() {
     },
     {
       name: "Yearly",
-      price: "$99",
+      price: "$159",
       description: "Best value for dedicated developers",
       billingPeriod: "per year",
       features: [
