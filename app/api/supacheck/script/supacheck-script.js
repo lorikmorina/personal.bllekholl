@@ -1,42 +1,6 @@
 // Supabase Security Check Tool
 // VERSION: Will be replaced dynamically
 (function() {
-  // Function to load the CSS stylesheet
-  function loadStylesheet() {
-    const stylesheetUrl = `${window.location.origin}/api/supacheck/script/styles`;
-    const linkElement = document.createElement('link');
-    linkElement.id = 'supacheck-styles';
-    linkElement.rel = 'stylesheet';
-    linkElement.href = stylesheetUrl;
-    document.head.appendChild(linkElement);
-  }
-  
-  // Load the stylesheet first
-  loadStylesheet();
-  
-  // Function to detect dark mode from system or document
-  function detectDarkMode() {
-    // Check if user prefers dark mode at system level
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    // Check if document already has dark mode class or dark mode attribute
-    const documentIsDark = document.documentElement.classList.contains('dark') || 
-                          document.documentElement.getAttribute('data-theme') === 'dark' ||
-                          document.body.classList.contains('dark-mode') ||
-                          document.body.classList.contains('darkMode');
-    
-    return prefersDark || documentIsDark;
-  }
-  
-  // Function to apply dark mode to the widget if detected
-  function applyTheme() {
-    const isDarkMode = detectDarkMode();
-    const widget = document.getElementById('supabase-check-widget');
-    if (widget && isDarkMode) {
-      widget.classList.add('dark-theme');
-    }
-  }
-
   // Utility function to search for Supabase credentials in script content
   function checkScriptContent(content) {
     let foundUrl = null;
@@ -106,13 +70,16 @@
   function createWidget() {
     const container = document.createElement('div');
     container.id = 'supabase-check-widget';
-    // Apply dark theme if needed
-    if (detectDarkMode()) {
-      container.classList.add('dark-theme');
-    }
+    container.style.cssText = `
+      position: fixed; bottom: 20px; right: 20px; width: 320px;
+      background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: sans-serif;
+      z-index: 9999; overflow: hidden; transition: all 0.3s ease; color: #1a202c;
+      max-height: 80vh; display: flex; flex-direction: column;
+    `;
 
     const header = document.createElement('div');
-    header.className = 'widget-header';
+    header.style.cssText = 'padding: 10px 15px; background: #3182ce; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
     header.textContent = 'SecureVibing Supacheck';
     header.onclick = () => {
       const content = document.getElementById('supabase-check-content');
@@ -121,13 +88,14 @@
 
     const closeButton = document.createElement('span');
     closeButton.textContent = '×';
-    closeButton.className = 'widget-close';
+    closeButton.style.cssText = 'cursor: pointer; font-size: 18px;';
     closeButton.onclick = (e) => { e.stopPropagation(); document.body.removeChild(container); };
     header.appendChild(closeButton);
     container.appendChild(header);
 
     const content = document.createElement('div');
     content.id = 'supabase-check-content';
+    content.style.cssText = 'padding: 15px; overflow-y: auto; flex-grow: 1;';
     container.appendChild(content);
 
     document.body.appendChild(container);
@@ -159,15 +127,24 @@
   // Helper function to add status item to the widget
   function addStatusItem(label, status, isOk = true) {
     const itemEl = document.createElement('div');
-    itemEl.className = `status-item ${isOk ? 'status-ok' : 'status-error'}`;
+    itemEl.style.cssText = `
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; padding: 8px 12px; border-radius: 4px;
+      background: ${isOk ? '#F0FDF4' : '#FEF2F2'};
+      border-left: 3px solid ${isOk ? '#22C55E' : '#EF4444'};
+    `;
 
     const labelEl = document.createElement('div');
     labelEl.textContent = label;
-    labelEl.className = 'label';
+    labelEl.style.fontWeight = 'bold';
     
     const statusEl = document.createElement('div');
     statusEl.textContent = status;
-    statusEl.className = 'status';
+    statusEl.style.cssText = `
+      padding: 2px 8px; border-radius: 12px; font-size: 12px; 
+      background: ${isOk ? '#DCFCE7' : '#FEE2E2'}; 
+      color: ${isOk ? '#166534' : '#B91C1C'};
+    `;
     
     itemEl.appendChild(labelEl);
     itemEl.appendChild(statusEl);
@@ -178,7 +155,14 @@
   // Add a message with login suggestion
   function addLoginMessage() {
     const messageEl = document.createElement('div');
-    messageEl.className = 'supacheck-alert info';
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #EFF6FF;
+      border-radius: 4px;
+      border-left: 3px solid #3B82F6;
+      font-size: 13px;
+    `;
     messageEl.textContent = "Login with a test account to test more Supabase configurations";
     contentEl.appendChild(messageEl);
   }
@@ -186,7 +170,15 @@
   // Add a message about CORS limitations
   function addCorsInfoMessage() {
     const messageEl = document.createElement('div');
-    messageEl.className = 'supacheck-alert warning';
+    messageEl.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: #FEF3C7;
+      border-radius: 4px;
+      border-left: 3px solid #F59E0B;
+      font-size: 13px;
+      line-height: 1.4;
+    `;
     messageEl.innerHTML = "⚠️ <strong>CORS Alert:</strong> Some Supabase requests may not be visible due to CORS restrictions. " +
       "If you're testing on a different domain than your app, data may be limited.<br><br>" +
       "For complete testing, run this check directly on your deployed application.";
@@ -198,14 +190,25 @@
   function createNetworkSection() {
     const sectionEl = document.createElement('div');
     sectionEl.id = 'supabase-network-section';
-    sectionEl.className = 'supacheck-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
     
     const titleEl = document.createElement('div');
     titleEl.textContent = 'Network Requests';
-    titleEl.className = 'supacheck-section-title';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
     
     const requestsContainer = document.createElement('div');
     requestsContainer.id = 'supabase-requests';
+    requestsContainer.style.cssText = `
+      max-height: 200px;
+      overflow-y: auto;
+    `;
     
     sectionEl.appendChild(titleEl);
     sectionEl.appendChild(requestsContainer);
@@ -217,11 +220,18 @@
   function createTablesSection() {
     const sectionEl = document.createElement('div');
     sectionEl.id = 'supabase-tables-section';
-    sectionEl.className = 'supacheck-section';
+    sectionEl.style.cssText = `
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    `;
     
     const titleEl = document.createElement('div');
     titleEl.textContent = 'Discovered Tables';
-    titleEl.className = 'supacheck-section-title';
+    titleEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 10px;
+    `;
     
     const tablesContainer = document.createElement('div');
     tablesContainer.id = 'supabase-tables';
@@ -312,12 +322,26 @@
   function createFixTableModal() {
     const modalOverlay = document.createElement('div');
     modalOverlay.id = 'supacheck-modal-overlay';
+    modalOverlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5); z-index: 10000; display: none;
+      align-items: center; justify-content: center;
+    `;
     
     const modal = document.createElement('div');
     modal.id = 'supacheck-fix-modal';
+    modal.style.cssText = `
+      background: white; border-radius: 8px; width: 90%; max-width: 600px;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+      display: flex; flex-direction: column; position: relative;
+    `;
     
     const modalHeader = document.createElement('div');
-    modalHeader.className = 'modal-header';
+    modalHeader.style.cssText = `
+      padding: 16px; border-bottom: 1px solid #e2e8f0; background: #3182ce;
+      color: white; font-weight: bold; display: flex; justify-content: space-between;
+      align-items: center; border-top-left-radius: 8px; border-top-right-radius: 8px;
+    `;
     
     const modalTitle = document.createElement('div');
     modalTitle.id = 'supacheck-modal-title';
@@ -325,7 +349,7 @@
     
     const closeButton = document.createElement('span');
     closeButton.textContent = '×';
-    closeButton.className = 'widget-close';
+    closeButton.style.cssText = 'cursor: pointer; font-size: 24px;';
     closeButton.onclick = () => {
       modalOverlay.style.display = 'none';
     };
@@ -335,24 +359,26 @@
     
     const modalContent = document.createElement('div');
     modalContent.id = 'supacheck-modal-content';
-    modalContent.className = 'modal-content';
+    modalContent.style.cssText = 'padding: 16px; flex-grow: 1;';
     
     const columnsContainer = document.createElement('div');
     columnsContainer.id = 'supacheck-columns-container';
-    columnsContainer.style.marginBottom = '16px';
+    columnsContainer.style.cssText = 'margin-bottom: 16px;';
     
     const instructionsEl = document.createElement('div');
-    instructionsEl.style.marginBottom = '16px';
-    instructionsEl.style.color = 'var(--supacheck-muted-foreground)';
+    instructionsEl.style.cssText = 'margin-bottom: 16px; color: #4b5563;';
     instructionsEl.innerHTML = 'Check the columns you want to limit users from updating:';
     
     const modalFooter = document.createElement('div');
-    modalFooter.className = 'modal-footer';
+    modalFooter.style.cssText = 'padding: 16px; border-top: 1px solid #e2e8f0; text-align: right;';
     
     const generateButton = document.createElement('button');
     generateButton.id = 'supacheck-generate-button';
     generateButton.textContent = 'Show me the fix';
-    generateButton.className = 'supacheck-button';
+    generateButton.style.cssText = `
+      background: #3182ce; color: white; padding: 8px 16px; border: none;
+      border-radius: 4px; cursor: pointer; font-weight: bold;
+    `;
     generateButton.onclick = generateRLSPolicy;
     
     modalContent.appendChild(instructionsEl);
@@ -412,21 +438,125 @@ ${conditions}
     // Display results
     resultContainer.style.display = 'block';
     resultContainer.innerHTML = `
-      <div style="margin: 20px 0; border-top: 1px solid var(--supacheck-border); padding-top: 20px;">
+      <div style="margin: 20px 0; border-top: 1px solid #e2e8f0; padding-top: 20px;">
         <h3 style="font-weight: bold; margin-bottom: 10px;">Follow these steps:</h3>
         <ol style="margin-left: 20px; line-height: 1.5;">
           <li>Go to your Supabase project</li>
           <li>Go to SQL Editor</li>
           <li>Run this auth policy for your table:</li>
         </ol>
-        <div class="result-code">
-          <pre>${policy}</pre>
+        <div style="background: #f1f5f9; padding: 16px; border-radius: 4px; margin-top: 10px; overflow-x: auto;">
+          <pre style="margin: 0; white-space: pre-wrap; font-family: monospace;">${policy}</pre>
         </div>
       </div>
     `;
     
     // Scroll to the result
     resultContainer.scrollIntoView({ behavior: 'smooth' });
+  }
+  
+  // Fetch columns for a table
+  async function fetchTableColumns(baseUrl, tableName, apiKey) {
+    const columnsContainer = document.getElementById('supacheck-columns-container');
+    columnsContainer.innerHTML = '<div style="text-align: center;">Loading columns...</div>';
+    
+    // Try first with JWT if available
+    if (window._currentUserJwt) {
+      try {
+        console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using JWT token...`);
+        const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+        const response = await fetch(sampleUrl, {
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${window._currentUserJwt}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`[Column Discovery] Successfully retrieved columns using JWT for '${tableName}'`);
+            const columns = Object.keys(data[0]);
+            displayColumns(columns);
+            return; // Success with JWT, exit function
+          }
+        }
+        // If we get here, the JWT approach failed - continue to API key approach
+        console.log(`[Column Discovery] JWT approach failed for '${tableName}', trying API key approach...`);
+      } catch (e) {
+        console.error(`[Column Discovery] Error with JWT approach for '${tableName}':`, e);
+        // Continue to API key approach
+      }
+    }
+    
+    // Original approach - try with API key as bearer token
+    try {
+      console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using API key...`);
+      const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+      const response = await fetch(sampleUrl, {
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`[Column Discovery] API key approach failed with status ${response.status} for '${tableName}'`);
+        throw new Error(`Failed to fetch sample data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // We have a row, get columns from it
+        console.log(`[Column Discovery] Successfully retrieved columns using API key for '${tableName}'`);
+        const columns = Object.keys(data[0]);
+        displayColumns(columns);
+      } else {
+        // No data, try to introspect using Supabase's introspection API
+        // This is a fallback and might not work depending on API configuration
+        console.error(`[Column Discovery] No data available for column extraction from '${tableName}'`);
+        throw new Error('No data available to extract columns');
+      }
+    } catch (error) {
+      console.error(`[Column Discovery] Final error fetching columns for '${tableName}':`, error);
+      columnsContainer.innerHTML = `
+        <div style="color: #ef4444; padding: 10px;">
+          Could not retrieve columns automatically. Please enter them manually:
+        </div>
+        <div style="margin-top: 10px; color: #6b7280; font-size: 12px;">
+          <p>This may happen if:</p>
+          <ul style="list-style-type: disc; margin-left: 20px; margin-top: 5px;">
+            <li>The table is empty (no rows to analyze)</li>
+            <li>Row Level Security (RLS) is blocking access</li>
+            <li>The table exists but you don't have permission to view it</li>
+          </ul>
+        </div>
+        <div style="margin-top: 10px;">
+          <textarea id="columns-manual-input" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;" 
+            placeholder="Enter column names, one per line"></textarea>
+        </div>
+        <div style="margin-top: 10px;">
+          <button id="add-manual-columns" style="background: #3182ce; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer;">
+            Add Columns
+          </button>
+        </div>
+      `;
+      
+      // Set up button for manual column entry
+      document.getElementById('add-manual-columns').onclick = () => {
+        const manualInput = document.getElementById('columns-manual-input').value;
+        const columns = manualInput.split('\n')
+          .map(col => col.trim())
+          .filter(col => col.length > 0);
+        
+        if (columns.length > 0) {
+          displayColumns(columns);
+        } else {
+          alert('Please enter at least one column name');
+        }
+      };
+    }
   }
   
   // Display columns as checkboxes
@@ -441,12 +571,13 @@ ${conditions}
       const isNonUpdatable = nonUpdatableFields.includes(column);
       
       const checkboxContainer = document.createElement('div');
-      checkboxContainer.className = 'checkbox-container';
+      checkboxContainer.style.cssText = 'margin-bottom: 8px; display: flex; align-items: center;';
       
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.id = `column-${column}`;
       checkbox.value = column;
+      checkbox.style.marginRight = '8px';
       
       // Pre-check common sensitive fields
       const sensitiveFields = ['email', 'password', 'credits', 'role', 'subscription_tier', 'is_admin'];
@@ -464,7 +595,7 @@ ${conditions}
       label.htmlFor = `column-${column}`;
       label.textContent = column;
       if (isNonUpdatable) {
-        label.className = 'disabled';
+        label.style.color = '#9ca3af';
         label.title = 'This field is typically not updatable';
       }
       
@@ -523,23 +654,50 @@ ${conditions}
     
     const tableEl = document.createElement('div');
     tableEl.id = `table-${tableName}`;
-    tableEl.className = 'table-entry';
+    tableEl.style.cssText = `
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: #F9FAFB;
+      border-radius: 4px;
+      font-size: 12px;
+      border-left: 3px solid #22C55E;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
     
     const tableInfoEl = document.createElement('div');
-    tableInfoEl.className = 'table-info';
+    tableInfoEl.style.flexGrow = '1';
     
     const tableNameEl = document.createElement('div');
-    tableNameEl.className = 'table-name';
+    tableNameEl.style.cssText = `
+      font-weight: bold;
+      margin-bottom: 2px;
+    `;
     tableNameEl.textContent = tableName;
     
     const endpointEl = document.createElement('div');
-    endpointEl.className = 'table-endpoint';
+    endpointEl.style.cssText = `
+      font-size: 11px;
+      color: #6B7280;
+      word-break: break-all;
+    `;
     endpointEl.textContent = endpoint;
     
     // Add Fix Table button
     const fixTableBtn = document.createElement('button');
     fixTableBtn.textContent = 'Fix Table';
-    fixTableBtn.className = 'supacheck-button success small';
+    fixTableBtn.style.cssText = `
+      background-color: #22C55E;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      margin-left: 8px;
+      white-space: nowrap;
+    `;
     
     // Set up click handler
     fixTableBtn.onclick = (e) => {
@@ -641,11 +799,26 @@ ${conditions}
     
     const containerEl = document.createElement('div');
     containerEl.id = `json-container-${id}`;
-    containerEl.className = 'json-container';
+    containerEl.style.cssText = `
+      margin-bottom: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    `;
     
     // Header with endpoint info
     const headerEl = document.createElement('div');
-    headerEl.className = 'json-header';
+    headerEl.style.cssText = `
+      padding: 8px 12px;
+      background: ${title ? '#E0F2FE' : '#EBF5FF'};
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    `;
     
     // Extract endpoint path for display
     let endpointPath = endpoint;
@@ -658,7 +831,7 @@ ${conditions}
     
     // If we have a title, display it instead of just the endpoint
     if (title) {
-      endpointText.innerHTML = `<span style="color: var(--supacheck-info);">${title}</span><br><span style="font-size: 11px; color: var(--supacheck-muted-foreground);">${endpointPath}</span>`;
+      endpointText.innerHTML = `<span style="color: #3B82F6;">${title}</span><br><span style="font-size: 11px; color: #64748B;">${endpointPath}</span>`;
     } else {
       endpointText.textContent = endpointPath;
     }
@@ -678,7 +851,12 @@ ${conditions}
     // Content with JSON data
     const contentEl = document.createElement('div');
     contentEl.id = `json-content-${id}`;
-    contentEl.className = 'json-content';
+    contentEl.style.cssText = `
+      padding: 0;
+      max-height: 250px; /* Slightly shorter */
+      overflow-y: auto;
+      background: #ffffff; /* White background */
+    `;
     
     // ---> NEW: Handle Authenticated Data View differently
     const isAuthDataView = id.startsWith('auth-data-');
@@ -849,10 +1027,17 @@ ${conditions}
   function showLoading() {
     const loadingEl = document.createElement('div');
     loadingEl.id = 'supabase-check-loading';
-    loadingEl.className = 'loading-container';
+    loadingEl.style.cssText = 'display: flex; align-items: center; margin-bottom: 10px; padding: 10px;';
 
     const spinner = document.createElement('div');
-    spinner.className = 'spinner';
+    spinner.style.cssText = 'width: 16px; height: 16px; border: 2px solid #3B82F6; border-top-color: transparent; border-radius: 50%; margin-right: 10px; animation: spin 1s linear infinite;';
+
+    if (!document.getElementById('spinner-keyframes')) {
+      const style = document.createElement('style');
+      style.id = 'spinner-keyframes';
+      style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+    }
 
     const textEl = document.createElement('div');
     textEl.textContent = 'Scanning...';
@@ -1388,8 +1573,6 @@ ${conditions}
       }
       
       const endpoint = url.split('/').slice(3).join('/');
-      const requestsContainer = document.getElementById('supabase-requests');
-      if (!requestsContainer) return;
       
       // Avoid duplicates
       const existingRequests = document.querySelectorAll(`div[data-url="${url}"]`);
@@ -1398,12 +1581,24 @@ ${conditions}
       }
       
       const requestEl = document.createElement('div');
-      requestEl.className = 'request-entry';
+      requestEl.style.cssText = `
+        padding: 6px 8px;
+        margin-bottom: 4px;
+        background: #F9FAFB;
+        border-radius: 4px;
+        font-size: 12px;
+        border-left: 3px solid #3B82F6;
+        cursor: pointer;
+      `;
       requestEl.dataset.url = url;
       
       const methodEl = document.createElement('span');
       methodEl.textContent = method;
-      methodEl.className = 'request-method';
+      methodEl.style.cssText = `
+        font-weight: bold;
+        color: #3B82F6;
+        margin-right: 6px;
+      `;
       
       requestEl.appendChild(methodEl);
       requestEl.appendChild(document.createTextNode(endpoint));
@@ -1419,9 +1614,10 @@ ${conditions}
             responseEl.scrollIntoView({ behavior: 'smooth' });
             
             // Highlight the entry by flashing it
-            responseEl.classList.add('highlight');
+            const originalBackground = responseEl.style.background;
+            responseEl.style.background = '#FDE68A';
             setTimeout(() => {
-              responseEl.classList.remove('highlight');
+              responseEl.style.background = originalBackground;
             }, 1000);
           }
         }
@@ -1633,35 +1829,6 @@ ${conditions}
     } else {
       addStatusItem('Supabase', 'Not Found', true);
     }
-    
-    // Watch for theme changes
-    setupThemeWatcher();
-  }
-  
-  // Setup a watcher for theme changes
-  function setupThemeWatcher() {
-    // Watch for system preference changes
-    if (window.matchMedia) {
-      const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      if (colorSchemeQuery.addEventListener) {
-        colorSchemeQuery.addEventListener('change', () => {
-          applyTheme();
-        });
-      }
-    }
-    
-    // Watch for class changes on document/body
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class' || 
-            mutation.attributeName === 'data-theme') {
-          applyTheme();
-        }
-      });
-    });
-    
-    observer.observe(document.documentElement, { attributes: true });
-    observer.observe(document.body, { attributes: true });
   }
 
   runChecks();
@@ -1802,12 +1969,4 @@ ${conditions}
     button.disabled = false;
   }
   // <--- END NEW
-
-  // Add a response info message by default
-  function addResponseInfoMessage() {
-    const messageEl = document.createElement('div');
-    messageEl.className = 'supacheck-alert info';
-    messageEl.innerHTML = "When Supabase requests are detected, response data will appear here.";
-    document.getElementById('supabase-responses').appendChild(messageEl);
-  }
 })(); 
