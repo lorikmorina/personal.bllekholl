@@ -1,76 +1,245 @@
 // Supabase Security Check Tool
 // VERSION: Will be replaced dynamically
 (function() {
+  // Global flag to track if the script has already initialized
+  let hasInitialized = false;
+
+  // Add detailed console logging for debugging
+  function logDebug(message, data) {
+    console.log(`[Supacheck Debug] ${message}`, data || '');
+  }
+
+  function logError(message, error) {
+    console.error(`[Supacheck Error] ${message}`, error || '');
+  }
+
   // Utility function to search for Supabase credentials in script content
   function checkScriptContent(content) {
-    let foundUrl = null;
-    let foundKey = null;
-    
-    // Search for Supabase URLs using regex patterns
-    const urlPattern = /(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/gi;
-    const urlMatches = content.match(urlPattern) || [];
-    
-    // Updated Regex for Supabase Anon Key (JWT format)
-    // More flexible pattern that looks for any JWT pattern regardless of variable name
-    // Looks for strings that match the JWT format (three parts separated by dots)
-    const keyPattern = /(['"])?(eyJ[a-zA-Z0-9._-]+)\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*['"]?/gi;
-    
-    let keyMatch;
-    while ((keyMatch = keyPattern.exec(content)) !== null) {
-      // The actual key starts with the JWT header part
-      if (keyMatch[2]) {
-        // Extract the full JWT by matching from the start position
-        const fullKeyMatch = content.substring(keyMatch.index).match(/['"]?(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)['"]?/);
-        if (fullKeyMatch && fullKeyMatch[1]) {
-          const potentialKey = fullKeyMatch[1];
-          // Basic check to verify it's a proper JWT (three parts)
-          if (potentialKey.split('.').length === 3) {
-            foundKey = potentialKey;
-            if (foundUrl) {
-              return { url: foundUrl, key: foundKey };
+    try {
+      let foundUrl = null;
+      let foundKey = null;
+      
+      // Search for Supabase URLs using regex patterns
+      const urlPattern = /(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/gi;
+      const urlMatches = content.match(urlPattern) || [];
+      
+      // Log any URL matches for debugging
+      if (urlMatches.length > 0) {
+        logDebug(`Found Supabase URL candidates: ${urlMatches.length}`);
+      }
+      
+      // More flexible pattern that looks for any JWT pattern regardless of variable name
+      // Looks for strings that match the JWT format (three parts separated by dots)
+      const keyPattern = /(['"])?(eyJ[a-zA-Z0-9._-]+)\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*['"]?/gi;
+      
+      let keyMatch;
+      while ((keyMatch = keyPattern.exec(content)) !== null) {
+        // The actual key starts with the JWT header part
+        if (keyMatch[2]) {
+          // Extract the full JWT by matching from the start position
+          const fullKeyMatch = content.substring(keyMatch.index).match(/['"]?(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)['"]?/);
+          if (fullKeyMatch && fullKeyMatch[1]) {
+            const potentialKey = fullKeyMatch[1];
+            // Basic check to verify it's a proper JWT (three parts)
+            if (potentialKey.split('.').length === 3) {
+              foundKey = potentialKey;
+              logDebug(`Found potential Supabase key: ${potentialKey.substring(0, 10)}...`);
+              if (foundUrl) {
+                return { url: foundUrl, key: foundKey };
+              }
+              break; // Found a key, stop looking for more keys for now
             }
-            break; // Found a key, stop looking for more keys for now
           }
         }
       }
-    }
 
-    // If we found a URL but not a key yet, search near the URL again with a simpler pattern
-    if (urlMatches.length > 0 && !foundKey) {
-      foundUrl = urlMatches[0];
-      // Look for JWT keys potentially near the URL (broader search)
-      const nearbyKeyPattern = /(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/g; // Simpler JWT search
-      const nearbyKeyMatches = content.match(nearbyKeyPattern) || [];
-      
-      if (nearbyKeyMatches.length > 0) {
-        // Find the key closest to the URL? For now, just take the first valid one.
-        foundKey = nearbyKeyMatches.find(key => key.split('.').length === 3); // Ensure it looks like JWT
+      // If we found a URL but not a key yet, search near the URL again with a simpler pattern
+      if (urlMatches.length > 0 && !foundKey) {
+        foundUrl = urlMatches[0];
+        logDebug(`Using Supabase URL: ${foundUrl}`);
+        
+        // Look for JWT keys potentially near the URL (broader search)
+        const nearbyKeyPattern = /(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/g; // Simpler JWT search
+        const nearbyKeyMatches = content.match(nearbyKeyPattern) || [];
+        
+        if (nearbyKeyMatches.length > 0) {
+          logDebug(`Found ${nearbyKeyMatches.length} potential key matches near the URL`);
+          // Find the key closest to the URL? For now, just take the first valid one.
+          foundKey = nearbyKeyMatches.find(key => key.split('.').length === 3); // Ensure it looks like JWT
+          if (foundKey) {
+            logDebug(`Selected key: ${foundKey.substring(0, 10)}...`);
+          }
+        }
       }
-    }
-    
-    // Return if we found both URL and Key
-    if (foundUrl && foundKey) {
-      return { url: foundUrl, key: foundKey };
-    }
-    
-    // If only key found so far, keep searching for URL if not found yet
-    if (foundKey && !foundUrl && urlMatches.length > 0) {
-       return { url: urlMatches[0], key: foundKey };
-    }
 
-    // Fallback: If only URL was found, return null for key
-    if (urlMatches.length > 0 && !foundKey) {
-      return { url: urlMatches[0], key: null }; // Indicate URL found, but no key
-    }
+      // Also look for variable names like supabaseKey, SUPABASE_KEY, etc.
+      if (urlMatches.length > 0 && !foundKey) {
+        const variableNamePatterns = [
+          /['"]?(supabaseKey|supabaseAnonKey|SUPABASE_KEY|SUPABASE_ANON_KEY|apiKey|API_KEY|anonKey|ANON_KEY)['"]?\s*[:=]\s*['"]([^'"]+)['"]/i,
+          /['"]?(supabase\.?key|supabase\.?anon\.?key)['"]?\s*[:=]\s*['"]([^'"]+)['"]/i
+        ];
+        
+        for (const pattern of variableNamePatterns) {
+          const matches = [...content.matchAll(pattern)];
+          if (matches.length > 0) {
+            logDebug(`Found potential key via variable name pattern: ${matches[0][1]}`);
+            const keyCandidate = matches[0][2];
+            if (keyCandidate && keyCandidate.length > 20) { // Basic length check
+              foundKey = keyCandidate;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Return if we found both URL and Key
+      if (foundUrl && foundKey) {
+        return { url: foundUrl, key: foundKey };
+      }
+      
+      // If only key found so far, keep searching for URL if not found yet
+      if (foundKey && !foundUrl && urlMatches.length > 0) {
+         return { url: urlMatches[0], key: foundKey };
+      }
 
-    // Fallback: If only Key was found, but no URL
-    if (foundKey && !foundUrl) {
-      // We cannot proceed without a URL, so treat as not found
-      // Or should we try a default URL? For now, return null.
+      // Fallback: If only URL was found, return null for key
+      if (urlMatches.length > 0 && !foundKey) {
+        logDebug(`Returning URL only (no key found): ${urlMatches[0]}`);
+        return { url: urlMatches[0], key: null }; // Indicate URL found, but no key
+      }
+
+      // Fallback: If only Key was found, but no URL
+      if (foundKey && !foundUrl) {
+        // Attempt to guess the URL from the key (based on common patterns)
+        const projectRef = tryExtractProjectRefFromKey(foundKey);
+        if (projectRef) {
+          const guessedUrl = `https://${projectRef}.supabase.co`;
+          logDebug(`Guessed URL from key: ${guessedUrl}`);
+          return { url: guessedUrl, key: foundKey };
+        }
+        
+        // If couldn't guess URL, return null
+        logDebug(`Found key but no URL, couldn't proceed`);
+        return null;
+      }
+      
+      return null; // No credentials found
+    } catch (error) {
+      logError("Error in checkScriptContent:", error);
       return null;
     }
+  }
+
+  // New: Try to extract project reference from key
+  function tryExtractProjectRefFromKey(key) {
+    try {
+      // JWT tokens consist of 3 parts: header.payload.signature
+      const parts = key.split('.');
+      if (parts.length !== 3) return null;
+      
+      // Decode the payload
+      const payload = JSON.parse(atob(parts[1]));
+      
+      // Check for common fields that might contain project reference
+      if (payload.iss && payload.iss.includes('supabase')) {
+        const issuerParts = payload.iss.split('/');
+        if (issuerParts.length > 0) {
+          // Try to extract project ref from issuer
+          const potentialRef = issuerParts[issuerParts.length - 1];
+          if (potentialRef && potentialRef.length > 5) {
+            return potentialRef;
+          }
+        }
+      }
+      
+      return null;
+    } catch (e) {
+      // If any error occurs during parsing, return null
+      return null;
+    }
+  }
+
+  // Check for Supabase in localStorage
+  function checkLocalStorage() {
+    try {
+      logDebug("Checking localStorage for Supabase data");
+      let foundUrl = null;
+      let foundKey = null;
+      
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const value = localStorage.getItem(key);
+        
+        // Skip empty values
+        if (!value) continue;
+        
+        // Check if key name suggests Supabase
+        const isSupabaseKey = key.toLowerCase().includes('supabase') || 
+                            key.toLowerCase().includes('anon') || 
+                            key.toLowerCase().includes('api');
+        
+        if (isSupabaseKey) {
+          logDebug(`Found potential Supabase item in localStorage: ${key}`);
+          try {
+            // First check if the value itself contains a URL
+            const urlMatch = value.match(/(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/i);
+            if (urlMatch) {
+              foundUrl = urlMatch[1];
+              logDebug(`Found Supabase URL in localStorage value: ${foundUrl}`);
+            }
+            
+            // Then check for JWT format
+            const keyMatch = value.match(/(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/);
+            if (keyMatch) {
+              foundKey = keyMatch[1];
+              logDebug(`Found potential API key in localStorage value: ${foundKey.substring(0, 10)}...`);
+            }
+            
+            // Try parsing as JSON if no direct matches
+            if (!foundUrl || !foundKey) {
+              try {
+                const parsed = JSON.parse(value);
+                
+                // Check parsed object for URL and key
+                const jsonStr = JSON.stringify(parsed);
+                
+                if (!foundUrl) {
+                  const urlMatch = jsonStr.match(/(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/i);
+                  if (urlMatch) {
+                    foundUrl = urlMatch[1];
+                    logDebug(`Found Supabase URL in parsed localStorage JSON: ${foundUrl}`);
+                  }
+                }
+                
+                if (!foundKey) {
+                  const keyMatch = jsonStr.match(/(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/);
+                  if (keyMatch) {
+                    foundKey = keyMatch[1];
+                    logDebug(`Found potential API key in parsed localStorage JSON: ${foundKey.substring(0, 10)}...`);
+                  }
+                }
+              } catch (e) {
+                // Not valid JSON, continue
+              }
+            }
+          } catch (e) {
+            logError("Error processing localStorage item:", e);
+          }
+        }
+        
+        // If we found both URL and key, stop searching
+        if (foundUrl && foundKey) break;
+      }
+      
+      // Return results
+      if (foundUrl || foundKey) {
+        return { url: foundUrl, key: foundKey };
+      }
+    } catch (e) {
+      logError("Error accessing localStorage:", e);
+    }
     
-    return null; // No credentials found
+    return null;
   }
 
   // Create a minimal container to display results
@@ -1284,44 +1453,154 @@ ${conditions}
 
   // Search for Supabase URLs and keys in all sources
   async function findSupabaseCredentials() {
-    let finalSupabaseUrl = null;
-    let finalSupabaseKey = null;
-    
-    // Check inline scripts first
-    const inlineScripts = document.querySelectorAll('script:not([src])');
-
-    for (const script of inlineScripts) {
-      if (script.textContent) {
-        const result = checkScriptContent(script.textContent);
-        if (result) {
-          finalSupabaseUrl = result.url;
-          finalSupabaseKey = result.key;
-          break;
+    try {
+      let finalSupabaseUrl = null;
+      let finalSupabaseKey = null;
+      
+      logDebug("Starting Supabase credentials search");
+      
+      // 1. First check localStorage - fastest and most reliable source
+      logDebug("Checking localStorage");
+      const localStorageResults = checkLocalStorage();
+      if (localStorageResults && (localStorageResults.url || localStorageResults.key)) {
+        logDebug("Found credentials in localStorage", localStorageResults);
+        finalSupabaseUrl = localStorageResults.url;
+        finalSupabaseKey = localStorageResults.key;
+        
+        // If we have both, return immediately
+        if (finalSupabaseUrl && finalSupabaseKey) {
+          return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
         }
       }
-    }
-
-    if (!finalSupabaseUrl) {
-      const { contents } = await fetchAndAnalyzeScripts();
-
-      for (const scriptData of contents) {
-        if (scriptData.content) {
-          const result = checkScriptContent(scriptData.content);
+      
+      // 2. Check inline scripts
+      logDebug("Checking inline scripts");
+      const inlineScripts = document.querySelectorAll('script:not([src])');
+      
+      for (const script of inlineScripts) {
+        if (script.textContent) {
+          const result = checkScriptContent(script.textContent);
           if (result) {
-            finalSupabaseUrl = result.url;
-            finalSupabaseKey = result.key;
-            break;
+            logDebug("Found credentials in inline script", { 
+              url: result.url, 
+              hasKey: !!result.key 
+            });
+            
+            finalSupabaseUrl = finalSupabaseUrl || result.url;
+            finalSupabaseKey = finalSupabaseKey || result.key;
+            
+            // If we have both, return immediately
+            if (finalSupabaseUrl && finalSupabaseKey) {
+              return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
+            }
           }
         }
       }
-    }
-    
-    // Store the key globally for other functions to use
-    if (finalSupabaseKey) {
-      window._supabaseAnonKey = finalSupabaseKey;
-    }
+      
+      // 3. Check environment variables in HTML (meta tags)
+      logDebug("Checking environment variables in meta tags");
+      document.querySelectorAll('meta').forEach(meta => {
+        try {
+          const name = meta.getAttribute('name') || '';
+          const content = meta.getAttribute('content') || '';
+          
+          // Check for Supabase URL
+          if ((name.toLowerCase().includes('supabase') || name.toLowerCase().includes('api')) && 
+              content.includes('supabase.co')) {
+            const urlMatch = content.match(/(https?:\/\/[a-zA-Z0-9-]+\.supabase\.co)/i);
+            if (urlMatch) {
+              finalSupabaseUrl = finalSupabaseUrl || urlMatch[1];
+              logDebug(`Found Supabase URL in meta tag: ${finalSupabaseUrl}`);
+            }
+          }
+          
+          // Check for API key
+          if ((name.toLowerCase().includes('supabase') || name.toLowerCase().includes('key') || 
+               name.toLowerCase().includes('token')) && content.length > 20) {
+            const keyMatch = content.match(/(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/);
+            if (keyMatch) {
+              finalSupabaseKey = finalSupabaseKey || keyMatch[1];
+              logDebug(`Found potential API key in meta tag: ${finalSupabaseKey.substring(0, 10)}...`);
+            }
+          }
+        } catch (e) {
+          // Ignore errors with individual meta tags
+        }
+      });
+      
+      // If we have both from metadata, return immediately
+      if (finalSupabaseUrl && finalSupabaseKey) {
+        return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
+      }
+      
+      // 4. Fetch and analyze external scripts
+      try {
+        logDebug("Fetching external scripts");
+        const { contents } = await fetchAndAnalyzeScripts();
+        logDebug(`Analyzing ${contents.length} external scripts`);
 
-    return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
+        for (const scriptData of contents) {
+          if (scriptData.content) {
+            const result = checkScriptContent(scriptData.content);
+            if (result) {
+              logDebug("Found credentials in external script", { 
+                url: result.url, 
+                hasKey: !!result.key,
+                script: scriptData.url
+              });
+              
+              finalSupabaseUrl = finalSupabaseUrl || result.url;
+              finalSupabaseKey = finalSupabaseKey || result.key;
+              
+              // If we have both, break and return
+              if (finalSupabaseUrl && finalSupabaseKey) {
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        logError("Error fetching or analyzing external scripts", e);
+        // Continue with what we have so far
+      }
+      
+      // 5. Last resort: Try to extract from window or document properties
+      if (!finalSupabaseUrl || !finalSupabaseKey) {
+        logDebug("Trying to extract from global window object");
+        // Convert window to string and search
+        try {
+          // This is a bit hacky but can sometimes find values in closures
+          const windowStr = document.documentElement.innerHTML;
+          const result = checkScriptContent(windowStr);
+          if (result) {
+            finalSupabaseUrl = finalSupabaseUrl || result.url;
+            finalSupabaseKey = finalSupabaseKey || result.key;
+            logDebug("Found credentials in document HTML", { 
+              url: !!finalSupabaseUrl, 
+              hasKey: !!finalSupabaseKey 
+            });
+          }
+        } catch (e) {
+          logError("Error extracting from window object", e);
+        }
+      }
+      
+      // Store the key globally for other functions to use
+      if (finalSupabaseKey) {
+        window._supabaseAnonKey = finalSupabaseKey;
+        logDebug("Stored API key globally");
+      }
+
+      logDebug("Credentials search complete", { 
+        foundUrl: !!finalSupabaseUrl, 
+        foundKey: !!finalSupabaseKey 
+      });
+      
+      return { supabaseUrl: finalSupabaseUrl, supabaseKey: finalSupabaseKey };
+    } catch (error) {
+      logError("Error in findSupabaseCredentials", error);
+      return { supabaseUrl: null, supabaseKey: null };
+    }
   }
 
   // Monitor network requests to Supabase
@@ -1787,58 +2066,112 @@ ${conditions}
 
   // Main execution
   async function runChecks() {
-    const loadingEl = showLoading();
+    // Prevent multiple initializations
+    if (hasInitialized) {
+      logDebug("Script already initialized, skipping");
+      return;
+    }
+    hasInitialized = true;
     
-    // Find Supabase credentials
-    const { supabaseUrl, supabaseKey } = await findSupabaseCredentials();
-    
-    // Store globally for reference
-    window._supabaseUrl = supabaseUrl;
-    window._supabaseAnonKey = supabaseKey; 
-
-    // Clear loading indicator
-    hideLoading();
-    
-    // Display Supabase status
-    if (supabaseUrl && supabaseKey) {
-      addStatusItem('Supabase', 'Found', false);
+    try {
+      // Start with user feedback
+      logDebug("Starting Supabase security checks");
+      const loadingEl = showLoading();
       
-      // ---> NEW: Attempt to find user JWT from cookies early
-      const jwtFromCookies = findUserJwtInCookies();
-      if (jwtFromCookies) {
-        window._currentUserJwt = jwtFromCookies;
-        console.log("[Startup] User JWT found in cookies and stored globally.");
+      // Set up error handling
+      window.addEventListener('error', function(event) {
+        logError("Unhandled error in script", event.error);
+        hideLoading();
+        addStatusItem('Script Error', 'Check Console', false);
+      });
+      
+      // Find Supabase credentials with timeout
+      let timeoutId = setTimeout(() => {
+        logError("Credential search timed out after 10 seconds");
+        hideLoading();
+        addStatusItem('Supabase Search', 'Timed Out', false);
+      }, 10000); // 10 second timeout
+      
+      // Find Supabase credentials
+      const { supabaseUrl, supabaseKey } = await findSupabaseCredentials();
+      
+      // Clear timeout since we got a response
+      clearTimeout(timeoutId);
+      
+      // Store globally for reference
+      window._supabaseUrl = supabaseUrl;
+      window._supabaseAnonKey = supabaseKey; 
+
+      // Clear loading indicator
+      hideLoading();
+      
+      // Display Supabase status
+      if (supabaseUrl && supabaseKey) {
+        addStatusItem('Supabase', 'Found', false);
+        
+        // ---> NEW: Attempt to find user JWT from cookies early
+        const jwtFromCookies = findUserJwtInCookies();
+        if (jwtFromCookies) {
+          window._currentUserJwt = jwtFromCookies;
+          logDebug("User JWT found in cookies and stored globally.");
+        }
+        // <--- END NEW
+        
+        // Start monitoring network requests and discover tables
+        const discoveredTables = monitorNetworkRequests(supabaseUrl);
+        
+        // Verify tables and check RLS
+        try {
+          const { rlsConfigured, existingTables } = await verifyTablesAndCheckRLS(supabaseUrl, supabaseKey, discoveredTables);
+          addStatusItem('Row Level Security', 
+                       rlsConfigured ? 'Potentially Configured (Anon Limited)' : '⚠️ Not Configured (Anon Access Detected)', 
+                       rlsConfigured);
+        } catch (error) {
+          logError("Error checking RLS status", error);
+          addStatusItem('Row Level Security', 'Error Checking', false);
+        }
+
+        // ---> NEW: After checks, if we have JWT from cookies & discovered tables, ensure fetches happened
+        if (window._currentUserJwt && window._discoveredTableNames.size > 0) {
+           logDebug("Re-checking discovered tables against cookie JWT...");
+           window._discoveredTableNames.forEach(tableName => {
+              // Check if auth data already exists for this table to avoid duplicate fetches
+              if (!document.getElementById(`json-container-auth-data-${tableName}`)) {
+                  logDebug(`Triggering auth fetch for discovered table '${tableName}' using cookie JWT.`);
+                  fetchAndDisplayAuthData(supabaseUrl, tableName, window._currentUserJwt, supabaseKey);
+              }
+           });
+        }
+        // <--- END NEW
+
+        // Add CORS info message
+        addCorsInfoMessage();
+      } else {
+        if (supabaseUrl) {
+          addStatusItem('Supabase URL', 'Found, Missing Key', false);
+          logDebug("Found Supabase URL but no API key");
+        } else if (supabaseKey) {
+          addStatusItem('Supabase Key', 'Found, Missing URL', false);
+          logDebug("Found Supabase key but no URL");
+        } else {
+          addStatusItem('Supabase', 'Not Found', true);
+          logDebug("No Supabase credentials found");
+        }
       }
-      // <--- END NEW
-      
-      // Start monitoring network requests and discover tables
-      const discoveredTables = monitorNetworkRequests(supabaseUrl);
-      
-      // Verify tables and check RLS
-      const { rlsConfigured, existingTables } = await verifyTablesAndCheckRLS(supabaseUrl, supabaseKey, discoveredTables);
-      addStatusItem('Row Level Security', 
-                     rlsConfigured ? 'Potentially Configured (Anon Limited)' : '⚠️ Not Configured (Anon Access Detected)', 
-                     rlsConfigured);
-
-      // ---> NEW: After checks, if we have JWT from cookies & discovered tables, ensure fetches happened
-      if (window._currentUserJwt && window._discoveredTableNames.size > 0) {
-         console.log("[Startup] Re-checking discovered tables against cookie JWT...");
-         window._discoveredTableNames.forEach(tableName => {
-            // Check if auth data already exists for this table to avoid duplicate fetches
-            if (!document.getElementById(`json-container-auth-data-${tableName}`)) {
-                console.log(`[Startup] Triggering auth fetch for discovered table '${tableName}' using cookie JWT.`);
-                fetchAndDisplayAuthData(supabaseUrl, tableName, window._currentUserJwt, supabaseKey);
-            }
-         });
-      }
-      // <--- END NEW
-
-    } else {
-      addStatusItem('Supabase', 'Not Found', true);
+    } catch (error) {
+      logError("Error in runChecks", error);
+      hideLoading();
+      addStatusItem('Supabase Check', 'Failed', false);
     }
   }
 
-  runChecks();
+  // Try to start checks when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runChecks);
+  } else {
+    // DOM already loaded, run checks directly
+    runChecks();
+  }
 
   // ---> NEW: Helper to format values for display
   function formatValueForDisplay(value) {
@@ -1877,7 +2210,7 @@ ${conditions}
     const statusEl = document.getElementById(`test-status-${tableName}-${columnName}-${primaryKeyValue}`);
 
     if (!statusEl || !window._currentUserJwt || !window._supabaseAnonKey) {
-        console.error("[Test Update] Missing context for update test:", button.dataset);
+        logError("Missing context for update test:", button.dataset);
         if (statusEl) statusEl.textContent = 'Error: Missing context';
         return;
     }
@@ -1886,7 +2219,7 @@ ${conditions}
     try {
       originalValue = JSON.parse(originalValueStr);
     } catch (e) {
-      console.error("[Test Update] Failed to parse original value:", originalValueStr, e);
+      logError("Failed to parse original value:", originalValueStr, e);
       statusEl.textContent = 'Error: Bad original value';
       return;
     }
@@ -1896,7 +2229,7 @@ ${conditions}
     const apiKey = window._supabaseAnonKey;
     const userToken = window._currentUserJwt;
 
-    console.log(`[Test Update] Testing PATCH for ${tableName}.${columnName} (ID: ${primaryKeyValue})`);
+    logDebug(`Testing PATCH for ${tableName}.${columnName} (ID: ${primaryKeyValue})`);
     statusEl.textContent = 'Testing...';
     statusEl.style.color = '#6b7280';
     button.disabled = true;
@@ -1907,7 +2240,7 @@ ${conditions}
     // --- First PATCH: Attempt to update with modified value ---
     try {
       const patchBody = { [columnName]: modifiedValue };
-      console.log("[Test Update] PATCH 1 Body:", patchBody);
+      logDebug("PATCH 1 Body:", patchBody);
 
       const response = await fetch(patchUrl, {
         method: 'PATCH',
@@ -1921,10 +2254,10 @@ ${conditions}
       });
 
       if (response.ok && response.status === 204) { // 204 No Content is success for PATCH
-        console.log(`✅ [Test Update] PATCH 1 successful for ${tableName}.${columnName}. Column is updatable.`);
+        logDebug(`✅ PATCH 1 successful for ${tableName}.${columnName}. Column is updatable.`);
         updateSuccess = true;
       } else {
-        console.error(`❌ [Test Update] PATCH 1 failed for ${tableName}.${columnName} (Status: ${response.status})`);
+        logError(`❌ PATCH 1 failed for ${tableName}.${columnName} (Status: ${response.status})`);
         errorMessage = `Status ${response.status}`;
         try {
            const errJson = await response.json();
@@ -1932,7 +2265,7 @@ ${conditions}
         } catch(e) { /* ignore */ }
       }
     } catch (error) {
-      console.error(`❌ [Test Update] Network error during PATCH 1 for ${tableName}.${columnName}:`, error);
+      logError(`❌ Network error during PATCH 1 for ${tableName}.${columnName}:`, error);
       errorMessage = 'Network Error';
       updateSuccess = false;
     }
@@ -1940,7 +2273,7 @@ ${conditions}
     // --- Second PATCH: Revert to original value (always attempt) ---
     try {
       const revertBody = { [columnName]: originalValue };
-      console.log("[Test Update] PATCH 2 (Revert) Body:", revertBody);
+      logDebug("PATCH 2 (Revert) Body:", revertBody);
 
       const revertResponse = await fetch(patchUrl, {
         method: 'PATCH',
@@ -1954,14 +2287,14 @@ ${conditions}
       });
 
       if (!revertResponse.ok) {
-        console.error(`⚠️ [Test Update] PATCH 2 (Revert) failed for ${tableName}.${columnName} (Status: ${revertResponse.status})! Manual check needed.`);
+        logError(`⚠️ PATCH 2 (Revert) failed for ${tableName}.${columnName} (Status: ${revertResponse.status})! Manual check needed.`);
         // Optionally update UI to indicate revert failure
         errorMessage += ' (Revert Failed!)'; 
       } else {
-        console.log(`[Test Update] PATCH 2 (Revert) successful for ${tableName}.${columnName}.`);
+        logDebug(`PATCH 2 (Revert) successful for ${tableName}.${columnName}.`);
       }
     } catch (error) {
-      console.error(`⚠️ [Test Update] Network error during PATCH 2 (Revert) for ${tableName}.${columnName}:`, error);
+      logError(`⚠️ Network error during PATCH 2 (Revert) for ${tableName}.${columnName}:`, error);
       errorMessage += ' (Revert Network Error!)';
     }
 
