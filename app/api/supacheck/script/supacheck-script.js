@@ -11,20 +11,27 @@
     const urlMatches = content.match(urlPattern) || [];
     
     // Updated Regex for Supabase Anon Key (JWT format)
-    // Looks for patterns like: eyJ... or variable assignments
-    const keyPattern = /(['"]?(?:supabaseKey|apiKey)['"]?\s*[:=]\s*['"]|['"])(eyJ[a-zA-Z0-9._-]+)['"]/gi;
+    // More flexible pattern that looks for any JWT pattern regardless of variable name
+    // Looks for strings that match the JWT format (three parts separated by dots)
+    const keyPattern = /(['"])?(eyJ[a-zA-Z0-9._-]+)\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*['"]?/gi;
     
     let keyMatch;
     while ((keyMatch = keyPattern.exec(content)) !== null) {
-      // The actual key is in the second capture group
-      if (keyMatch[2] && keyMatch[2].length > 50) { // Basic length check for JWT
-        foundKey = keyMatch[2];
-        // If we already found a URL, we can return now
-        if (foundUrl) {
-          return { url: foundUrl, key: foundKey };
+      // The actual key starts with the JWT header part
+      if (keyMatch[2]) {
+        // Extract the full JWT by matching from the start position
+        const fullKeyMatch = content.substring(keyMatch.index).match(/['"]?(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)['"]?/);
+        if (fullKeyMatch && fullKeyMatch[1]) {
+          const potentialKey = fullKeyMatch[1];
+          // Basic check to verify it's a proper JWT (three parts)
+          if (potentialKey.split('.').length === 3) {
+            foundKey = potentialKey;
+            if (foundUrl) {
+              return { url: foundUrl, key: foundKey };
+            }
+            break; // Found a key, stop looking for more keys for now
+          }
         }
-        // Keep searching in case we find the URL later
-        break; // Found a key, stop looking for more keys for now
       }
     }
 
@@ -32,7 +39,7 @@
     if (urlMatches.length > 0 && !foundKey) {
       foundUrl = urlMatches[0];
       // Look for JWT keys potentially near the URL (broader search)
-      const nearbyKeyPattern = /(eyJ[a-zA-Z0-9._-]{40,})/g; // Simpler JWT search
+      const nearbyKeyPattern = /(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/g; // Simpler JWT search
       const nearbyKeyMatches = content.match(nearbyKeyPattern) || [];
       
       if (nearbyKeyMatches.length > 0) {
