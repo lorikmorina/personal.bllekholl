@@ -282,14 +282,44 @@ export default function ReportsList() {
                           </h4>
                           {report.leaks.length > 0 ? (
                             <ul className="space-y-2">
-                              {report.leaks.map((leak, index) => (
-                                <li key={index} className="border rounded p-2">
-                                  <p className="font-medium text-sm">{leak.type}</p>
-                                  <p className="text-xs font-mono bg-secondary/30 p-1 rounded mt-1 overflow-x-auto">
-                                    {leak.preview}
-                                  </p>
-                                </li>
-                              ))}
+                              {report.leaks.map((leak, index) => {
+                                // Check if it's a Supabase leak with properly configured RLS
+                                const isSecureSupabase = 
+                                  leak.type === 'Supabase Credentials' && 
+                                  leak.details.includes('RLS appears to be configured correctly');
+                                
+                                return (
+                                  <li 
+                                    key={index} 
+                                    className={`border rounded p-2 ${
+                                      isSecureSupabase 
+                                        ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-900/20' 
+                                        : ''
+                                    }`}
+                                  >
+                                    <div className="flex items-center">
+                                      {isSecureSupabase ? (
+                                        <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                                      ) : null}
+                                      <p className={`font-medium text-sm ${
+                                        isSecureSupabase ? 'text-green-800 dark:text-green-300' : ''
+                                      }`}>
+                                        {isSecureSupabase 
+                                          ? 'Supabase (RLS Enabled)' 
+                                          : leak.type}
+                                      </p>
+                                    </div>
+                                    <p className="text-xs font-mono bg-secondary/30 p-1 rounded mt-1 overflow-x-auto">
+                                      {leak.preview}
+                                    </p>
+                                    {isSecureSupabase && (
+                                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                        Supabase found with Row Level Security (RLS) correctly configured - good security practice!
+                                      </p>
+                                    )}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           ) : (
                             <p className="text-sm text-muted-foreground">No leaks detected</p>
