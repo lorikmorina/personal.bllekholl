@@ -13,6 +13,19 @@
     console.error(`[Supacheck Error] ${message}`, error || '');
   }
 
+  // Add keyframes for button animations
+  function addKeyframeAnimations() {
+    if (!document.getElementById('supacheck-button-keyframes')) {
+      const buttonStyle = document.createElement('style');
+      buttonStyle.id = 'supacheck-button-keyframes';
+      buttonStyle.textContent = `
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+      `;
+      document.head.appendChild(buttonStyle);
+    }
+  }
+
   // Utility function to search for Supabase credentials in script content
   function checkScriptContent(content) {
     try {
@@ -255,8 +268,34 @@
     `;
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding: 10px 15px; background: #3182ce; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
-    header.textContent = 'SecureVibing Supacheck';
+    header.style.cssText = 'padding: 10px 15px; background: #2563eb; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
+    
+    // Create logo and text container
+    const logoContainer = document.createElement('div');
+    logoContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+    
+    // Add inline SVG logo
+    const logoSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    logoSvg.setAttribute('width', '24px');
+    logoSvg.setAttribute('height', '24px');
+    logoSvg.setAttribute('viewBox', '0 0 1080 1080');
+    logoSvg.setAttribute('fill', 'none');
+    logoSvg.style.cssText = 'flex-shrink: 0;';
+    
+    const logoPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    logoPath.setAttribute('d', 'M540 219.345C538.506 219.345 536.995 219.507 535.526 219.731C520.857 222.296 501.367 232.041 471.881 246.809C424.039 270.767 351.704 331.897 294.523 333.366C287.177 333.565 280.179 336.841 275.198 342.469C270.168 348.098 267.573 355.614 267.947 363.26C280.25 612.877 369.749 767.364 526.847 857.145C530.931 859.461 535.467 860.655 540 860.655C544.533 860.655 549.069 859.461 553.153 857.145C710.25 767.364 799.751 612.877 812.053 363.26C812.427 355.614 809.832 348.098 804.802 342.469C799.821 336.816 792.848 333.565 785.477 333.366C728.321 331.872 655.974 270.753 608.158 246.77C578.621 232.002 559.143 222.257 544.474 219.692C542.98 219.493 541.494 219.345 540 219.345ZM574.021 411.823C586.891 411.823 597.358 422.289 597.358 435.159L597.358 644.841C597.357 657.711 586.891 668.177 574.021 668.177C561.151 668.177 550.762 657.711 550.762 644.841L550.762 435.159C550.762 422.289 561.151 411.823 574.021 411.823ZM480.868 458.419C493.738 458.419 504.127 468.846 504.127 481.717L504.127 598.283C504.127 611.154 493.738 621.581 480.868 621.581C467.998 621.581 457.532 611.154 457.532 598.283L457.532 481.717C457.532 468.846 467.998 458.419 480.868 458.419ZM667.251 481.717C680.122 481.717 690.626 492.183 690.626 505.053L690.626 598.283C690.626 611.154 680.122 621.581 667.251 621.581C654.381 621.581 643.992 611.154 643.992 598.283L643.992 505.053C643.992 492.183 654.381 481.717 667.251 481.717ZM387.638 505.053C400.508 505.053 410.897 515.442 410.897 528.312L410.897 574.947C410.897 587.817 400.508 598.283 387.638 598.283C374.768 598.283 364.34 587.817 364.34 574.947L364.34 528.312C364.34 515.442 374.768 505.053 387.638 505.053Z');
+    logoPath.setAttribute('fill', 'white');
+    
+    logoSvg.appendChild(logoPath);
+    logoContainer.appendChild(logoSvg);
+    
+    // Add text
+    const headerText = document.createElement('span');
+    headerText.textContent = 'SecureVibing Supacheck';
+    logoContainer.appendChild(headerText);
+    
+    header.appendChild(logoContainer);
+    
     header.onclick = () => {
       const content = document.getElementById('supabase-check-content');
       content.style.display = content.style.display === 'none' ? 'block' : 'none';
@@ -336,7 +375,7 @@
       padding: 10px;
       background: #EFF6FF;
       border-radius: 4px;
-      border-left: 3px solid #3B82F6;
+      border-left: 3px solid #2563eb;
       font-size: 13px;
     `;
     messageEl.textContent = "Login with a test account to test more Supabase configurations";
@@ -364,32 +403,13 @@
 
   // Create a section for network requests
   function createNetworkSection() {
-    const sectionEl = document.createElement('div');
-    sectionEl.id = 'supabase-network-section';
-    sectionEl.style.cssText = `
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 1px solid #e2e8f0;
-    `;
+    // Create a hidden container for tracking requests
+    // This will keep the tracking functionality while hiding the UI
+    const dummyContainer = document.createElement('div');
+    dummyContainer.id = 'supabase-requests';
+    dummyContainer.style.display = 'none'; // Hide it completely
     
-    const titleEl = document.createElement('div');
-    titleEl.textContent = 'Network Requests';
-    titleEl.style.cssText = `
-      font-weight: bold;
-      margin-bottom: 10px;
-    `;
-    
-    const requestsContainer = document.createElement('div');
-    requestsContainer.id = 'supabase-requests';
-    requestsContainer.style.cssText = `
-      max-height: 200px;
-      overflow-y: auto;
-    `;
-    
-    sectionEl.appendChild(titleEl);
-    sectionEl.appendChild(requestsContainer);
-    contentEl.appendChild(sectionEl);
-    return requestsContainer;
+    return dummyContainer;
   }
 
   // Create a section for discovered tables
@@ -420,78 +440,16 @@
 
   // Create a section for response data
   function createResponseSection() {
-    const sectionEl = document.createElement('div');
-    sectionEl.id = 'supabase-response-section';
-    sectionEl.style.cssText = `
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 1px solid #e2e8f0;
-    `;
-    
-    const titleEl = document.createElement('div');
-    titleEl.textContent = 'Response Data';
-    titleEl.style.cssText = `
-      font-weight: bold;
-      margin-bottom: 10px;
-    `;
-    
+    // Create a hidden container for responses
     const responseContainer = document.createElement('div');
     responseContainer.id = 'supabase-responses';
-    
-    sectionEl.appendChild(titleEl);
-    sectionEl.appendChild(responseContainer);
-    contentEl.appendChild(sectionEl);
-    
-    // Add info message by default
-    addResponseInfoMessage();
-    
-    // Create complete table data section
-    createCompleteTableDataSection();
+    responseContainer.style.display = 'none'; // Hide it completely
     
     return responseContainer;
   }
   
-  // Create a section specifically for complete table data
-  function createCompleteTableDataSection() {
-    const sectionEl = document.createElement('div');
-    sectionEl.id = 'supabase-complete-data-section';
-    sectionEl.style.cssText = `
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 1px solid #e2e8f0;
-    `;
-    
-    const titleEl = document.createElement('div');
-    titleEl.textContent = 'Complete Table Data';
-    titleEl.style.cssText = `
-      font-weight: bold;
-      margin-bottom: 10px;
-    `;
-    
-    const tableDataContainer = document.createElement('div');
-    tableDataContainer.id = 'supabase-complete-data';
-    
-    sectionEl.appendChild(titleEl);
-    sectionEl.appendChild(tableDataContainer);
-    contentEl.appendChild(sectionEl);
-    
-    // Add info message
-    const messageEl = document.createElement('div');
-    messageEl.style.cssText = `
-      margin-top: 10px;
-      padding: 10px;
-      background: #EFF6FF;
-      border-radius: 4px;
-      border-left: 3px solid #3B82F6;
-      font-size: 13px;
-      line-height: 1.4;
-    `;
-    messageEl.innerHTML = "We'll use detected authentication tokens to fetch and display complete table data.<br><br>" +
-      "When Supabase requests are detected, we'll automatically query the same tables to show all accessible columns and data.";
-    
-    tableDataContainer.appendChild(messageEl);
-    
-    return tableDataContainer;
+  function addResponseInfoMessage() {
+    // No-op since the response section is hidden
   }
 
   // Create modal for the Fix Table feature
@@ -920,7 +878,7 @@ ${conditions}
       padding: 10px;
       background: #EFF6FF;
       border-radius: 4px;
-      border-left: 3px solid #3B82F6;
+      border-left: 3px solid #2563eb;
       font-size: 13px;
       line-height: 1.4;
     `;
@@ -1007,7 +965,7 @@ ${conditions}
     
     // If we have a title, display it instead of just the endpoint
     if (title) {
-      endpointText.innerHTML = `<span style="color: #3B82F6;">${title}</span><br><span style="font-size: 11px; color: #64748B;">${endpointPath}</span>`;
+      endpointText.innerHTML = `<span style="color: #2563eb;">${title}</span><br><span style="font-size: 11px; color: #64748B;">${endpointPath}</span>`;
     } else {
       endpointText.textContent = endpointPath;
     }
@@ -1092,18 +1050,58 @@ ${conditions}
             const nonUpdatableFields = [primaryKeyColumn, 'email', 'created_at', 'updated_at', 'user_id']; // Fields to exclude from testing
             if (baseUrl && tableName && primaryKeyValue && !nonUpdatableFields.includes(key)) {
                 const buttonEl = document.createElement('button');
-                buttonEl.textContent = 'Test';
+                
+                // Create icon element for the button
+                const iconEl = document.createElement('span');
+                iconEl.innerHTML = '⚙️'; // Gear icon
+                iconEl.style.cssText = 'margin-right: 4px; font-size: 10px;';
+                
+                const textEl = document.createElement('span');
+                textEl.textContent = 'Test';
+                
+                // Add button container with modern styling
                 buttonEl.style.cssText = `
-                    padding: 2px 6px; 
-                    font-size: 10px; 
-                    cursor: pointer; 
-                    border: 1px solid #9ca3af;
-                    background: #f9fafb;
+                    display: flex;
+                    align-items: center;
+                    padding: 4px 8px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    border: none;
                     border-radius: 4px;
-                    color: #374151;
-                    margin-left: auto; /* Push to the right */
+                    background: #2563eb;
+                    color: white;
+                    margin-left: auto;
                     flex-shrink: 0;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
                 `;
+                
+                // Add hover effect using mouseover/mouseout
+                buttonEl.onmouseover = () => {
+                    buttonEl.style.background = '#2563EB';
+                    buttonEl.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                };
+                
+                buttonEl.onmouseout = () => {
+                    buttonEl.style.background = '#2563eb';
+                    buttonEl.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+                };
+                
+                // Add active state for when button is pressed
+                buttonEl.onmousedown = () => {
+                    buttonEl.style.background = '#1D4ED8';
+                    buttonEl.style.transform = 'translateY(1px)';
+                };
+                
+                buttonEl.onmouseup = () => {
+                    buttonEl.style.background = '#2563EB';
+                    buttonEl.style.transform = 'translateY(0)';
+                };
+                
+                buttonEl.appendChild(iconEl);
+                buttonEl.appendChild(textEl);
+                
                 buttonEl.dataset.baseUrl = baseUrl;
                 buttonEl.dataset.tableName = tableName;
                 buttonEl.dataset.primaryKeyColumn = primaryKeyColumn;
@@ -1206,7 +1204,7 @@ ${conditions}
     loadingEl.style.cssText = 'display: flex; align-items: center; margin-bottom: 10px; padding: 10px;';
 
     const spinner = document.createElement('div');
-    spinner.style.cssText = 'width: 16px; height: 16px; border: 2px solid #3B82F6; border-top-color: transparent; border-radius: 50%; margin-right: 10px; animation: spin 1s linear infinite;';
+    spinner.style.cssText = 'width: 16px; height: 16px; border: 2px solid #2563eb; border-top-color: transparent; border-radius: 50%; margin-right: 10px; animation: spin 1s linear infinite;';
 
     if (!document.getElementById('spinner-keyframes')) {
       const style = document.createElement('style');
@@ -1615,16 +1613,10 @@ ${conditions}
     // Create the authenticated data section
     createAuthDataSection();
     
-    // Create counter for requests
-    const requestCountEl = document.createElement('div');
-    requestCountEl.id = 'supabase-request-count';
-    requestCountEl.style.cssText = `
-      font-size: 12px;
-      color: #6B7280;
-      margin-bottom: 5px;
-    `;
-    requestCountEl.textContent = "Checking for existing requests...";
-    requestsContainer.appendChild(requestCountEl);
+    // Create hidden response container
+    const responsesContainer = createResponseSection();
+    document.body.appendChild(requestsContainer); // Attach to DOM but hidden
+    document.body.appendChild(responsesContainer); // Attach to DOM but hidden
     
     // First, check for existing requests using Performance API
     const { requests, tableNames } = analyzePerformanceEntries(supabaseUrl);
@@ -1633,23 +1625,15 @@ ${conditions}
     const headerTables = checkForHeaderTables();
     const allTables = [...new Set([...tableNames, ...headerTables])];
     
-    // Update the request count
+    // Process existing requests without UI updates
     if (requests.length > 0) {
       requestCount = requests.length;
-      requestCountEl.textContent = `${requestCount} request${requestCount !== 1 ? 's' : ''} detected`;
       
-      // Add those requests to the list
+      // Process those requests without adding UI elements
       for (const req of requests) {
-        addRequestEntry(req.method, req.url);
+        // Just process table data without UI
+        processRequestForTableData(req.method, req.url);
       }
-    } else {
-      requestCountEl.textContent = "No requests detected yet";
-      // Show login message if no requests found
-      setTimeout(() => {
-        if (requestCount === 0) {
-          addLoginMessage();
-        }
-      }, 1000);
     }
 
     // Intercept fetch requests for new ones
@@ -1716,13 +1700,13 @@ ${conditions}
         // Skip our own verification requests
         if (!isVerificationRequest(url)) {
           requestCount++;
-          updateRequestCount();
           
           // Intercept and capture the response
           p.then(function(response) {
             try {
               const method = (init && init.method) ? init.method : 'GET';
-              addRequestEntry(method, url); // Add to network list
+              // Use processRequestForTableData instead of addRequestEntry
+              processRequestForTableData(method, url);
               
               // Clone the response to read data without consuming it
               const clonedResponse = response.clone();
@@ -1817,8 +1801,8 @@ ${conditions}
           const originalOnLoad = this.onload;
           this.onload = function() {
             requestCount++;
-            updateRequestCount();
-            addRequestEntry(this._supaRequestMethod || 'GET', this._supaRequestUrl); // Add to network list
+            // Use processRequestForTableData instead of addRequestEntry
+            processRequestForTableData(this._supaRequestMethod || 'GET', this._supaRequestUrl);
             
             // Try to parse the response as JSON
             try {
@@ -1851,74 +1835,35 @@ ${conditions}
       originalXhrSend.apply(this, arguments);
     };
     
-    // Add a request entry to the list
+    // Replace addRequestEntry with a function that just processes data without UI
     function addRequestEntry(method, url) {
       // Skip our own verification requests
       if (isVerificationRequest(url)) {
         return;
       }
       
-      const endpoint = url.split('/').slice(3).join('/');
-      
-      // Avoid duplicates
-      const existingRequests = document.querySelectorAll(`div[data-url="${url}"]`);
-      if (existingRequests.length > 0) {
-        return;
-      }
-      
-      const requestEl = document.createElement('div');
-      requestEl.style.cssText = `
-        padding: 6px 8px;
-        margin-bottom: 4px;
-        background: #F9FAFB;
-        border-radius: 4px;
-        font-size: 12px;
-        border-left: 3px solid #3B82F6;
-        cursor: pointer;
-      `;
-      requestEl.dataset.url = url;
-      
-      const methodEl = document.createElement('span');
-      methodEl.textContent = method;
-      methodEl.style.cssText = `
-        font-weight: bold;
-        color: #3B82F6;
-        margin-right: 6px;
-      `;
-      
-      requestEl.appendChild(methodEl);
-      requestEl.appendChild(document.createTextNode(endpoint));
-      requestsContainer.appendChild(requestEl);
-      
-      // Make request entry clickable to show response
-      requestEl.onclick = () => {
-        // Focus on the response section if we have a response
-        if (capturedResponses.has(url)) {
-          const id = url.replace(/[^a-zA-Z0-9]/g, '-');
-          const responseEl = document.getElementById(`json-container-${id}`);
-          if (responseEl) {
-            responseEl.scrollIntoView({ behavior: 'smooth' });
-            
-            // Highlight the entry by flashing it
-            const originalBackground = responseEl.style.background;
-            responseEl.style.background = '#FDE68A';
-            setTimeout(() => {
-              responseEl.style.background = originalBackground;
-            }, 1000);
-          }
-        }
-      };
-      
-      // Scroll to bottom to show latest request
-      requestsContainer.scrollTop = requestsContainer.scrollHeight;
+      // Process the request for table data without creating UI elements
+      processRequestForTableData(method, url);
     }
     
-    // Update the request counter
-    function updateRequestCount() {
-      const countEl = document.getElementById('supabase-request-count');
-      if (countEl) {
-        countEl.textContent = `${requestCount} request${requestCount !== 1 ? 's' : ''} detected`;
+    // New function to process request data without UI
+    function processRequestForTableData(method, url) {
+      // Extract table name if present
+      if (url.includes('/rest/v1/')) {
+        const tableName = extractTableNameFromUrl(url);
+        if (tableName) {
+          // Add to discovered tables if not already added
+          window._discoveredTableNames.add(tableName);
+          // Add table UI entry (keeping this as it's useful information)
+          addTableEntry(tableName, url);
+        }
       }
+    }
+    
+    // Update the request counter (no UI updates needed)
+    function updateRequestCount() {
+      requestCount++;
+      // No visible counter updates needed
     }
     
     return allTables; // Return all discovered tables
@@ -2074,6 +2019,9 @@ ${conditions}
     hasInitialized = true;
     
     try {
+      // Add keyframe animations
+      addKeyframeAnimations();
+      
       // Start with user feedback
       logDebug("Starting Supabase security checks");
       const loadingEl = showLoading();
@@ -2205,7 +2153,7 @@ ${conditions}
 
   // ---> NEW: Handler for the Test Update button click
   async function handleTestUpdateClick(event) {
-    const button = event.target;
+    const button = event.target.tagName === 'BUTTON' ? event.target : event.target.closest('button');
     const { baseUrl, tableName, primaryKeyColumn, primaryKeyValue, columnName, originalValue: originalValueStr } = button.dataset;
     const statusEl = document.getElementById(`test-status-${tableName}-${columnName}-${primaryKeyValue}`);
 
@@ -2230,9 +2178,15 @@ ${conditions}
     const userToken = window._currentUserJwt;
 
     logDebug(`Testing PATCH for ${tableName}.${columnName} (ID: ${primaryKeyValue})`);
-    statusEl.textContent = 'Testing...';
-    statusEl.style.color = '#6b7280';
+    
+    // Improved loading state
+    const originalButtonContent = button.innerHTML;
+    button.innerHTML = '<span style="display: inline-block; width: 12px; height: 12px; border: 2px solid white; border-top-color: transparent; border-radius: 50%; margin-right: 6px; animation: spin 1s linear infinite;"></span><span style="animation: pulse 1.5s ease infinite;">Testing...</span>';
+    button.style.opacity = '0.8';
     button.disabled = true;
+    
+    statusEl.textContent = '';
+    statusEl.style.color = '#6b7280';
 
     let updateSuccess = false;
     let errorMessage = '';
@@ -2299,14 +2253,16 @@ ${conditions}
     }
 
     // --- Update UI ---
-    if (updateSuccess) {
-      statusEl.textContent = '✅ Updatable';
-      statusEl.style.color = '#15803d'; // Dark green
-    } else {
-      statusEl.textContent = `❌ Not Updatable (${errorMessage})`;
-      statusEl.style.color = '#b91c1c'; // Dark red
-    }
+    // Restore button
+    button.innerHTML = originalButtonContent;
+    button.style.opacity = '1';
     button.disabled = false;
-  }
+    
+    if (updateSuccess) {
+      statusEl.innerHTML = '<span style="color: #15803d; font-weight: bold;">✅ Updatable</span>';
+    } else {
+      statusEl.innerHTML = `<span style="color: #b91c1c; font-weight: bold;">❌ Not Updatable</span> <span style="color: #6b7280; font-size: 9px;">(${errorMessage})</span>`;
+    }
+}
   // <--- END NEW
 })(); 
