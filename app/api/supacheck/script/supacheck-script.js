@@ -21,6 +21,8 @@
       buttonStyle.textContent = `
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        @keyframes slideDown { from { max-height: 0; opacity: 0; } to { max-height: 80vh; opacity: 1; } }
+        @keyframes slideUp { from { max-height: 80vh; opacity: 1; } to { max-height: 0; opacity: 0; } }
       `;
       document.head.appendChild(buttonStyle);
     }
@@ -50,7 +52,7 @@
         // The actual key starts with the JWT header part
         if (keyMatch[2]) {
           // Extract the full JWT by matching from the start position
-          const fullKeyMatch = content.substring(keyMatch.index).match(/['"]?(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)['"]?/);
+          const fullKeyMatch = content.substring(keyMatch.index).match(/['"]?(eyJ[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]*)/);
           if (fullKeyMatch && fullKeyMatch[1]) {
             const potentialKey = fullKeyMatch[1];
             // Basic check to verify it's a proper JWT (three parts)
@@ -260,19 +262,31 @@
     const container = document.createElement('div');
     container.id = 'supabase-check-widget';
     container.style.cssText = `
-      position: fixed; bottom: 20px; right: 20px; width: 320px;
-      background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); font-family: sans-serif;
-      z-index: 9999; overflow: hidden; transition: all 0.3s ease; color: #1a202c;
+      position: fixed; bottom: 20px; right: 20px; width: 350px;
+      background: #ffffff; border: none; border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 5px 10px rgba(0, 0, 0, 0.05); 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
+      z-index: 9999; overflow: hidden; transition: all 0.3s cubic-bezier(0.2, 0, 0.2, 1); color: #1a202c;
       max-height: 80vh; display: flex; flex-direction: column;
     `;
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding: 10px 15px; background: #2563eb; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-shrink: 0;';
+    header.style.cssText = `
+      padding: 14px 16px; 
+      background: linear-gradient(135deg, #2563eb, #4338ca); 
+      color: white; 
+      font-weight: 600; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      cursor: pointer; 
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    `;
     
     // Create logo and text container
     const logoContainer = document.createElement('div');
-    logoContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+    logoContainer.style.cssText = 'display: flex; align-items: center; gap: 10px;';
     
     // Add inline SVG logo
     const logoSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -292,25 +306,75 @@
     // Add text
     const headerText = document.createElement('span');
     headerText.textContent = 'SecureVibing Supacheck';
+    headerText.style.fontWeight = '600';
+    headerText.style.letterSpacing = '0.2px';
     logoContainer.appendChild(headerText);
     
     header.appendChild(logoContainer);
     
+    // Add arrow indicator
+    const toggleArrow = document.createElement('span');
+    toggleArrow.id = 'supacheck-toggle-arrow';
+    toggleArrow.textContent = '▼';
+    toggleArrow.style.cssText = 'transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1); font-size: 12px; opacity: 0.9;';
+    
     header.onclick = () => {
       const content = document.getElementById('supabase-check-content');
-      content.style.display = content.style.display === 'none' ? 'block' : 'none';
+      const isOpen = content.classList.contains('open');
+      const arrow = document.getElementById('supacheck-toggle-arrow');
+      
+      if (isOpen) {
+        // Close animation
+        content.style.animation = 'slideUp 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards';
+        arrow.style.transform = 'rotate(0deg)';
+        // After animation completes, update class
+        setTimeout(() => {
+          content.classList.remove('open');
+        }, 300);
+      } else {
+        // Open animation
+        content.style.display = 'block';
+        content.style.animation = 'slideDown 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards';
+        arrow.style.transform = 'rotate(180deg)';
+        content.classList.add('open');
+      }
     };
 
     const closeButton = document.createElement('span');
     closeButton.textContent = '×';
-    closeButton.style.cssText = 'cursor: pointer; font-size: 18px;';
-    closeButton.onclick = (e) => { e.stopPropagation(); document.body.removeChild(container); };
+    closeButton.style.cssText = 'cursor: pointer; font-size: 20px; margin-left: 12px; opacity: 0.9; line-height: 1; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;';
+    closeButton.onmouseover = () => { closeButton.style.opacity = '1'; };
+    closeButton.onmouseout = () => { closeButton.style.opacity = '0.9'; };
+    closeButton.onclick = (e) => { 
+      e.stopPropagation(); 
+      
+      // Add fade out animation before removing
+      container.style.opacity = '0';
+      container.style.transform = 'translateY(10px)';
+      
+      // Remove after animation
+      setTimeout(() => {
+        document.body.removeChild(container);
+      }, 300);
+    };
+    
+    // Add the arrow and close button
+    header.appendChild(toggleArrow);
     header.appendChild(closeButton);
     container.appendChild(header);
 
     const content = document.createElement('div');
     content.id = 'supabase-check-content';
-    content.style.cssText = 'padding: 15px; overflow-y: auto; flex-grow: 1;';
+    content.style.cssText = `
+      padding: 16px; 
+      overflow-y: auto; 
+      flex-grow: 1;
+      display: none;
+      opacity: 0;
+      transform-origin: top;
+      transition: opacity 0.3s ease, max-height 0.3s ease;
+      background: #f8fafc;
+    `;
     container.appendChild(content);
 
     document.body.appendChild(container);
@@ -344,21 +408,36 @@
     const itemEl = document.createElement('div');
     itemEl.style.cssText = `
       display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 10px; padding: 8px 12px; border-radius: 4px;
+      margin-bottom: 12px; padding: 12px 14px; border-radius: 8px;
       background: ${isOk ? '#F0FDF4' : '#FEF2F2'};
       border-left: 3px solid ${isOk ? '#22C55E' : '#EF4444'};
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     `;
+
+    // Add hover effect
+    itemEl.onmouseover = () => {
+      itemEl.style.transform = 'translateY(-1px)';
+      itemEl.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.1)';
+    };
+    
+    itemEl.onmouseout = () => {
+      itemEl.style.transform = 'translateY(0)';
+      itemEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+    };
 
     const labelEl = document.createElement('div');
     labelEl.textContent = label;
-    labelEl.style.fontWeight = 'bold';
+    labelEl.style.fontWeight = '600';
+    labelEl.style.fontSize = '14px';
     
     const statusEl = document.createElement('div');
     statusEl.textContent = status;
     statusEl.style.cssText = `
-      padding: 2px 8px; border-radius: 12px; font-size: 12px; 
+      padding: 3px 10px; border-radius: 12px; font-size: 12px; 
       background: ${isOk ? '#DCFCE7' : '#FEE2E2'}; 
       color: ${isOk ? '#166534' : '#B91C1C'};
+      font-weight: 500;
     `;
     
     itemEl.appendChild(labelEl);
@@ -371,12 +450,14 @@
   function addLoginMessage() {
     const messageEl = document.createElement('div');
     messageEl.style.cssText = `
-      margin-top: 10px;
-      padding: 10px;
+      margin-top: 14px;
+      padding: 12px 14px;
       background: #EFF6FF;
-      border-radius: 4px;
+      border-radius: 8px;
       border-left: 3px solid #2563eb;
       font-size: 13px;
+      line-height: 1.5;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     `;
     messageEl.textContent = "Login with a test account to test more Supabase configurations";
     contentEl.appendChild(messageEl);
@@ -417,20 +498,39 @@
     const sectionEl = document.createElement('div');
     sectionEl.id = 'supabase-tables-section';
     sectionEl.style.cssText = `
-      margin-top: 15px;
-      padding-top: 10px;
+      margin-top: 20px;
+      padding-top: 16px;
       border-top: 1px solid #e2e8f0;
     `;
     
     const titleEl = document.createElement('div');
     titleEl.textContent = 'Discovered Tables';
     titleEl.style.cssText = `
-      font-weight: bold;
-      margin-bottom: 10px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 15px;
+      color: #334155;
+      display: flex;
+      align-items: center;
     `;
+    
+    // Add database icon before title
+    const dbIcon = document.createElement('span');
+    dbIcon.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+        <path d="M12 8C16.4183 8 20 6.65685 20 5C20 3.34315 16.4183 2 12 2C7.58172 2 4 3.34315 4 5C4 6.65685 7.58172 8 12 8Z" fill="#334155"/>
+        <path d="M4 12V5C4 6.65685 7.58172 8 12 8C16.4183 8 20 6.65685 20 5V12C20 13.6569 16.4183 15 12 15C7.58172 15 4 13.6569 4 12Z" fill="#334155" fill-opacity="0.5"/>
+        <path d="M4 19V12C4 13.6569 7.58172 15 12 15C16.4183 15 20 13.6569 20 12V19C20 20.6569 16.4183 22 12 22C7.58172 22 4 20.6569 4 19Z" fill="#334155" fill-opacity="0.25"/>
+      </svg>
+    `;
+    titleEl.prepend(dbIcon);
     
     const tablesContainer = document.createElement('div');
     tablesContainer.id = 'supabase-tables';
+    tablesContainer.style.cssText = `
+      display: grid;
+      gap: 10px;
+    `;
     
     sectionEl.appendChild(titleEl);
     sectionEl.appendChild(tablesContainer);
@@ -458,34 +558,61 @@
     modalOverlay.id = 'supacheck-modal-overlay';
     modalOverlay.style.cssText = `
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.5); z-index: 10000; display: none;
+      background: rgba(15, 23, 42, 0.6); z-index: 10000; display: none;
       align-items: center; justify-content: center;
+      backdrop-filter: blur(3px);
+      transition: opacity 0.3s ease;
+      opacity: 0;
     `;
     
     const modal = document.createElement('div');
     modal.id = 'supacheck-fix-modal';
     modal.style.cssText = `
-      background: white; border-radius: 8px; width: 90%; max-width: 600px;
-      max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+      background: white; border-radius: 12px; width: 90%; max-width: 600px;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
       display: flex; flex-direction: column; position: relative;
+      transform: translateY(20px); transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1);
     `;
     
     const modalHeader = document.createElement('div');
     modalHeader.style.cssText = `
-      padding: 16px; border-bottom: 1px solid #e2e8f0; background: #3182ce;
-      color: white; font-weight: bold; display: flex; justify-content: space-between;
-      align-items: center; border-top-left-radius: 8px; border-top-right-radius: 8px;
+      padding: 18px; border-bottom: 1px solid #e2e8f0; 
+      background: linear-gradient(135deg, #3B82F6, #2563EB);
+      color: white; font-weight: 600; display: flex; justify-content: space-between;
+      align-items: center; border-top-left-radius: 12px; border-top-right-radius: 12px;
     `;
     
     const modalTitle = document.createElement('div');
     modalTitle.id = 'supacheck-modal-title';
     modalTitle.textContent = 'Restrict Columns Updates';
+    modalTitle.style.cssText = 'font-size: 16px; letter-spacing: 0.2px;';
     
     const closeButton = document.createElement('span');
     closeButton.textContent = '×';
-    closeButton.style.cssText = 'cursor: pointer; font-size: 24px;';
+    closeButton.style.cssText = `
+      cursor: pointer; font-size: 28px;
+      height: 28px; width: 28px;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 0.2s;
+      opacity: 0.9;
+    `;
+    
+    closeButton.onmouseover = () => {
+      closeButton.style.opacity = '1';
+    };
+    
+    closeButton.onmouseout = () => {
+      closeButton.style.opacity = '0.9';
+    };
+    
     closeButton.onclick = () => {
-      modalOverlay.style.display = 'none';
+      // Fade out animation
+      modalOverlay.style.opacity = '0';
+      modal.style.transform = 'translateY(20px)';
+      
+      setTimeout(() => {
+        modalOverlay.style.display = 'none';
+      }, 300);
     };
     
     modalHeader.appendChild(modalTitle);
@@ -493,26 +620,70 @@
     
     const modalContent = document.createElement('div');
     modalContent.id = 'supacheck-modal-content';
-    modalContent.style.cssText = 'padding: 16px; flex-grow: 1;';
+    modalContent.style.cssText = 'padding: 20px; flex-grow: 1;';
     
     const columnsContainer = document.createElement('div');
     columnsContainer.id = 'supacheck-columns-container';
-    columnsContainer.style.cssText = 'margin-bottom: 16px;';
+    columnsContainer.style.cssText = 'margin-bottom: 20px;';
     
     const instructionsEl = document.createElement('div');
-    instructionsEl.style.cssText = 'margin-bottom: 16px; color: #4b5563;';
-    instructionsEl.innerHTML = 'Check the columns you want to limit users from updating:';
+    instructionsEl.style.cssText = 'margin-bottom: 20px; color: #4b5563; line-height: 1.5;';
+    
+    // Create more informative instructions with icon
+    instructionsEl.innerHTML = `
+      <div style="display: flex; align-items: flex-start; margin-bottom: 16px;">
+        <div style="margin-right: 12px; flex-shrink: 0; color: #3B82F6;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 16V12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 8H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h3 style="font-weight: 600; font-size: 15px; margin-bottom: 6px; color: #1E293B;">Protect Your Table Data</h3>
+          <p style="font-size: 14px;">Check the columns you want to limit users from updating. This will help secure sensitive data by generating Row Level Security (RLS) policies for your Supabase table.</p>
+        </div>
+      </div>
+    `;
     
     const modalFooter = document.createElement('div');
-    modalFooter.style.cssText = 'padding: 16px; border-top: 1px solid #e2e8f0; text-align: right;';
+    modalFooter.style.cssText = 'padding: 16px 20px; border-top: 1px solid #e2e8f0; text-align: right;';
     
     const generateButton = document.createElement('button');
     generateButton.id = 'supacheck-generate-button';
     generateButton.textContent = 'Show me the fix';
     generateButton.style.cssText = `
-      background: #3182ce; color: white; padding: 8px 16px; border: none;
-      border-radius: 4px; cursor: pointer; font-weight: bold;
+      background: linear-gradient(135deg, #3B82F6, #2563EB);
+      color: white;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
     `;
+    
+    // Add hover and active states for the button
+    generateButton.onmouseover = () => {
+      generateButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+      generateButton.style.transform = 'translateY(-1px)';
+    };
+    
+    generateButton.onmouseout = () => {
+      generateButton.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+      generateButton.style.transform = 'translateY(0)';
+    };
+    
+    generateButton.onmousedown = () => {
+      generateButton.style.transform = 'scale(0.98)';
+    };
+    
+    generateButton.onmouseup = () => {
+      generateButton.style.transform = 'scale(1)';
+    };
+    
     generateButton.onclick = generateRLSPolicy;
     
     modalContent.appendChild(instructionsEl);
@@ -534,12 +705,6 @@
     
     return modalOverlay;
   }
-  
-  // Store current table data for the modal
-  let currentFixTableData = {
-    tableName: null,
-    columns: []
-  };
   
   // Generate RLS Policy based on selected columns
   function generateRLSPolicy() {
@@ -572,125 +737,71 @@ ${conditions}
     // Display results
     resultContainer.style.display = 'block';
     resultContainer.innerHTML = `
-      <div style="margin: 20px 0; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-        <h3 style="font-weight: bold; margin-bottom: 10px;">Follow these steps:</h3>
-        <ol style="margin-left: 20px; line-height: 1.5;">
-          <li>Go to your Supabase project</li>
-          <li>Go to SQL Editor</li>
-          <li>Run this auth policy for your table:</li>
-        </ol>
-        <div style="background: #f1f5f9; padding: 16px; border-radius: 4px; margin-top: 10px; overflow-x: auto;">
-          <pre style="margin: 0; white-space: pre-wrap; font-family: monospace;">${policy}</pre>
+      <div style="margin: 24px 0 16px; border-top: 1px solid #e2e8f0; padding-top: 24px;">
+        <div style="display: flex; align-items: flex-start; margin-bottom: 20px;">
+          <div style="margin-right: 12px; color: #22C55E; flex-shrink: 0;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+              <path d="M16 10L11 15L8 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-weight: 600; font-size: 16px; color: #1E293B; margin-bottom: 8px;">Your RLS Policy Is Ready</h3>
+            <p style="font-size: 14px; color: #4B5563; line-height: 1.5;">Follow these steps to secure your table:</p>
+          </div>
         </div>
+        
+        <ol style="margin-left: 20px; line-height: 1.6; color: #4B5563; margin-bottom: 16px; font-size: 14px;">
+          <li>Go to your Supabase project dashboard</li>
+          <li>Navigate to the SQL Editor</li>
+          <li>Paste and run the policy below:</li>
+        </ol>
+        
+        <div style="background: #F8FAFC; padding: 16px; border-radius: 8px; margin-top: 16px; overflow-x: auto; border: 1px solid #E2E8F0;">
+          <pre style="margin: 0; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; color: #334155; font-size: 13px; line-height: 1.5;">${policy}</pre>
+        </div>
+        
+        <button id="copy-policy-button" style="background: #E2E8F0; border: none; border-radius: 6px; padding: 8px 16px; margin-top: 16px; font-size: 13px; cursor: pointer; display: flex; align-items: center; color: #334155; font-weight: 500;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+            <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Copy Policy to Clipboard
+        </button>
       </div>
     `;
     
+    // Add copy functionality
+    const copyButton = document.getElementById('copy-policy-button');
+    copyButton.addEventListener('click', () => {
+      navigator.clipboard.writeText(policy).then(() => {
+        copyButton.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+            <path d="M20 6L9 17L4 12" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Copied!
+        `;
+        copyButton.style.background = '#D1FAE5';
+        copyButton.style.color = '#15803D';
+        
+        setTimeout(() => {
+          copyButton.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+              <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Copy Policy to Clipboard
+          `;
+          copyButton.style.background = '#E2E8F0';
+          copyButton.style.color = '#334155';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
+    });
+    
     // Scroll to the result
     resultContainer.scrollIntoView({ behavior: 'smooth' });
-  }
-  
-  // Fetch columns for a table
-  async function fetchTableColumns(baseUrl, tableName, apiKey) {
-    const columnsContainer = document.getElementById('supacheck-columns-container');
-    columnsContainer.innerHTML = '<div style="text-align: center;">Loading columns...</div>';
-    
-    // Try first with JWT if available
-    if (window._currentUserJwt) {
-      try {
-        console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using JWT token...`);
-        const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
-        const response = await fetch(sampleUrl, {
-          headers: {
-            'apikey': apiKey,
-            'Authorization': `Bearer ${window._currentUserJwt}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data) && data.length > 0) {
-            console.log(`[Column Discovery] Successfully retrieved columns using JWT for '${tableName}'`);
-            const columns = Object.keys(data[0]);
-            displayColumns(columns);
-            return; // Success with JWT, exit function
-          }
-        }
-        // If we get here, the JWT approach failed - continue to API key approach
-        console.log(`[Column Discovery] JWT approach failed for '${tableName}', trying API key approach...`);
-      } catch (e) {
-        console.error(`[Column Discovery] Error with JWT approach for '${tableName}':`, e);
-        // Continue to API key approach
-      }
-    }
-    
-    // Original approach - try with API key as bearer token
-    try {
-      console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using API key...`);
-      const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
-      const response = await fetch(sampleUrl, {
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`
-        }
-      });
-      
-      if (!response.ok) {
-        console.error(`[Column Discovery] API key approach failed with status ${response.status} for '${tableName}'`);
-        throw new Error(`Failed to fetch sample data: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (Array.isArray(data) && data.length > 0) {
-        // We have a row, get columns from it
-        console.log(`[Column Discovery] Successfully retrieved columns using API key for '${tableName}'`);
-        const columns = Object.keys(data[0]);
-        displayColumns(columns);
-      } else {
-        // No data, try to introspect using Supabase's introspection API
-        // This is a fallback and might not work depending on API configuration
-        console.error(`[Column Discovery] No data available for column extraction from '${tableName}'`);
-        throw new Error('No data available to extract columns');
-      }
-    } catch (error) {
-      console.error(`[Column Discovery] Final error fetching columns for '${tableName}':`, error);
-      columnsContainer.innerHTML = `
-        <div style="color: #ef4444; padding: 10px;">
-          Could not retrieve columns automatically. Please enter them manually:
-        </div>
-        <div style="margin-top: 10px; color: #6b7280; font-size: 12px;">
-          <p>This may happen if:</p>
-          <ul style="list-style-type: disc; margin-left: 20px; margin-top: 5px;">
-            <li>The table is empty (no rows to analyze)</li>
-            <li>Row Level Security (RLS) is blocking access</li>
-            <li>The table exists but you don't have permission to view it</li>
-          </ul>
-        </div>
-        <div style="margin-top: 10px;">
-          <textarea id="columns-manual-input" style="width: 100%; height: 100px; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;" 
-            placeholder="Enter column names, one per line"></textarea>
-        </div>
-        <div style="margin-top: 10px;">
-          <button id="add-manual-columns" style="background: #3182ce; color: white; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer;">
-            Add Columns
-          </button>
-        </div>
-      `;
-      
-      // Set up button for manual column entry
-      document.getElementById('add-manual-columns').onclick = () => {
-        const manualInput = document.getElementById('columns-manual-input').value;
-        const columns = manualInput.split('\n')
-          .map(col => col.trim())
-          .filter(col => col.length > 0);
-        
-        if (columns.length > 0) {
-          displayColumns(columns);
-        } else {
-          alert('Please enter at least one column name');
-        }
-      };
-    }
   }
   
   // Display columns as checkboxes
@@ -701,17 +812,52 @@ ${conditions}
     const nonUpdatableFields = ['id', 'created_at', 'updated_at'];
     currentFixTableData.columns = columns;
     
+    // Add column grid layout
+    const columnGrid = document.createElement('div');
+    columnGrid.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    `;
+    
     columns.forEach(column => {
       const isNonUpdatable = nonUpdatableFields.includes(column);
       
       const checkboxContainer = document.createElement('div');
-      checkboxContainer.style.cssText = 'margin-bottom: 8px; display: flex; align-items: center;';
+      checkboxContainer.style.cssText = `
+        background: ${isNonUpdatable ? '#F1F5F9' : '#F8FAFC'};
+        padding: 10px 14px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        transition: background-color 0.2s ease;
+        border: 1px solid ${isNonUpdatable ? '#E2E8F0' : '#F1F5F9'};
+      `;
+      
+      if (!isNonUpdatable) {
+        checkboxContainer.onmouseover = () => {
+          checkboxContainer.style.background = '#F1F5F9';
+          checkboxContainer.style.borderColor = '#E2E8F0';
+        };
+        
+        checkboxContainer.onmouseout = () => {
+          checkboxContainer.style.background = '#F8FAFC';
+          checkboxContainer.style.borderColor = '#F1F5F9';
+        };
+      }
       
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.id = `column-${column}`;
       checkbox.value = column;
-      checkbox.style.marginRight = '8px';
+      checkbox.style.cssText = `
+        margin-right: 10px;
+        cursor: ${isNonUpdatable ? 'not-allowed' : 'pointer'};
+        width: 16px;
+        height: 16px;
+        accent-color: #2563EB;
+      `;
       
       // Pre-check common sensitive fields
       const sensitiveFields = ['email', 'password', 'credits', 'role', 'subscription_tier', 'is_admin'];
@@ -728,15 +874,23 @@ ${conditions}
       const label = document.createElement('label');
       label.htmlFor = `column-${column}`;
       label.textContent = column;
+      label.style.cssText = `
+        cursor: ${isNonUpdatable ? 'not-allowed' : 'pointer'};
+        color: ${isNonUpdatable ? '#94A3B8' : '#334155'};
+        font-size: 14px;
+        user-select: none;
+      `;
+      
       if (isNonUpdatable) {
-        label.style.color = '#9ca3af';
         label.title = 'This field is typically not updatable';
       }
       
       checkboxContainer.appendChild(checkbox);
       checkboxContainer.appendChild(label);
-      columnsContainer.appendChild(checkboxContainer);
+      columnGrid.appendChild(checkboxContainer);
     });
+    
+    columnsContainer.appendChild(columnGrid);
     
     // Reset result container
     const resultContainer = document.getElementById('supacheck-result-container');
@@ -751,6 +905,15 @@ ${conditions}
     
     modalTitle.textContent = `Restrict Column Updates for "${tableName}"`;
     modalOverlay.style.display = 'flex';
+    
+    // Animate in
+    setTimeout(() => {
+      modalOverlay.style.opacity = '1';
+      const modal = document.getElementById('supacheck-fix-modal');
+      if (modal) {
+        modal.style.transform = 'translateY(0)';
+      }
+    }, 10);
     
     // Store current table
     currentFixTableData.tableName = tableName;
@@ -789,34 +952,72 @@ ${conditions}
     const tableEl = document.createElement('div');
     tableEl.id = `table-${tableName}`;
     tableEl.style.cssText = `
-      padding: 6px 8px;
-      margin-bottom: 4px;
-      background: #F9FAFB;
-      border-radius: 4px;
-      font-size: 12px;
+      padding: 12px 14px;
+      background: #FFFFFF;
+      border-radius: 8px;
+      font-size: 13px;
       border-left: 3px solid #22C55E;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     `;
+    
+    // Add hover effect
+    tableEl.onmouseover = () => {
+      tableEl.style.transform = 'translateY(-1px)';
+      tableEl.style.boxShadow = '0 3px 6px rgba(0, 0, 0, 0.1)';
+    };
+    
+    tableEl.onmouseout = () => {
+      tableEl.style.transform = 'translateY(0)';
+      tableEl.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+    };
     
     const tableInfoEl = document.createElement('div');
     tableInfoEl.style.flexGrow = '1';
     
     const tableNameEl = document.createElement('div');
     tableNameEl.style.cssText = `
-      font-weight: bold;
-      margin-bottom: 2px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
     `;
-    tableNameEl.textContent = tableName;
+    
+    // Add table icon
+    const tableIcon = document.createElement('span');
+    tableIcon.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 6px;">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke="#334155" stroke-width="2"/>
+        <line x1="3" y1="9" x2="21" y2="9" stroke="#334155" stroke-width="2"/>
+        <line x1="3" y1="15" x2="21" y2="15" stroke="#334155" stroke-width="2"/>
+        <line x1="9" y1="3" x2="9" y2="21" stroke="#334155" stroke-width="2"/>
+      </svg>
+    `;
+    
+    tableNameEl.appendChild(tableIcon);
+    tableNameEl.appendChild(document.createTextNode(tableName));
     
     const endpointEl = document.createElement('div');
     endpointEl.style.cssText = `
       font-size: 11px;
-      color: #6B7280;
+      color: #64748B;
       word-break: break-all;
+      margin-top: 2px;
     `;
-    endpointEl.textContent = endpoint;
+    
+    // Format endpoint to be more readable
+    let displayEndpoint = endpoint;
+    try {
+      const url = new URL(endpoint);
+      const pathWithQuery = url.pathname + url.search;
+      displayEndpoint = pathWithQuery; 
+    } catch(e) {}
+    
+    endpointEl.textContent = displayEndpoint;
     
     // Add Fix Table button
     const fixTableBtn = document.createElement('button');
@@ -825,13 +1026,33 @@ ${conditions}
       background-color: #22C55E;
       color: white;
       border: none;
-      border-radius: 4px;
-      padding: 4px 8px;
-      font-size: 11px;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
-      margin-left: 8px;
+      margin-left: 10px;
       white-space: nowrap;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     `;
+    
+    // Add button hover and active states
+    fixTableBtn.onmouseover = () => {
+      fixTableBtn.style.backgroundColor = '#16A34A';
+    };
+    
+    fixTableBtn.onmouseout = () => {
+      fixTableBtn.style.backgroundColor = '#22C55E';
+    };
+    
+    fixTableBtn.onmousedown = () => {
+      fixTableBtn.style.transform = 'scale(0.98)';
+    };
+    
+    fixTableBtn.onmouseup = () => {
+      fixTableBtn.style.transform = 'scale(1)';
+    };
     
     // Set up click handler
     fixTableBtn.onclick = (e) => {
@@ -1051,11 +1272,7 @@ ${conditions}
             if (baseUrl && tableName && primaryKeyValue && !nonUpdatableFields.includes(key)) {
                 const buttonEl = document.createElement('button');
                 
-                // Create icon element for the button
-                const iconEl = document.createElement('span');
-                iconEl.innerHTML = '⚙️'; // Gear icon
-                iconEl.style.cssText = 'margin-right: 4px; font-size: 10px;';
-                
+                // Create text element for the button
                 const textEl = document.createElement('span');
                 textEl.textContent = 'Test';
                 
@@ -1099,7 +1316,6 @@ ${conditions}
                     buttonEl.style.transform = 'translateY(0)';
                 };
                 
-                buttonEl.appendChild(iconEl);
                 buttonEl.appendChild(textEl);
                 
                 buttonEl.dataset.baseUrl = baseUrl;
@@ -2265,4 +2481,137 @@ ${conditions}
     }
 }
   // <--- END NEW
+
+  // Store current table data for the modal
+  let currentFixTableData = {
+    tableName: null,
+    columns: []
+  };
+
+  // Fetch columns for a table
+  async function fetchTableColumns(baseUrl, tableName, apiKey) {
+    const columnsContainer = document.getElementById('supacheck-columns-container');
+    columnsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #64748B; display: flex; align-items: center; justify-content: center; gap: 10px;"><div style="width: 20px; height: 20px; border: 2px solid #3B82F6; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>Loading columns...</div>';
+    
+    // Try first with JWT if available
+    if (window._currentUserJwt) {
+      try {
+        console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using JWT token...`);
+        const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+        const response = await fetch(sampleUrl, {
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${window._currentUserJwt}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            console.log(`[Column Discovery] Successfully retrieved columns using JWT for '${tableName}'`);
+            const columns = Object.keys(data[0]);
+            displayColumns(columns);
+            return; // Success with JWT, exit function
+          }
+        }
+        // If we get here, the JWT approach failed - continue to API key approach
+        console.log(`[Column Discovery] JWT approach failed for '${tableName}', trying API key approach...`);
+      } catch (e) {
+        console.error(`[Column Discovery] Error with JWT approach for '${tableName}':`, e);
+        // Continue to API key approach
+      }
+    }
+    
+    // Original approach - try with API key as bearer token
+    try {
+      console.log(`[Column Discovery] Attempting to fetch columns for '${tableName}' using API key...`);
+      const sampleUrl = `${baseUrl}/rest/v1/${tableName}?limit=1`;
+      const response = await fetch(sampleUrl, {
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`[Column Discovery] API key approach failed with status ${response.status} for '${tableName}'`);
+        throw new Error(`Failed to fetch sample data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (Array.isArray(data) && data.length > 0) {
+        // We have a row, get columns from it
+        console.log(`[Column Discovery] Successfully retrieved columns using API key for '${tableName}'`);
+        const columns = Object.keys(data[0]);
+        displayColumns(columns);
+      } else {
+        // No data, try to introspect using Supabase's introspection API
+        // This is a fallback and might not work depending on API configuration
+        console.error(`[Column Discovery] No data available for column extraction from '${tableName}'`);
+        throw new Error('No data available to extract columns');
+      }
+    } catch (error) {
+      console.error(`[Column Discovery] Final error fetching columns for '${tableName}':`, error);
+      columnsContainer.innerHTML = `
+        <div style="color: #ef4444; padding: 16px; background: #FEF2F2; border-radius: 8px; margin-bottom: 16px; border: 1px solid #FEE2E2;">
+          <h4 style="font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#EF4444" stroke-width="2"/>
+              <path d="M12 8V12" stroke="#EF4444" stroke-width="2" stroke-linecap="round"/>
+              <path d="M12 16H12.01" stroke="#EF4444" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Could not retrieve columns automatically
+          </h4>
+          <p style="margin-bottom: 12px; font-size: 14px; line-height: 1.5;">Please enter the column names manually:</p>
+          
+          <div style="margin-top: 16px; color: #6B7280; font-size: 13px; padding: 12px; background: #F9FAFB; border-radius: 6px;">
+            <p style="margin-bottom: 6px; font-weight: 500;">This may happen if:</p>
+            <ul style="list-style-type: disc; margin-left: 20px; margin-top: 8px; line-height: 1.5;">
+              <li>The table is empty (no rows to analyze)</li>
+              <li>Row Level Security (RLS) is blocking access</li>
+              <li>The table exists but you don't have permission to view it</li>
+            </ul>
+          </div>
+          
+          <div style="margin-top: 16px;">
+            <textarea id="columns-manual-input" style="width: 100%; height: 120px; padding: 12px; border: 1px solid #E5E7EB; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Monaco, 'Courier New', monospace; font-size: 13px;" 
+              placeholder="Enter column names, one per line"></textarea>
+          </div>
+          
+          <div style="margin-top: 16px;">
+            <button id="add-manual-columns" style="background: linear-gradient(135deg, #3B82F6, #2563EB); color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); transition: all 0.2s ease;">
+              Add Columns
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // Set up button for manual column entry with hover effects
+      const addButton = document.getElementById('add-manual-columns');
+      
+      addButton.onmouseover = () => {
+        addButton.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        addButton.style.transform = 'translateY(-1px)';
+      };
+      
+      addButton.onmouseout = () => {
+        addButton.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+        addButton.style.transform = 'translateY(0)';
+      };
+      
+      addButton.onclick = () => {
+        const manualInput = document.getElementById('columns-manual-input').value;
+        const columns = manualInput.split('\n')
+          .map(col => col.trim())
+          .filter(col => col.length > 0);
+        
+        if (columns.length > 0) {
+          displayColumns(columns);
+        } else {
+          alert('Please enter at least one column name');
+        }
+      };
+    }
+  }
 })(); 
