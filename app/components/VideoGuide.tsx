@@ -1,13 +1,52 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import * as AspectRatio from "@radix-ui/react-aspect-ratio"
 import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react'
 
 const VideoGuide = () => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
+  const [isInView, setIsInView] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const videoContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const options = {
+      root: null,
+      rootMargin: '0px',
+      threshold: 0.5, // When at least 50% of the video is visible
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        setIsInView(entry.isIntersecting)
+      })
+    }, options)
+
+    if (videoContainerRef.current) {
+      observer.observe(videoContainerRef.current)
+    }
+
+    return () => {
+      if (videoContainerRef.current) {
+        observer.unobserve(videoContainerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (videoRef.current) {
+      if (isInView) {
+        videoRef.current.play()
+          .then(() => setIsPlaying(true))
+          .catch(err => console.error("Error playing video:", err))
+      } else {
+        videoRef.current.pause()
+        setIsPlaying(false)
+      }
+    }
+  }, [isInView])
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -44,14 +83,17 @@ const VideoGuide = () => {
           Supacheck Quick Start Guide
         </h2>
         <div className="max-w-4xl mx-auto">
-          <div className="relative rounded-xl overflow-hidden shadow-2xl transition-all duration-300 hover:shadow-[0_0_2rem_rgba(0,0,0,0.3)] dark:shadow-[0_0_1rem_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_2rem_rgba(255,255,255,0.2)]">
+          <div 
+            ref={videoContainerRef}
+            className="relative rounded-xl overflow-hidden shadow-2xl transition-all duration-300 hover:shadow-[0_0_2rem_rgba(0,0,0,0.3)] dark:shadow-[0_0_1rem_rgba(255,255,255,0.1)] dark:hover:shadow-[0_0_2rem_rgba(255,255,255,0.2)]"
+          >
             <AspectRatio.Root ratio={16 / 9}>
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
-                onClick={togglePlay}
+                playsInline
               >
                 <source src="/SupacheckFinal.mov" type="video/quicktime" />
                 Your browser does not support the video tag.
