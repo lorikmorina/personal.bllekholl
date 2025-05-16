@@ -193,25 +193,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <ChevronRight className="w-4 h-4" />
               </button>
               
-              {/* AI-assisted scan button - disabled and greyed out */}
-              <div className="relative">
-                <button 
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md text-muted-foreground cursor-not-allowed opacity-50"
-                  disabled
-                >
-                  <div className="flex items-center">
-                    <Shield className="w-5 h-5 mr-3" />
-                    <span>AI Assisted Scan</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                <Badge 
-                  variant="secondary" 
-                  className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] py-0 px-1.5"
-                >
-                  Coming Soon
-                </Badge>
-              </div>
+              
               
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
