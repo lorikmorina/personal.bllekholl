@@ -453,7 +453,7 @@ export default function Hero() {
                   </div>
                   <div className="flex items-center ml-3">
                     <p className="text-muted-foreground text-xs max-w-[200px]">
-                      websites in indie community have been identified with critical security vulnerabilities
+                      websites in indie community currently have critical security vulnerabilities
                     </p>
                     <div className="relative inline-block ml-1.5 group">
                       <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
