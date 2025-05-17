@@ -1,12 +1,12 @@
-import LearnHeader from "@/app/components/learn/LearnHeader"
-import LearnTopicGrid from "@/app/components/learn/LearnTopicGrid"
+import ScanHeader from "@/app/components/scan/ScanHeader"
+import FreeScanner from "@/app/components/scan/FreeScanner"
 import NewsletterSubscribe from "@/app/components/NewsletterSubscribe"
 
-export default function LearnPage() {
+export default function ScanFreePage() {
   return (
     <div className="py-10">
-      <LearnHeader />
-      <LearnTopicGrid />
+      <ScanHeader />
+      <FreeScanner />
       <NewsletterSubscribe />
     </div>
   )

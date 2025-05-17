@@ -7,7 +7,7 @@ export default function Footer() {
         <nav className="-mb-6 columns-2 sm:flex sm:justify-center sm:space-x-12" aria-label="Footer">
           {[
             { name: "Pricing", href: "/pricing" },
-            { name: "Learn Free", href: "/learn" },
+            { name: "Free Scan", href: "/learn" },
             { name: "Signup", href: "/signup" },
             { name: "Privacy", href: "/privacy" },
             { name: "Terms", href: "/terms" },
@@ -26,7 +26,7 @@ export default function Footer() {
         
         <div className="mt-10 flex justify-center">
           <a 
-            href="https://x.com/lorikmor" 
+            href="https://x.com/securevibing" 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-muted-foreground hover:text-foreground"

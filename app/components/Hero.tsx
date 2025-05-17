@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { 
   Shield, Globe, Zap, Lock, Lightbulb, User,
   AlertCircle, Gauge, Heart, Repeat, MessageSquare, Share, VerifiedIcon, 
-  CheckCircle, XCircle, BarChart4
+  CheckCircle, XCircle, BarChart4, ArrowRight, Info
 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import axios from "axios"
@@ -349,9 +349,26 @@ export default function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Do you use Cursor, Windsurf, Claude, ChatGPT, Grok to code? Then you need to scan your website for security issues to see if your website has vulnerabilities that can lose you big money or loyal customers. Find leaked API keys, database misconfigurations,
-              missing security headers, and other common vulnerabilities.
+              Do you use Cursor, Windsurf, Claude, ChatGPT, Grok to code? Then you need to scan your website for security issues to see if your website has vulnerabilities that can lose you big money or loyal customers.
             </motion.p>
+            
+            {/* CTA Button */}
+            <motion.div
+              className="mt-6 sm:mt-8 flex justify-center sm:justify-start"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            >
+              <Button 
+                onClick={() => router.push('/signup')}
+                variant="default"
+                size="lg"
+                className="rounded-full"
+              >
+                Get Secured Now
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </motion.div>
             
             {/* Free Security Scan */}
             <motion.div
@@ -360,6 +377,7 @@ export default function Hero() {
               transition={{ duration: 0.8, delay: 0.4 }}
               className="mt-8 w-full"
             >
+              {/* Commented out free scanner section
               <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
                 <h3 className="text-lg font-semibold mb-3 flex items-center">
                   <Shield className="mr-2 h-5 w-5 text-primary" />
@@ -389,7 +407,6 @@ export default function Hero() {
                   </Button>
                 </div>
                 
-                {/* Add Turnstile Widget before the scan result */}
                 <div className="my-4 flex justify-center">
                   <TurnstileWidget 
                     siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ''}
@@ -403,13 +420,54 @@ export default function Hero() {
                   Signup and Upgrade to complete results and fixes.
                 </p>
                 
-                {/* Scan Result Card */}
                 <ScanResultCard
                   result={scanResult}
                   isLoading={isScanning}
                   onSignup={handleSignup}
                 />
               </div>
+              */}
+              
+              {/* Glowing Orb */}
+              <div className="flex justify-center sm:justify-start mt-4">
+                <div className="flex items-center">
+                  <div className="relative" style={{ width: '50px' }}>
+                    <style jsx>{`
+                      @keyframes pulse {
+                        0% { box-shadow: 0 0 8px 2px #c1121f, inset 0 0 8px 2px #c1121f; }
+                        50% { box-shadow: 0 0 12px 4px #c1121f, inset 0 0 10px 3px #c1121f; }
+                        100% { box-shadow: 0 0 8px 2px #c1121f, inset 0 0 8px 2px #c1121f; }
+                      }
+                      .glowing-orb {
+                        background-color: transparent;
+                        width: 50px;
+                        height: 50px;
+                        border-radius: 25px;
+                        box-shadow: 0 0 8px 2px #c1121f, inset 0 0 8px 2px #c1121f;
+                        animation: pulse 2s linear infinite;
+                      }
+                    `}</style>
+                    <div className="glowing-orb flex items-center justify-center">
+                      <p className="text-[#c1121f] font-black text-xl" style={{ textShadow: '0 0 4px #c1121f' }}>4</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center ml-3">
+                    <p className="text-muted-foreground text-xs max-w-[200px]">
+                      websites in indie community have been identified with critical security vulnerabilities
+                    </p>
+                    <div className="relative inline-block ml-1.5 group">
+                      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 w-48 p-2 bg-popover text-popover-foreground text-xs rounded shadow-md border border-border z-10">
+                        Our service actively scans different websites of the community for vulnerabilities, it might be your site or not!
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                          <div className="border-t border-l border-border size-2 bg-popover rotate-45"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
             </motion.div>
           </motion.div>
           

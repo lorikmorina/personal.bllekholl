@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from "react"
 import { motion, useAnimation, useMotionValue } from "framer-motion"
-import { KeySquare, Shield, Zap } from "lucide-react"
+import { KeySquare, Shield, Database } from "lucide-react"
 
 const features = [
   {
@@ -16,9 +16,9 @@ const features = [
     icon: <Shield className="w-12 h-12 mb-4 text-green-500" />,
   },
   {
-    title: "Fast Scans",
-    description: "Get results in seconds with our efficient scanning technology.",
-    icon: <Zap className="w-12 h-12 mb-4 text-yellow-500" />,
+    title: "Database Configurations",
+    description: "Identify and fix insecure database configurations that could lead to data leaks or breaches.",
+    icon: <Database className="w-12 h-12 mb-4 text-yellow-500" />,
   },
 ]
 
