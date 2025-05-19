@@ -448,7 +448,7 @@ export default function Hero() {
                       }
                     `}</style>
                     <div className="glowing-orb flex items-center justify-center">
-                      <p className="text-[#c1121f] font-black text-xl" style={{ textShadow: '0 0 4px #c1121f' }}>4</p>
+                      <p className="text-[#c1121f] font-black text-xl" style={{ textShadow: '0 0 4px #c1121f' }}>5</p>
                     </div>
                   </div>
                   <div className="flex items-center ml-3">
