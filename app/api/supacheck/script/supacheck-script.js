@@ -310,6 +310,21 @@
     headerText.style.letterSpacing = '0.2px';
     logoContainer.appendChild(headerText);
     
+    // Add status dot
+    const statusDot = document.createElement('span');
+    statusDot.id = 'supacheck-status-dot';
+    statusDot.style.cssText = `
+      width: 10px; 
+      height: 10px; 
+      border-radius: 50%; 
+      background-color: #22C55E; /* Default green */
+      margin-left: 8px; 
+      display: inline-block; /* Initially visible as widget is closed */
+      vertical-align: middle;
+      transition: background-color 0.3s ease;
+    `;
+    logoContainer.appendChild(statusDot);
+    
     header.appendChild(logoContainer);
     
     // Add arrow indicator
@@ -322,17 +337,21 @@
       const content = document.getElementById('supabase-check-content');
       const isOpen = content.classList.contains('open');
       const arrow = document.getElementById('supacheck-toggle-arrow');
+      const statusDot = document.getElementById('supacheck-status-dot'); // Get the status dot
       
       if (isOpen) {
         // Close animation
         content.style.animation = 'slideUp 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards';
         arrow.style.transform = 'rotate(0deg)';
-        // After animation completes, update class
+        // After animation completes, update class and display
         setTimeout(() => {
           content.classList.remove('open');
+          content.style.display = 'none'; 
+          if (statusDot) statusDot.style.display = 'inline-block'; // Show dot when closed
         }, 300);
       } else {
         // Open animation
+        if (statusDot) statusDot.style.display = 'none'; // Hide dot when open
         content.style.display = 'block';
         content.style.animation = 'slideDown 0.3s cubic-bezier(0.2, 0, 0.2, 1) forwards';
         arrow.style.transform = 'rotate(180deg)';
@@ -1613,6 +1632,15 @@ ${conditions}
            console.error(`[Verification] Error checking table '${table}':`, tableError); // Log error
           // Table doesn't exist or other error, don't add to UI
           continue;
+        }
+      }
+      
+      const statusDot = document.getElementById('supacheck-status-dot');
+      if (statusDot) {
+        if (anyTableWithDisabledRLS) {
+          statusDot.style.backgroundColor = '#EF4444'; // Red
+        } else {
+          statusDot.style.backgroundColor = '#22C55E'; // Green
         }
       }
       
