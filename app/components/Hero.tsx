@@ -429,7 +429,7 @@ export default function Hero() {
               */}
               
               {/* Glowing Orb */}
-              <div className="flex justify-center sm:justify-start mt-4">
+              {/* <div className="flex justify-center sm:justify-start mt-4">
                 <div className="flex items-center">
                   <div className="relative" style={{ width: '50px' }}>
                     <style jsx>{`
@@ -466,7 +466,7 @@ export default function Hero() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
               
             </motion.div>
           </motion.div>
