@@ -43,7 +43,10 @@ export default function RootLayout({
         {/* <Script src="https://securevibing.com/api/supacheck/script?userId=509cbd79-2730-46ed-bfcd-af4cb853eb4e" 
         async
         /> */}
-        
+        <Script async
+        src="https://afficone.com/scripts/sdk.js?token=1445255842028650"
+        />
+
 
         
        
