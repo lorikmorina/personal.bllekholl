@@ -89,7 +89,7 @@ const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
             <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-300">
               <div className="flex">
                 <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5 text-red-500" />
-                <span>{rlsMessage}</span>
+                <span>{severity === 'critical' ? "Critical: A high-risk security vulnerability has been found." : rlsMessage}</span>
               </div>
             </div>
           )}
