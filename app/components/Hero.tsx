@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useRef } from "react"
-import { motion } from "framer-motion"
+import { useState, useRef, useEffect } from "react"
+import { motion, useMotionValue, useTransform, animate as fmAnimate, useInView } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input" 
 import { useRouter } from "next/navigation"
@@ -15,6 +15,34 @@ import axios from "axios"
 
 // Add Card component
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+
+// AnimatedNumber Component
+interface AnimatedNumberProps {
+  to: number;
+  duration?: number;
+  prefix?: string;
+  suffix?: string;
+  textClassName?: string;
+}
+
+const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ to, duration = 2, prefix = "", suffix = "", textClassName }) => {
+  const count = useMotionValue(0);
+  const roundedDisplay = useTransform(count, (latest) => {
+    const num = Math.round(latest);
+    return `${prefix}${num.toLocaleString()}${suffix}`;
+  });
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, amount: 0.2 });
+
+  useEffect(() => {
+    if (isInView) {
+      const controls = fmAnimate(count, to, { duration, ease: "easeOut" });
+      return () => controls.stop();
+    }
+  }, [isInView, count, to, duration]);
+
+  return <motion.span ref={ref} className={textClassName}>{roundedDisplay}</motion.span>;
+};
 
 // Twitter Post Marquee Component
 const TwitterPostMarquee = () => {
@@ -81,6 +109,36 @@ const TwitterPostMarquee = () => {
         <h2 className="text-2xl font-bold mb-2">What people are saying</h2>
         <p className="text-muted-foreground">Join other vibe coders securing their websites</p>
       </div>
+
+      {/* Animated Statistics Section */}
+      <motion.div 
+        className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mb-12 text-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, staggerChildren: 0.2 }}
+      >
+        {[
+          { numericValue: 20, prefix: "$", suffix: "k+", label: "Saved", colorClass: "text-green-500" },
+          { numericValue: 100, prefix: "", suffix: "+", label: "Websites Scanned", colorClass: "text-blue-500" },
+          { numericValue: 10000, prefix: "", suffix: "+", label: "Users Data Secured", colorClass: "text-red-500" },
+        ].map((stat, index) => (
+          <motion.div 
+            key={index} 
+            className="bg-card/50 p-4 sm:p-6 rounded-xl border border-border shadow-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: index * 0.1 }}
+          >
+            <AnimatedNumber
+              to={stat.numericValue}
+              prefix={stat.prefix}
+              suffix={stat.suffix}
+              textClassName={`text-3xl sm:text-4xl font-bold ${stat.colorClass}`}
+            />
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">{stat.label}</p>
+          </motion.div>
+        ))}
+      </motion.div>
       
       <div className="relative overflow-hidden">
         {/* Left gradient overlay */}

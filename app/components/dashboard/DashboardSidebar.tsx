@@ -177,6 +177,22 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <ChevronRight className="w-4 h-4" />
               </button>
               
+              {/* Deep Scan Tool - New button */}
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'deep-scan' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('deep-scan')}
+              >
+                <div className="flex items-center">
+                  <SearchCheck className="w-5 h-5 mr-3" />
+                  <span>Deep Scan</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
               {/* Supabase Check Tool - New button */}
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
@@ -193,21 +209,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <ChevronRight className="w-4 h-4" />
               </button>
               
-              {/* Deep Scan Tool - New button */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'deep-scan' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('deep-scan')}
-              >
-                <div className="flex items-center">
-                  <SearchCheck className="w-5 h-5 mr-3" />
-                  <span>Deep Scan</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              
               
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
