@@ -5,6 +5,7 @@ import DashboardLayout from "@/app/components/dashboard/DashboardLayout"
 import LightScanTool from "@/app/components/dashboard/tools/LightScanTool"
 import SupabaseCheckTool from "@/app/components/dashboard/tools/SupabaseCheckTool"
 import ReportsList from "@/app/components/dashboard/reports/ReportsList"
+import DeepScanTool from "@/app/components/dashboard/tools/DeepScanTool"
 import DashboardProvider from "@/app/components/dashboard/DashboardProvider"
 
 export default function DashboardPage() {
@@ -19,6 +20,7 @@ export default function DashboardPage() {
         {activeTool === "light-scan" && <LightScanTool />}
         {activeTool === "supabase-check" && <SupabaseCheckTool />}
         {activeTool === "reports" && <ReportsList />}
+        {activeTool === "deep-scan" && <DeepScanTool />}
       </DashboardLayout>
     </DashboardProvider>
   )

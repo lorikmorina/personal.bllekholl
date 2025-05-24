@@ -50,7 +50,7 @@ export default function TermsOfService() {
         
         <h2>6. Payment Terms</h2>
         <p>
-          Payments for subscriptions are processed through Paddle. By subscribing to a paid plan, you authorize us to charge the applicable fees to your designated payment method. All payments are non-refundable except as required by law.
+          Payments for subscriptions (SaaS plans) are processed through Paddle. Payments for one-time services, such as our Deep Security Scan, are processed through Dodo Payments. By subscribing to a paid plan or purchasing a one-time service, you authorize us to charge the applicable fees to your designated payment method. All payments are non-refundable except as required by law.
         </p>
         
         <h2>7. Acceptable Use</h2>
