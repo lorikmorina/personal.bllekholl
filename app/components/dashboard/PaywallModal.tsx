@@ -155,7 +155,8 @@ export default function PaywallModal({ isOpen, onClose, onUpgrade }: PaywallModa
         customData: {
           // Keep sending custom data - might be useful for webhooks/backup
           userId: user.id,
-          plan: selectedPlan
+          plan: selectedPlan,
+          _afficoneRef: (window as any).Afficone?.referral // Add Afficone referral
         },
         // REMOVED success callback
         closeCallback: () => {
