@@ -157,6 +157,15 @@ export default function Header() {
           >
             Scan Free
           </Link>
+          {/* Affiliate Program Link - Desktop Nav */}
+          <Link
+            href="https://securevibing.afficone.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
+          >
+            Affiliate
+          </Link>
           {user && (
             <Link
               href="/dashboard"
@@ -199,6 +208,16 @@ export default function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={openBillingModal}>
                   Billing
+                </DropdownMenuItem>
+                {/* Affiliate Program Link - Desktop */}
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href="https://securevibing.afficone.com" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    Affiliate Program
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
@@ -256,6 +275,17 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Scan Free
+              </Link>
+              
+              {/* Affiliate Program Link - Mobile Nav */}
+              <Link
+                href="https://securevibing.afficone.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Affiliate
               </Link>
               
               {user && (

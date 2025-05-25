@@ -8,6 +8,7 @@ export default function Footer() {
           {[
             { name: "Pricing", href: "/pricing" },
             { name: "Free Scan", href: "/learn" },
+            { name: "Affiliate Program", href: "https://securevibing.afficone.com", target: "_blank" },
             { name: "Signup", href: "/signup" },
             { name: "Privacy", href: "/privacy" },
             { name: "Terms", href: "/terms" },
@@ -16,6 +17,8 @@ export default function Footer() {
             <div key={item.name} className="pb-6">
               <Link
                 href={item.href}
+                target={item.target || undefined}
+                rel={item.target === "_blank" ? "noopener noreferrer" : undefined}
                 className="text-sm leading-6 text-muted-foreground hover:text-foreground"
               >
                 {item.name}

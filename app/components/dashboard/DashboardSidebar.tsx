@@ -239,6 +239,17 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
               <span>Billing</span>
             </button>
             
+            {/* Affiliate Program Link - New */}
+            <Link 
+              href="https://securevibing.afficone.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center px-3 py-2 text-sm rounded-md text-foreground hover:bg-secondary/10 mb-2"
+            >
+              <Users className="w-5 h-5 mr-3" />
+              <span>Affiliate Program</span>
+            </Link>
+            
             {/* Logout - existing button */}
             <button 
               className="w-full flex items-center px-3 py-2 text-sm rounded-md text-destructive hover:bg-destructive/10"
