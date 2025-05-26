@@ -158,14 +158,14 @@ export default function Header() {
             Scan Free
           </Link>
           {/* Affiliate Program Link - Desktop Nav */}
-          <Link
+          {/* <Link
             href="https://securevibing.afficone.com"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
           >
             Affiliate
-          </Link>
+          </Link> */}
           {user && (
             <Link
               href="/dashboard"

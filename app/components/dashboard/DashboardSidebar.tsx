@@ -178,7 +178,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
               </button>
               
               {/* Deep Scan Tool - New button */}
-              <button 
+              {/* <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
                   activeTool === 'deep-scan' 
                     ? 'bg-primary text-primary-foreground' 
@@ -191,7 +191,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                   <span>Deep Scan</span>
                 </div>
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </button> */}
 
               {/* Supabase Check Tool - New button */}
               <button 
