@@ -95,7 +95,7 @@ const VideoGuide = () => {
                 onPause={() => setIsPlaying(false)}
                 playsInline
               >
-                <source src="/SupacheckFinal.mov" type="video/quicktime" />
+                <source src="/SupacheckFinal.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
             </AspectRatio.Root>

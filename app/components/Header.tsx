@@ -155,7 +155,7 @@ export default function Header() {
             rel="noopener noreferrer"
             className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
           >
-            Scan Free
+            Free Tool
           </Link>
           {/* Affiliate Program Link - Desktop Nav */}
           {/* <Link
@@ -274,7 +274,7 @@ export default function Header() {
                 className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Scan Free
+                Free Tool
               </Link>
               
               {/* Affiliate Program Link - Mobile Nav */}
