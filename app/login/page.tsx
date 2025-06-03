@@ -10,7 +10,7 @@ export default function LoginPage() {
         </p>
       </div>
       
-      <SignupForm />
+      <SignupForm defaultMode="login" />
     </div>
   )
 } 

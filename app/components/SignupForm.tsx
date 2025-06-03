@@ -9,10 +9,15 @@ import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import TurnstileWidget from "@/app/components/TurnstileWidget"
 import { Separator } from "@/components/ui/separator"
+import Link from "next/link"
 
 type AuthMode = 'login' | 'signup' | 'confirmation_sent' | 'email_not_confirmed'
 
-export default function SignupForm() {
+interface SignupFormProps {
+  defaultMode?: 'login' | 'signup'
+}
+
+export default function SignupForm({ defaultMode = 'login' }: SignupFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -22,8 +27,8 @@ export default function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-  const [authMode, setAuthMode] = useState<AuthMode>('login')
-  const [needsSignup, setNeedsSignup] = useState(false)
+  const [authMode, setAuthMode] = useState<AuthMode>(defaultMode)
+  const [needsSignup, setNeedsSignup] = useState(defaultMode === 'signup')
   const supabase = createClient()
   
   async function handleEmailAuth() {
@@ -67,7 +72,7 @@ export default function SignupForm() {
         throw new Error("Passwords do not match")
       }
 
-      if (needsSignup) {
+      if (needsSignup || defaultMode === 'signup') {
         // Sign up new user
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -103,10 +108,9 @@ export default function SignupForm() {
         })
         
         if (error) {
-          // If invalid credentials, user might not exist - switch to signup mode
+          // If invalid credentials, user might not exist - suggest signup
           if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email or password')) {
-            setNeedsSignup(true)
-            setError("No account found with this email. Please create a new account below.")
+            setError("Invalid email or password. Don't have an account yet?")
             return
           }
           
@@ -217,8 +221,8 @@ export default function SignupForm() {
     setConfirmPassword("")
     setError(null)
     setSuccess(null)
-    setNeedsSignup(false)
-    setAuthMode('login')
+    setNeedsSignup(defaultMode === 'signup')
+    setAuthMode(defaultMode)
   }
 
   if (authMode === 'confirmation_sent') {
@@ -249,7 +253,7 @@ export default function SignupForm() {
               Resend confirmation email
             </Button>
             <Button variant="ghost" onClick={resetForm} className="w-full">
-              Back to login
+              Back to {defaultMode === 'signup' ? 'signup' : 'login'}
             </Button>
           </div>
         </div>
@@ -290,21 +294,23 @@ export default function SignupForm() {
               Resend confirmation email
             </Button>
             <Button variant="ghost" onClick={resetForm} className="w-full">
-              Back to login
+              Back to {defaultMode === 'signup' ? 'signup' : 'login'}
             </Button>
           </div>
         </div>
       </div>
     )
   }
+
+  const isSignupMode = needsSignup || defaultMode === 'signup'
   
   return (
     <div className="max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border border-border">
       <h2 className="text-2xl font-bold mb-2">
-        {needsSignup ? 'Create Account' : 'Log In'}
+        {isSignupMode ? 'Create Account' : 'Log In'}
       </h2>
       <p className="text-muted-foreground mb-6">
-        {needsSignup 
+        {isSignupMode 
           ? 'Sign up to get unlimited website security scans.' 
           : 'Welcome back! Please sign in to your account.'
         }
@@ -360,7 +366,7 @@ export default function SignupForm() {
             </div>
           </div>
 
-          {needsSignup && (
+          {isSignupMode && (
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
@@ -393,18 +399,8 @@ export default function SignupForm() {
             {isSubmitting ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : null}
-            {needsSignup ? 'Create Account' : 'Log In'}
+            {isSignupMode ? 'Create Account' : 'Log In'}
           </Button>
-
-          {needsSignup && (
-            <Button 
-              variant="ghost" 
-              onClick={() => setNeedsSignup(false)}
-              className="w-full"
-            >
-              Already have an account? Log in
-            </Button>
-          )}
         </div>
 
         <div className="relative">
@@ -451,6 +447,26 @@ export default function SignupForm() {
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
+
+        {/* Navigation Links */}
+        <div className="text-center space-y-2">
+          <Separator className="my-4" />
+          {defaultMode === 'login' ? (
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/signup" className="text-primary hover:underline font-medium">
+                Create one here
+              </Link>
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline font-medium">
+                Log in here
+              </Link>
+            </p>
+          )}
+        </div>
         
         <p className="text-center text-xs text-muted-foreground">
           By continuing, you agree to our{" "}
