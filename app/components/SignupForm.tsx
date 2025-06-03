@@ -2,16 +2,163 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import TurnstileWidget from "@/app/components/TurnstileWidget"
+import { Separator } from "@/components/ui/separator"
+
+type AuthMode = 'login' | 'signup' | 'confirmation_sent' | 'email_not_confirmed'
 
 export default function SignupForm() {
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [needsSignup, setNeedsSignup] = useState(false)
   const supabase = createClient()
+  
+  async function handleEmailAuth() {
+    setIsSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    
+    try {
+      // Validate Turnstile token first
+      if (!turnstileToken) {
+        throw new Error("Please complete the security check")
+      }
+      
+      // Verify the turnstile token server-side
+      const verifyResponse = await fetch('/api/verify-turnstile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: turnstileToken }),
+        credentials: 'same-origin'
+      })
+      
+      const verification = await verifyResponse.json()
+      
+      if (!verification.success) {
+        throw new Error("Security verification failed. Please try again.")
+      }
+
+      // Basic validation
+      if (!email || !password) {
+        throw new Error("Please enter both email and password")
+      }
+
+      if (password.length < 6) {
+        throw new Error("Password must be at least 6 characters")
+      }
+
+      // If we're in signup mode and passwords don't match
+      if (needsSignup && password !== confirmPassword) {
+        throw new Error("Passwords do not match")
+      }
+
+      if (needsSignup) {
+        // Sign up new user
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/dashboard`
+          }
+        })
+        
+        if (error) {
+          // If user already exists but email not confirmed
+          if (error.message.includes('already registered')) {
+            setAuthMode('email_not_confirmed')
+            setSuccess("This email is already registered but not confirmed. Please check your email for the confirmation link, or try logging in.")
+            return
+          }
+          throw error
+        }
+        
+        if (data.user && !data.session) {
+          // Email confirmation required
+          setAuthMode('confirmation_sent')
+          setSuccess(`Confirmation email sent to ${email}. Please check your email and click the confirmation link to complete your registration.`)
+        } else if (data.session) {
+          // Auto-logged in (email confirmation disabled)
+          window.location.href = '/dashboard'
+        }
+      } else {
+        // Attempt to sign in
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+        
+        if (error) {
+          // If invalid credentials, user might not exist - switch to signup mode
+          if (error.message.includes('Invalid login credentials') || error.message.includes('Invalid email or password')) {
+            setNeedsSignup(true)
+            setError("No account found with this email. Please create a new account below.")
+            return
+          }
+          
+          // If email not confirmed
+          if (error.message.includes('Email not confirmed')) {
+            setAuthMode('email_not_confirmed')
+            setError("Your email address is not confirmed. Please check your email for a confirmation link.")
+            return
+          }
+          
+          throw error
+        }
+        
+        if (data.session) {
+          // Successful login
+          window.location.href = '/dashboard'
+        }
+      }
+      
+    } catch (err) {
+      console.error("Auth error:", err)
+      setError(err instanceof Error ? err.message : "Authentication failed. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!email) {
+      setError("Please enter your email address")
+      return
+    }
+    
+    try {
+      setIsSubmitting(true)
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?redirect=/dashboard`
+        }
+      })
+      
+      if (error) throw error
+      
+      setSuccess("Confirmation email resent. Please check your email.")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend confirmation email")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
   
   async function handleGoogleSignIn() {
     setIsSubmitting(true)
@@ -62,12 +209,105 @@ export default function SignupForm() {
     setTurnstileToken(token)
     setError(null) // Clear any previous errors
   }
+
+  // Reset form when switching between login/signup
+  const resetForm = () => {
+    setEmail("")
+    setPassword("")
+    setConfirmPassword("")
+    setError(null)
+    setSuccess(null)
+    setNeedsSignup(false)
+    setAuthMode('login')
+  }
+
+  if (authMode === 'confirmation_sent') {
+    return (
+      <div className="max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border border-border">
+        <div className="text-center">
+          <Mail className="h-16 w-16 mx-auto text-primary mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Check your email</h2>
+          <p className="text-muted-foreground mb-6">
+            We've sent you a confirmation link at <strong>{email}</strong>
+          </p>
+          {success && (
+            <Alert className="mb-4">
+              <AlertTitle>Success</AlertTitle>
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-4">
+            <Button 
+              variant="outline" 
+              onClick={resendConfirmation}
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Resend confirmation email
+            </Button>
+            <Button variant="ghost" onClick={resetForm} className="w-full">
+              Back to login
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (authMode === 'email_not_confirmed') {
+    return (
+      <div className="max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border border-border">
+        <div className="text-center">
+          <Mail className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Email not confirmed</h2>
+          <p className="text-muted-foreground mb-6">
+            Your account exists but your email address <strong>{email}</strong> has not been confirmed yet.
+          </p>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Notice</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {success && (
+            <Alert className="mb-4">
+              <AlertTitle>Success</AlertTitle>
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-4">
+            <Button 
+              onClick={resendConfirmation}
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Resend confirmation email
+            </Button>
+            <Button variant="ghost" onClick={resetForm} className="w-full">
+              Back to login
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div className="max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border border-border">
-      <h2 className="text-2xl font-bold mb-6">Log In or Create an Account</h2>
+      <h2 className="text-2xl font-bold mb-2">
+        {needsSignup ? 'Create Account' : 'Log In'}
+      </h2>
       <p className="text-muted-foreground mb-6">
-        Sign up to get unlimited website security scans.
+        {needsSignup 
+          ? 'Sign up to get unlimited website security scans.' 
+          : 'Welcome back! Please sign in to your account.'
+        }
       </p>
       
       <div className="space-y-6">
@@ -77,6 +317,103 @@ export default function SignupForm() {
             siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || ''}
             onSuccess={handleTurnstileSuccess}
           />
+        </div>
+
+        {/* Email/Password Form */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="pl-10"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pl-10 pr-10"
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          {needsSignup && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-10 pr-10"
+                  disabled={isSubmitting}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <Button 
+            onClick={handleEmailAuth}
+            disabled={isSubmitting || !turnstileToken}
+            className="w-full"
+          >
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            {needsSignup ? 'Create Account' : 'Log In'}
+          </Button>
+
+          {needsSignup && (
+            <Button 
+              variant="ghost" 
+              onClick={() => setNeedsSignup(false)}
+              className="w-full"
+            >
+              Already have an account? Log in
+            </Button>
+          )}
+        </div>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+          </div>
         </div>
         
         <Button 
@@ -105,6 +442,13 @@ export default function SignupForm() {
           <Alert variant="destructive">
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert>
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
         
