@@ -230,7 +230,7 @@ export default function Header() {
           
           {/* Login button when not logged in */}
           {!user && !loading && (
-            <Link href="/signup" passHref>
+            <Link href="/login" passHref>
               <Button variant="default" size="sm">
                 <User className="h-4 w-4 mr-2" />
                 Login
