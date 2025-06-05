@@ -808,7 +808,7 @@ export default function LightScanTool() {
         <CardHeader>
           <CardTitle className="text-2xl">Website Security Scan</CardTitle>
           <CardDescription>
-            Quickly scan any website for security vulnerabilities, exposed API keys, and missing security headers.
+            Quickly scan any website for security vulnerabilities, database misconfigurations, exposed API keys, and missing security headers.
           </CardDescription>
         </CardHeader>
         <CardContent>

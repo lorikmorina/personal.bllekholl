@@ -9,9 +9,9 @@ import Script from "next/script"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "Secure Vibing - Website Security Scanner",
-  description: "Scan your website for security vulnerabilities, exposed API keys, and missing security headers",
-  generator: 'v0.dev'
+  title: "Secure Vibing - Website Security Scanner for AI Assisted Coding",
+  description: "Scan your website for security vulnerabilities, database misconfigurations, exposed API keys, and missing security headers",
+  generator: ''
 }
 
 export default function RootLayout({
