@@ -141,6 +141,13 @@ export default function Header() {
           >
             Pricing
           </Link>
+          <Link
+            href="/blog"
+            rel="noopener noreferrer"
+            className="text-sm font-semibold leading-6 text-foreground hover:text-primary transition-colors"
+          >
+            Blog
+          </Link>
           {!user && (
             <Link
               href="/signup"
@@ -257,6 +264,14 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Pricing
+              </Link>
+              
+              <Link
+                href="/blog"
+                className="block rounded-md px-3 py-2 text-base font-medium text-foreground hover:bg-secondary/20"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Blog
               </Link>
               
               {!user && (
