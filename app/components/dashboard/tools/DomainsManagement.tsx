@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, Globe, Shield, Check, Mail, Clock, ExternalLink } from "lucide-react"
+import { Loader2, Globe, Shield, Check, Mail, Clock, ExternalLink, Calendar, Zap, Pause } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useDashboard } from "../DashboardProvider"
 import PaywallModal from "../PaywallModal"
@@ -37,6 +37,8 @@ const normalizeDomain = (inputUrl: string | null): string | null => {
   }
 };
 
+type PeriodicScanStatus = 'daily' | 'weekly' | 'monthly' | 'off' | null;
+
 export default function DomainsManagement() {
   const [url, setUrl] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -45,7 +47,7 @@ export default function DomainsManagement() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [dailyScansEnabled, setDailyScansEnabled] = useState(false)
+  const [periodicScanStatus, setPeriodicScanStatus] = useState<PeriodicScanStatus>(null)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const { user } = useDashboard()
   const supabase = createClient()
@@ -66,7 +68,7 @@ export default function DomainsManagement() {
     try {
       const { data, error: dbError } = await supabase
         .from('profiles')
-        .select('subscription_plan, subscription_status, main_website, daily_scans_status')
+        .select('subscription_plan, subscription_status, main_website, periodic_scan_status')
         .eq('id', user.id)
         .single();
 
@@ -80,8 +82,8 @@ export default function DomainsManagement() {
         if (data.main_website) {
           setUrl(data.main_website);
         }
-        if (data.daily_scans_status !== null) {
-          setDailyScansEnabled(data.daily_scans_status);
+        if (data.periodic_scan_status !== null) {
+          setPeriodicScanStatus(data.periodic_scan_status);
         }
       } else {
         setUserProfile(null);
@@ -150,7 +152,7 @@ export default function DomainsManagement() {
         .from('profiles')
         .update({ 
           main_website: normalizedDomain,
-          daily_scans_status: dailyScansEnabled
+          periodic_scan_status: periodicScanStatus
         })
         .eq('id', user.id);
 
@@ -161,10 +163,17 @@ export default function DomainsManagement() {
       setUserProfile((prev: any) => ({ 
         ...prev, 
         main_website: normalizedDomain,
-        daily_scans_status: dailyScansEnabled
+        periodic_scan_status: periodicScanStatus
       }));
       setUrl(normalizedDomain);
-      setSuccess("Domain registered successfully! Daily scans will begin within 24 hours.");
+      
+      const scanFrequency = periodicScanStatus === 'off' 
+        ? 'disabled' 
+        : periodicScanStatus 
+          ? `${periodicScanStatus} scans` 
+          : 'no scans configured';
+      
+      setSuccess(`Domain registered successfully! ${scanFrequency === 'disabled' ? 'Periodic scans are disabled.' : `${scanFrequency.charAt(0).toUpperCase() + scanFrequency.slice(1)} will begin within 24 hours.`}`);
 
     } catch (error: any) {
       setError(error.message || "Failed to register domain");
@@ -198,6 +207,46 @@ export default function DomainsManagement() {
     if (success) setSuccess(null);
   };
 
+  // Periodic scan options
+  const scanOptions = [
+    {
+      value: 'daily' as const,
+      label: 'Daily',
+      description: 'Scan every day for maximum security',
+      icon: <Zap className="h-4 w-4" />,
+      bgColor: 'bg-green-50 dark:bg-green-900/20',
+      borderColor: 'border-green-200 dark:border-green-800',
+      textColor: 'text-green-700 dark:text-green-300'
+    },
+    {
+      value: 'weekly' as const,
+      label: 'Weekly',
+      description: 'Scan once per week',
+      icon: <Calendar className="h-4 w-4" />,
+      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+      borderColor: 'border-blue-200 dark:border-blue-800',
+      textColor: 'text-blue-700 dark:text-blue-300'
+    },
+    {
+      value: 'monthly' as const,
+      label: 'Monthly',
+      description: 'Scan once per month',
+      icon: <Clock className="h-4 w-4" />,
+      bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+      borderColor: 'border-purple-200 dark:border-purple-800',
+      textColor: 'text-purple-700 dark:text-purple-300'
+    },
+    {
+      value: 'off' as const,
+      label: 'Off',
+      description: 'No periodic scans',
+      icon: <Pause className="h-4 w-4" />,
+      bgColor: 'bg-gray-50 dark:bg-gray-900/20',
+      borderColor: 'border-gray-200 dark:border-gray-800',
+      textColor: 'text-gray-700 dark:text-gray-300'
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <Card>
@@ -207,7 +256,7 @@ export default function DomainsManagement() {
             Domain Management
           </CardTitle>
           <CardDescription>
-            Register your main website domain to receive automated daily security scans and email reports.
+            Register your main website domain to receive automated periodic security scans and email reports.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -235,25 +284,41 @@ export default function DomainsManagement() {
               )}
             </div>
 
-            {/* Daily Scans Checkbox */}
-            <div className="flex items-start space-x-3">
-              <Checkbox
-                id="daily-scans"
-                checked={dailyScansEnabled}
-                onCheckedChange={(checked) => setDailyScansEnabled(checked as boolean)}
-                disabled={isLoadingProfile || isLoading}
-              />
-              <div className="space-y-1">
-                <label 
-                  htmlFor="daily-scans" 
-                  className="text-sm font-medium cursor-pointer flex items-center"
-                >
-                  <Mail className="h-4 w-4 mr-2" />
-                  Receive daily security scans of my website
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Get automated security reports delivered to your email every day
-                </p>
+            {/* Periodic Scan Frequency Selector */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center">
+                <Mail className="h-4 w-4 mr-2" />
+                Scan Frequency
+              </label>
+              <p className="text-xs text-muted-foreground mb-4">
+                Choose how often you want to receive automated security scans via email
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {scanOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPeriodicScanStatus(option.value)}
+                    disabled={isLoadingProfile || isLoading}
+                    className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                      periodicScanStatus === option.value
+                        ? `${option.bgColor} ${option.borderColor} ${option.textColor}`
+                        : 'bg-background border-border hover:border-primary/50'
+                    } ${isLoadingProfile || isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        {option.icon}
+                        <span className="font-medium ml-2">{option.label}</span>
+                      </div>
+                      {periodicScanStatus === option.value && (
+                        <Check className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                    <p className="text-xs opacity-80">{option.description}</p>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -308,7 +373,7 @@ export default function DomainsManagement() {
               <Shield className="h-4 w-4" />
               <AlertTitle>Premium Feature</AlertTitle>
               <AlertDescription>
-                Daily security scans and email reports are available for premium users only.
+                Periodic security scans and email reports are available for premium users only.
                 <Button
                   variant="link"
                   className="p-0 h-auto font-semibold ml-1"
@@ -344,12 +409,12 @@ export default function DomainsManagement() {
             <CardContent className="pt-6">
               <h4 className="font-semibold mb-3 flex items-center">
                 <Clock className="h-4 w-4 mr-2" />
-                How Daily Scans Work
+                How Periodic Scans Work
               </h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start">
                   <span className="text-primary mr-2">•</span>
-                  Automated security scans run every 24 hours
+                  Automated security scans run based on your selected frequency
                 </li>
                 <li className="flex items-start">
                   <span className="text-primary mr-2">•</span>
