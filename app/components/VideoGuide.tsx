@@ -2,7 +2,8 @@
 
 import React, { useRef, useState, useEffect } from 'react'
 import * as AspectRatio from "@radix-ui/react-aspect-ratio"
-import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react'
+import { Play, Pause, Volume2, VolumeX, Maximize, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 const VideoGuide = () => {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -94,10 +95,19 @@ const VideoGuide = () => {
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 playsInline
+                itemScope
+                itemType="https://schema.org/VideoObject"
               >
                 <source src="/SupacheckFinal.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
+              
+              {/* Hidden metadata for video */}
+              <meta itemProp="name" content="Supacheck Quick Start Guide" />
+              <meta itemProp="description" content="Learn how to use Supacheck with our comprehensive video guide for website security scanning." />
+              <meta itemProp="thumbnailUrl" content="/video-thumbnail.jpg" />
+              <meta itemProp="uploadDate" content="2024-01-15" />
+              <meta itemProp="duration" content="PT5M30S" />
             </AspectRatio.Root>
             
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 flex items-center justify-between text-white transition-opacity duration-300 opacity-0 hover:opacity-100">
@@ -110,6 +120,15 @@ const VideoGuide = () => {
               </button>
               
               <div className="flex items-center gap-3">
+                <Link 
+                  href="/watch"
+                  className="p-2 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors duration-200"
+                  aria-label="Open in dedicated player"
+                  title="Watch on dedicated page"
+                >
+                  <ExternalLink size={20} />
+                </Link>
+                
                 <button 
                   onClick={toggleMute}
                   className="p-2 rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 transition-colors duration-200"
@@ -127,6 +146,17 @@ const VideoGuide = () => {
                 </button>
               </div>
             </div>
+          </div>
+          
+          {/* Link to dedicated watch page */}
+          <div className="text-center mt-6">
+            <Link 
+              href="/watch"
+              className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors duration-200 font-medium"
+            >
+              <ExternalLink size={16} />
+              Watch on dedicated page for better experience
+            </Link>
           </div>
         </div>
       </div>

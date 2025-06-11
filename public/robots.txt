@@ -2,5 +2,6 @@
 User-agent: *
 Allow: /
 
-# Sitemap
-Sitemap: https://securevibing.com/sitemap.xml 
+# Sitemaps
+Sitemap: https://securevibing.com/sitemap.xml
+Sitemap: https://securevibing.com/video-sitemap.xml 

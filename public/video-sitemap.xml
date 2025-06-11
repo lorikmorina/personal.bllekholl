@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  <url>
+    <loc>https://securevibing.com/watch</loc>
+    <video:video>
+      <video:thumbnail_loc>https://securevibing.com/video-thumbnail.jpg</video:thumbnail_loc>
+      <video:title>Supacheck Quick Start Guide</video:title>
+      <video:description>Learn how to use Supacheck with our comprehensive video guide. This tutorial covers website security scanning, vulnerability detection, and how to improve your website's security posture step by step.</video:description>
+      <video:content_loc>https://securevibing.com/SupacheckFinal.mp4</video:content_loc>
+      <video:duration>330</video:duration>
+      <video:publication_date>2024-01-15T00:00:00Z</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
+      <video:tag>supacheck</video:tag>
+      <video:tag>security scanning</video:tag>
+      <video:tag>website security</video:tag>
+      <video:tag>cybersecurity</video:tag>
+      <video:tag>tutorial</video:tag>
+      <video:tag>guide</video:tag>
+      <video:category>Technology</video:category>
+    </video:video>
+  </url>
+</urlset> 
