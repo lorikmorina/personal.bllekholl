@@ -62,12 +62,12 @@ const TwitterPostMarquee = () => {
     {
       id: 2,
       author: {
-        name: "Chatbit",
-        handle: "@ChatbitAI",
-        avatar: "/Xprofiles/ChatbitAI.jpg",
+        name: "Christopher Woggon",
+        handle: "@chrissyinspace",
+        avatar: "/Xprofiles/chris.jpg",
         verified: true
       },
-      content: "Thanks, @lorikmor! Now I can sleep at night knowing my website isn't secretly a bug hotel. 🐞🏨",
+      content: "Check out Lorik's @SecureVibing to make sure your product works as intended!!",
       date: "1d"
     },
     {
@@ -107,7 +107,7 @@ const TwitterPostMarquee = () => {
     <div className="pt-12 pb-8 border-t border-border">
       <div className="mb-8 text-center">
         <h2 className="text-2xl font-bold mb-2">What people are saying</h2>
-        <p className="text-muted-foreground">Join other vibe coders securing their websites</p>
+        <p className="text-muted-foreground">Join other coders securing their websites</p>
       </div>
 
       {/* Animated Statistics Section */}
@@ -315,6 +315,53 @@ const ScanResultCard = ({ result, isLoading, onSignup }: any) => {
 // Add import for TurnstileWidget and useRef
 import TurnstileWidget from "@/app/components/TurnstileWidget"
 
+// Add AnimatedText Component for cycling text
+const AnimatedText = () => {
+  const texts = ["indie developers", "entrepreneurs", "security teams", "vibe coders"];
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [displayText, setDisplayText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    const currentText = texts[currentIndex];
+    let timeout: NodeJS.Timeout;
+
+    if (isPaused) {
+      timeout = setTimeout(() => {
+        setIsPaused(false);
+        setIsDeleting(true);
+      }, 2000); // Pause for 2 seconds at full text
+    } else if (isDeleting) {
+      if (displayText === "") {
+        setIsDeleting(false);
+        setCurrentIndex((prev) => (prev + 1) % texts.length);
+      } else {
+        timeout = setTimeout(() => {
+          setDisplayText(currentText.slice(0, displayText.length - 1));
+        }, 50); // Faster deletion
+      }
+    } else {
+      if (displayText === currentText) {
+        setIsPaused(true);
+      } else {
+        timeout = setTimeout(() => {
+          setDisplayText(currentText.slice(0, displayText.length + 1));
+        }, 100); // Typing speed
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayText, isDeleting, isPaused, currentIndex, texts]);
+
+  return (
+    <span className="relative">
+      {displayText}
+      <span className="animate-pulse">|</span>
+    </span>
+  );
+};
+
 export default function Hero() {
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -427,12 +474,79 @@ export default function Hero() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </motion.div>
+
+            {/* Loved by creators section */}
+            <motion.div
+              className="mt-6 flex flex-col items-center sm:items-start"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <div className="flex items-center space-x-1 mb-2">
+                {[...Array(5)].map((_, i) => (
+                  <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                ))}
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="flex -space-x-2">
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-background bg-muted">
+                    <img 
+                      src="/Xprofiles/uAghazadae.jpg" 
+                      alt="Abbas Agha"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-background bg-muted">
+                    <img 
+                      src="/Xprofiles/chris.jpg" 
+                      alt="Chatbit"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-background bg-muted">
+                    <img 
+                      src="/Xprofiles/jackfriks.jpg" 
+                      alt="Jack Friks"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-background bg-muted">
+                    <img 
+                      src="/Xprofiles/laoddev.jpg" 
+                      alt="Laod"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+                <span className="text-sm text-muted-foreground ml-2">
+                  Loved by <AnimatedText />
+                </span>
+              </div>
+            </motion.div>
             
             {/* Free Security Scan */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.4 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
               className="mt-8 w-full"
             >
               {/* Commented out free scanner section
@@ -539,7 +653,7 @@ export default function Hero() {
               <img 
                 src="/design/hero.png"
                 alt="SecureVibing Scanner"
-                className="w-full h-auto rounded-2xl shadow-lg"
+                className="w-full h-auto rounded-2xl"
               />
             </div>
           </motion.div>

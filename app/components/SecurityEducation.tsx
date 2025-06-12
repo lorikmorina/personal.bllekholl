@@ -10,6 +10,10 @@ export default function SecurityEducation() {
       content: "API keys should never be included directly in frontend code. They can be used by attackers to access your services and potentially rack up large bills or steal data. Always use environment variables and server-side code to handle API requests."
     },
     {
+      title: "Supabase RLS Misconfiguration",
+      content: "Row Level Security (RLS) in Supabase is critical for protecting user data. Misconfigured RLS policies can allow unauthorized users to access, modify, or delete sensitive data belonging to other users. This can lead to massive data breaches, legal liabilities, loss of customer trust, and significant financial losses from regulatory fines and lawsuits. Always test your RLS policies thoroughly and ensure they properly restrict data access based on user authentication and authorization."
+    },
+    {
       title: "Missing Content Security Policy",
       content: "Content Security Policy (CSP) helps prevent XSS attacks by specifying which domains can load content on your website. Without it, attackers might be able to inject malicious scripts into your pages."
     },
