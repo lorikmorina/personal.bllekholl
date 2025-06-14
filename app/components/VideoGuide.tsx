@@ -95,20 +95,28 @@ const VideoGuide = () => {
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 playsInline
-                itemScope
-                itemType="https://schema.org/VideoObject"
               >
                 <source src="/SupacheckFinal.mp4" type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
-              
-              {/* Hidden metadata for video */}
-              <meta itemProp="name" content="Supacheck Quick Start Guide" />
-              <meta itemProp="description" content="Learn how to use Supacheck with our comprehensive video guide for website security scanning." />
-              <meta itemProp="thumbnailUrl" content="/video-thumbnail.jpg" />
-              <meta itemProp="uploadDate" content="2024-01-15" />
-              <meta itemProp="duration" content="PT5M30S" />
             </AspectRatio.Root>
+            
+            {/* Video structured data for Google Search Console */}
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{
+                __html: JSON.stringify({
+                  "@context": "https://schema.org",
+                  "@type": "VideoObject",
+                  "name": "Supacheck Quick Start Guide",
+                  "description": "Learn how to use Supacheck with our comprehensive video guide for website security scanning.",
+                  "thumbnailUrl": "https://securevibing.com/video-thumbnail.jpg",
+                  "uploadDate": "2025-06-14",
+                  "duration": "PT0M47S",
+                  "contentUrl": "https://securevibing.com/SupacheckFinal.mp4"
+                })
+              }}
+            />
             
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 flex items-center justify-between text-white transition-opacity duration-300 opacity-0 hover:opacity-100">
               <button 
