@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Tables to test - common table names in Supabase applications
-const TABLES_TO_TEST = ['profiles', 'users', 'accounts', 'auth', 'customers', 'orders', 'posts', 'comments'];
+const TABLES_TO_TEST = ['profiles', 'users', 'accounts', 'auth', 'customers', 'orders', 'posts', 'comments', 'subscriptions'];
 
 export async function POST(request: Request) {
   try {
