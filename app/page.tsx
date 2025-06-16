@@ -7,6 +7,7 @@ import SecurityEducation from "./components/SecurityEducation"
 import Marquee from "./components/Marquee"
 import NewsletterSubscribe from "./components/NewsletterSubscribe"
 import Timeline from "./components/Timeline"
+import CookieBanner from "./components/CookieBanner"
 
 export default function Home() {
   return (
@@ -22,6 +23,7 @@ export default function Home() {
       {/* <ContactForm /> */}
       <Timeline/>
       <NewsletterSubscribe />
+      <CookieBanner />
     </>
   )
 }
