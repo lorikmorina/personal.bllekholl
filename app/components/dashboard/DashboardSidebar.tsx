@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Globe, Home, Settings, CreditCard, Database, SearchCheck } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Clock, Home, Settings, CreditCard, Database, SearchCheck } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "./DashboardProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -107,7 +107,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
     {
       name: "Security Scan",
       value: "lightscan",
-      icon: <Globe className="h-5 w-5" />,
+      icon: <Clock className="h-5 w-5" />,
     },
     {
       name: "Reports",
@@ -163,7 +163,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 TOOLS
               </h3>
               
-              {/* Domains Management Tool - New at top */}
+              {/* Periodic Scans Tool - Rebranded from Domains */}
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
                   activeTool === 'domains' 
@@ -173,8 +173,8 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 onClick={() => setActiveTool('domains')}
               >
                 <div className="flex items-center">
-                  <Globe className="w-5 h-5 mr-3" />
-                  <span>Domains</span>
+                  <Clock className="w-5 h-5 mr-3" />
+                  <span>Periodic Scans</span>
                 </div>
                 <ChevronRight className="w-4 h-4" />
               </button>
