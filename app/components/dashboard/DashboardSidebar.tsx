@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Clock, Home, Settings, CreditCard, Database, SearchCheck } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Clock, Home, Settings, CreditCard, Database, Search } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "./DashboardProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -226,7 +226,21 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <ChevronRight className="w-4 h-4" />
               </button>
               
-              
+              {/* Subdomain Finder Tool - New button */}
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'subdomain-finder' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('subdomain-finder')}
+              >
+                <div className="flex items-center">
+                  <Search className="w-5 h-5 mr-3" />
+                  <span>Subdomain Finder</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
               
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
