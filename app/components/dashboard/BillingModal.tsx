@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, CreditCard, X } from "lucide-react"
+import { AlertTriangle, CreditCard, X, CheckCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -12,9 +12,10 @@ interface BillingModalProps {
   onClose: () => void
   userId: string
   currentPlan: string
+  subscriptionStatus?: string
 }
 
-export default function BillingModal({ isOpen, onClose, userId, currentPlan }: BillingModalProps) {
+export default function BillingModal({ isOpen, onClose, userId, currentPlan, subscriptionStatus }: BillingModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const supabase = createClient()
@@ -41,8 +42,8 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
       }
       
       toast({
-        title: "Subscription Cancelled",
-        description: "Your subscription has been cancelled. You'll have access until the end of your billing period.",
+        title: "Subscription Cancellation Scheduled",
+        description: "Your subscription has been scheduled for cancellation. You'll retain access until the end of your billing period.",
         duration: 5000,
       })
       
@@ -62,6 +63,10 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
       setIsLoading(false)
     }
   }
+
+  const isPaidPlan = currentPlan === 'monthly' || currentPlan === 'yearly'
+  const isCancelled = subscriptionStatus === 'cancelled'
+  const isActive = subscriptionStatus === 'active'
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -83,19 +88,49 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
                 ? 'You are on the yearly subscription plan ($159/year).'
                 : 'You are on the free plan.'}
             </div>
+            
+            {/* Show cancellation status */}
+            {isCancelled && isPaidPlan && (
+              <div className="mt-3 p-3 rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+                <div className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium text-sm">Cancellation Scheduled</span>
+                </div>
+                <p className="text-sm text-orange-700 dark:text-orange-400 mt-1">
+                  Your subscription is scheduled to cancel at the end of your billing period. You'll retain full access until then.
+                </p>
+              </div>
+            )}
           </div>
           
-          {(currentPlan === 'monthly' || currentPlan === 'yearly') && (
+          {/* Show cancellation option for active paid plans */}
+          {isPaidPlan && isActive && (
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
                 <h3 className="font-medium">Cancel Subscription</h3>
-                
               </div>
               
               <div className="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 rounded-md flex items-start gap-2 text-sm">
                 <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div>
-                  Cancelling will stop future billing and you'll lose scanning access, consider cancelling at the end of your billing period.
+                  Cancelling will schedule your subscription to end at the end of your current billing period. You'll retain full access until then.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Show information for cancelled subscriptions */}
+          {isCancelled && isPaidPlan && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium">Subscription Status</h3>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 p-3 rounded-md flex items-start gap-2 text-sm">
+                <CheckCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium mb-1">Cancellation in progress</p>
+                  <p>Your subscription will automatically end at the conclusion of your current billing period. No further charges will be made.</p>
                 </div>
               </div>
             </div>
@@ -108,7 +143,8 @@ export default function BillingModal({ isOpen, onClose, userId, currentPlan }: B
             Close
           </Button>
           
-          {(currentPlan === 'monthly' || currentPlan === 'yearly') && (
+          {/* Only show cancel button for active paid plans */}
+          {isPaidPlan && isActive && (
             <Button 
               variant="destructive" 
               onClick={handleCancelSubscription}

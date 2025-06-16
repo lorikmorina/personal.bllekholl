@@ -83,14 +83,14 @@ export async function POST(request: Request) {
     const payload = JSON.parse(rawBody);
     console.log('Received Paddle webhook:', payload);
 
-    // Handle transaction completion events
+    // Create Supabase client with service role to bypass RLS
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Handle transaction completion events (new subscriptions)
     if (payload.event_type === 'transaction.completed') {
-      // Create Supabase client with service role to bypass RLS
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-      
       // Extract data from the webhook payload
       const customData = payload.data.custom_data;
       if (!customData || !customData.userId || !customData.plan) {
@@ -146,6 +146,49 @@ export async function POST(request: Request) {
       }
       
       console.log(`Successfully updated user ${userId} to ${planType} plan. Response:`, data);
+      
+      return NextResponse.json({ success: true });
+    }
+
+    // Handle subscription cancellation events (when subscription actually ends)
+    if (payload.event_type === 'subscription.canceled') {
+      console.log('Processing subscription.canceled event:', payload);
+      
+      // Extract subscription ID from the payload
+      const subscriptionId = payload.data.id;
+      if (!subscriptionId) {
+        throw new Error('Missing subscription ID in cancellation webhook payload');
+      }
+      
+      // Find the user by their paddle_subscription_id
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, subscription_plan, subscription_status')
+        .eq('paddle_subscription_id', subscriptionId)
+        .single();
+      
+      if (profileError || !userProfile) {
+        console.error('Error finding user profile for cancelled subscription:', profileError);
+        throw new Error(`User not found for subscription ID: ${subscriptionId}`);
+      }
+      
+      // Update the user's subscription to free plan
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          subscription_plan: 'free',
+          subscription_status: 'canceled', // Update status to match Paddle
+          updated_at: new Date().toISOString()
+          // Keep paddle_subscription_id for record keeping
+        })
+        .eq('id', userProfile.id);
+      
+      if (updateError) {
+        console.error('Error updating user profile after subscription cancellation:', updateError);
+        throw updateError;
+      }
+      
+      console.log(`Successfully updated user ${userProfile.id} to free plan after subscription cancellation`);
       
       return NextResponse.json({ success: true });
     }

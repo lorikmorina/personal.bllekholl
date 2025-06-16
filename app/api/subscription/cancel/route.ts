@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     // 1. Get user's profile including paddle_subscription_id
     const { data: userProfile, error: profileError } = await supabase
       .from('profiles')
-      .select('subscription_plan, paddle_subscription_id') // Select the paddle ID
+      .select('subscription_plan, paddle_subscription_id, subscription_status')
       .eq('id', userId)
       .single();
     
@@ -73,44 +73,48 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // 3. Check if subscription is already cancelled
+    if (userProfile.subscription_status === 'cancelled') {
+      return NextResponse.json(
+        { success: false, message: 'Subscription is already scheduled for cancellation' },
+        { status: 400 }
+      );
+    }
     
     if (!userProfile.paddle_subscription_id) {
       console.warn(`User ${userId} has a paid plan but no paddle_subscription_id.`);
-      // Decide how to handle this: error out, or just update DB?
-      // For now, let's error out as cancellation requires the ID.
       return NextResponse.json(
         { success: false, message: 'Paddle subscription ID not found. Cannot cancel with provider.' },
         { status: 400 }
       );
     }
     
-    // 3. Call Paddle API to cancel the subscription
+    // 4. Call Paddle API to cancel the subscription (schedules cancellation at end of period)
     try {
       await cancelPaddleSubscription(userProfile.paddle_subscription_id);
     } catch (paddleError: any) {
       console.error('Error cancelling subscription via Paddle API:', paddleError);
       return NextResponse.json(
         { success: false, message: paddleError.message || 'Failed to cancel subscription with Paddle.' },
-        { status: 500 } // Internal Server Error or specific Paddle error?
+        { status: 500 }
       );
     }
     
-    // 4. If Paddle cancellation is successful, update Supabase profile
+    // 5. Update only the subscription_status to 'cancelled', keep the plan unchanged
+    // This way user retains access until the end of the billing period
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
-        subscription_plan: 'free',
-        // Optionally clear paddle_subscription_id or set a status like 'cancelling'
-        // paddle_subscription_id: null, 
-        subscription_status: 'cancelled', // Add status tracking
+        subscription_status: 'cancelled', // Mark as cancelled but keep access
         updated_at: new Date().toISOString()
+        // NOTE: We DON'T change subscription_plan here - it stays 'monthly' or 'yearly'
+        // This will be changed to 'free' when Paddle sends the subscription.canceled webhook
       })
       .eq('id', userId);
     
     if (updateError) {
       console.error('Error updating user profile after Paddle cancellation:', updateError);
-      // Even if DB update fails, Paddle cancellation was initiated.
-      // Consider logging this for manual review.
       return NextResponse.json(
         { success: false, message: 'Subscription cancelled with Paddle, but failed to update local status.' },
         { status: 500 }
@@ -119,7 +123,7 @@ export async function POST(request: Request) {
     
     return NextResponse.json({
       success: true,
-      message: 'Subscription cancellation initiated successfully. Access will be removed at the end of the billing period.'
+      message: 'Subscription cancellation scheduled successfully. You\'ll retain access until the end of your billing period.'
     });
     
   } catch (error: any) {
