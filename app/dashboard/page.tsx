@@ -10,7 +10,7 @@ import DeepScanTool from "@/app/components/dashboard/tools/DeepScanTool"
 import DashboardProvider from "@/app/components/dashboard/DashboardProvider"
 
 export default function DashboardPage() {
-  const [activeTool, setActiveTool] = useState("domains")
+  const [activeTool, setActiveTool] = useState("light-scan")
   
   return (
     <DashboardProvider>
