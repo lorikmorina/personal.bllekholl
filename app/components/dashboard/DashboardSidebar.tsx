@@ -307,6 +307,7 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
           onClose={() => setIsBillingModalOpen(false)}
           userId={user.id}
           currentPlan={userProfile.subscription_plan || 'free'}
+          subscriptionStatus={userProfile.subscription_status}
         />
       )}
     </>

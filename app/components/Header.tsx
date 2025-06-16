@@ -27,6 +27,7 @@ export default function Header() {
   const [loading, setLoading] = useState(true)
   const [userPlan, setUserPlan] = useState('free')
   const [isBillingModalOpen, setIsBillingModalOpen] = useState(false)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | undefined>(undefined)
   const { theme, setTheme } = useTheme()
   const router = useRouter()
   const supabase = createClient()
@@ -45,12 +46,13 @@ export default function Header() {
         try {
           const { data, error } = await supabase
             .from('profiles')
-            .select('subscription_plan')
+            .select('subscription_plan, subscription_status')
             .eq('id', session.user.id)
             .single()
           
           if (!error && data) {
             setUserPlan(data.subscription_plan || 'free')
+            setSubscriptionStatus(data.subscription_status)
           }
         } catch (error) {
           console.error('Error fetching user plan:', error)
@@ -369,6 +371,7 @@ export default function Header() {
           onClose={closeBillingModal} 
           userId={user.id} 
           currentPlan={userPlan}
+          subscriptionStatus={subscriptionStatus}
         />
       )}
     </motion.header>
