@@ -57,7 +57,8 @@ const TwitterPostMarquee = () => {
         verified: true
       },
       content: "yesterday @lorikmor said me that i have a bug on my website.\n\nI want to say thanks to @lorikmor for catching my supabase bug and helping me fix it.\n\nAlso his app @SecureVibing is awesome to find website vulnerabilities. go check it out vibe coders",
-      date: "2h"
+      date: "2h",
+      url: "https://x.com/uAghazadae/status/1916512722298057065" // Add actual Twitter URL here
     },
     {
       id: 2,
@@ -68,7 +69,8 @@ const TwitterPostMarquee = () => {
         verified: true
       },
       content: "Check out Lorik's @SecureVibing to make sure your product works as intended!!",
-      date: "1d"
+      date: "1d",
+      url: "https://x.com/chrissyinspace/status/1930774747945836958" // Add actual Twitter URL here
     },
     {
       id: 3,
@@ -79,7 +81,8 @@ const TwitterPostMarquee = () => {
         verified: true
       },
       content: "this guy could have just said nothing and let himself have free access forever too \n\n go try his tool and secure your apps!!! @SecureVibing",
-      date: "1d"
+      date: "1d",
+      url: "https://x.com/jackfriks/status/1918337395591696509" // Add actual Twitter URL here
     },
     {
       id: 4,
@@ -89,8 +92,9 @@ const TwitterPostMarquee = () => {
         avatar: "/Xprofiles/laoddev.jpg",
         verified: true
       },
-      content: "thanks to @SecureVibing I was able to make my app @waitlaunch much more secure.",
-      date: "1d"
+      content: "true, everyone should be using  @SecureVibing",
+      date: "1d",
+      url: "https://x.com/laoddev/status/1926964976343793771" // Add actual Twitter URL here
     }
   ];
 
@@ -149,9 +153,12 @@ const TwitterPostMarquee = () => {
         
         <div className="flex animate-marquee py-4">
           {posts.concat(posts).map((post, index) => (
-            <div 
-              key={`${post.id}-${index}`} 
-              className="min-w-[300px] sm:min-w-[320px] max-w-[300px] sm:max-w-[320px] bg-card p-4 rounded-xl border border-border shadow-sm mx-3 flex flex-col hover:shadow-md transition-shadow"
+            <a
+              key={`${post.id}-${index}`}
+              href={post.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="min-w-[300px] sm:min-w-[320px] max-w-[300px] sm:max-w-[320px] bg-card p-4 rounded-xl border border-border shadow-sm mx-3 flex flex-col hover:shadow-md transition-all duration-200 hover:scale-[1.02] cursor-pointer no-underline"
             >
               <div className="flex items-start mb-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-muted mr-3 flex-shrink-0">
@@ -205,7 +212,7 @@ const TwitterPostMarquee = () => {
                   dangerouslySetInnerHTML={formatTweetContent(post.content)}
                 ></p>
               </div>
-            </div>
+            </a>
           ))}
         </div>
       </div>
