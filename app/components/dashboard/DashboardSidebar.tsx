@@ -226,6 +226,22 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 <ChevronRight className="w-4 h-4" />
               </button>
               
+              {/* SupabaseDeepScan Tool - New button */}
+              <button 
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                  activeTool === 'supabase-deep-scan' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'text-foreground hover:bg-secondary/10'
+                }`}
+                onClick={() => setActiveTool('supabase-deep-scan')}
+              >
+                <div className="flex items-center">
+                  <Database className="w-5 h-5 mr-3" />
+                  <span>SupabaseDeepScan</span>
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
               {/* Subdomain Finder Tool - New button */}
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
@@ -241,6 +257,8 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
                 </div>
                 <ChevronRight className="w-4 h-4" />
               </button>
+              
+              
               
               <button 
                 className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${

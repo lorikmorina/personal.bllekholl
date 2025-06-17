@@ -563,8 +563,6 @@ export default function SubdomainFinderTool() {
           isOpen={isPaywallOpen}
           onClose={() => setIsPaywallOpen(false)}
           onUpgrade={handleUpgrade}
-          feature="Subdomain Finder"
-          description="Discover hidden subdomains using enterprise-grade techniques including port scanning, DNS enumeration, and Certificate Transparency analysis."
         />
       )}
     </div>
