@@ -1101,9 +1101,9 @@ export default function LightScanTool() {
                 <p className="text-xs text-muted-foreground mt-4">
                   Scanned {result.jsFilesScanned} JavaScript files for potential API keys and sensitive information.
                 </p>
-                <p className="text-xs text-muted-foreground mt-1 opacity-70">
+                {/* <p className="text-xs text-muted-foreground mt-1 opacity-70">
                   For a custom and thorough scan of your website consider checking <a href="https://audit.securevibing.com" target="_blank" rel="noopener noreferrer" className="hover:underline">audit.securevibing.com</a>
-                </p>
+                </p> */}
               </div>
             </CardContent>
           </Card>
