@@ -122,9 +122,9 @@ const TwitterPostMarquee = () => {
         transition={{ duration: 0.5, staggerChildren: 0.2 }}
       >
         {[
-          { numericValue: 20, prefix: "$", suffix: "k+", label: "Saved", colorClass: "text-green-500" },
-          { numericValue: 100, prefix: "", suffix: "+", label: "Websites Scanned", colorClass: "text-blue-500" },
-          { numericValue: 10000, prefix: "", suffix: "+", label: "Users Data Secured", colorClass: "text-red-500" },
+          { numericValue: 50, prefix: "$", suffix: "k+", label: "Saved", colorClass: "text-green-500" },
+          { numericValue: 100, prefix: "", suffix: "+", label: "Startups Secured", colorClass: "text-blue-500" },
+          { numericValue: 500000, prefix: "", suffix: "+", label: "Users Data Secured", colorClass: "text-red-500" },
         ].map((stat, index) => (
           <motion.div 
             key={index} 
