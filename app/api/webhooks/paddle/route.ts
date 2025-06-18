@@ -118,8 +118,7 @@ export async function POST(request: Request) {
           .update({
             payment_status: 'completed',
             status: 'processing',
-            paddle_transaction_id: transactionId,
-            updated_at: new Date().toISOString()
+            paddle_transaction_id: transactionId
           })
           .eq('id', requestId);
         
@@ -196,8 +195,7 @@ export async function POST(request: Request) {
         .update({ 
           subscription_plan: planType,
           paddle_subscription_id: subscriptionId,
-          subscription_status: 'active',
-          updated_at: new Date().toISOString()
+          subscription_status: 'active'
         })
         .eq('id', userId)
         .select();
@@ -239,8 +237,7 @@ export async function POST(request: Request) {
         .from('profiles')
         .update({
           subscription_plan: 'free',
-          subscription_status: 'canceled', // Update status to match Paddle
-          updated_at: new Date().toISOString()
+          subscription_status: 'canceled'
           // Keep paddle_subscription_id for record keeping
         })
         .eq('id', userProfile.id);

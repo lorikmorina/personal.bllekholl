@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     // Update status to processing
     await supabase
       .from('deep_scan_requests')
-      .update({ status: 'processing', updated_at: new Date().toISOString() })
+      .update({ status: 'processing' })
       .eq('id', deep_scan_request_id);
 
     // Start the comprehensive scan in the background
@@ -74,8 +74,7 @@ export async function POST(request: NextRequest) {
           .from('deep_scan_requests')
           .update({
             status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown scan error',
-            updated_at: new Date().toISOString()
+            error_message: error instanceof Error ? error.message : 'Unknown scan error'
           })
           .eq('id', deep_scan_request_id);
       }
@@ -180,8 +179,7 @@ async function performComprehensiveScan(scanRequest: any, supabase: any) {
         status: 'completed',
         scan_results: scanResults,
         pdf_url: pdfUrl,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        completed_at: new Date().toISOString()
       })
       .eq('id', requestId);
 
