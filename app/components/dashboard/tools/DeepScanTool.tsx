@@ -164,30 +164,30 @@ export default function DeepScanTool() {
   }, [paddleLoaded, supabase, toast]);
 
   // Fetch user's deep scan requests
-  const fetchUserRequests = async () => {
-    if (!user) {
-      setIsLoadingRequests(false);
+    const fetchUserRequests = async () => {
+      if (!user) {
+        setIsLoadingRequests(false);
       setUserRequests([]);
-      return;
-    }
-    setIsLoadingRequests(true);
-    try {
-      const { data, error } = await supabase
-        .from('deep_scan_requests')
+        return;
+      }
+      setIsLoadingRequests(true);
+      try {
+        const { data, error } = await supabase
+          .from('deep_scan_requests')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setUserRequests(data || []);
-    } catch (error: any) {
-      console.error("Error fetching user's deep scan requests:", error);
-      setDeepScanMessage({ type: 'error', text: "Could not load your past requests." });
-      setUserRequests([]);
-    } finally {
-      setIsLoadingRequests(false);
-    }
-  };
+        if (error) throw error;
+        setUserRequests(data || []);
+      } catch (error: any) {
+        console.error("Error fetching user's deep scan requests:", error);
+        setDeepScanMessage({ type: 'error', text: "Could not load your past requests." });
+        setUserRequests([]);
+      } finally {
+        setIsLoadingRequests(false);
+      }
+    };
 
   useEffect(() => {
     fetchUserRequests();
@@ -855,89 +855,89 @@ export default function DeepScanTool() {
         strategy="lazyOnload"
       />
       
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="space-y-6"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl flex items-center">
-              <SearchCheck className="mr-2 h-6 w-6 text-primary" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center">
+            <SearchCheck className="mr-2 h-6 w-6 text-primary" />
               Deep Security Scan
-            </CardTitle>
-            <CardDescription className="pt-1">
+          </CardTitle>
+          <CardDescription className="pt-1">
               Comprehensive automated security analysis of your website. Get detailed insights about vulnerabilities, API exposures, and security misconfigurations.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
             {/* Enhanced informational list */}
-            <div className="mb-6 space-y-4 text-sm">
+          <div className="mb-6 space-y-4 text-sm">
               <h3 className="text-lg font-semibold text-foreground mb-3">What You Get:</h3>
-              <ul className="space-y-3">
-                <li className="flex items-start">
-                  <CheckCircle className="w-5 h-5 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
-                  <div>
+            <ul className="space-y-3">
+              <li className="flex items-start">
+                <CheckCircle className="w-5 h-5 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
+                <div>
                     <span className="font-semibold text-foreground">Comprehensive Analysis:</span> Advanced automated scanning for API keys, database misconfigurations, authentication bypasses, and security headers.
-                  </div>
-                </li>
-                <li className="flex items-start">
+                </div>
+              </li>
+              <li className="flex items-start">
                   <Target className="w-5 h-5 mr-3 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <div>
+                <div>
                     <span className="font-semibold text-foreground">JWT Token Testing:</span> Optional authenticated scanning with your JWT token to test user-specific endpoints and permissions.
-                  </div>
-                </li>
-                <li className="flex items-start">
+                </div>
+              </li>
+              <li className="flex items-start">
                   <FileText className="w-5 h-5 mr-3 mt-0.5 text-purple-500 flex-shrink-0" />
-                  <div>
+                <div>
                     <span className="font-semibold text-foreground">Detailed Reporting:</span> Receive a comprehensive security report with findings, risk levels, and actionable remediation recommendations.
-                  </div>
-                </li>
-                <li className="flex items-start">
+                </div>
+              </li>
+              <li className="flex items-start">
                   <Zap className="w-5 h-5 mr-3 mt-0.5 text-yellow-500 flex-shrink-0" />
-                  <div>
+                <div>
                     <span className="font-semibold text-foreground">Fast Results:</span> Automated analysis typically completes within minutes, with results available in your dashboard.
-                  </div>
-                </li>
-              </ul>
-            </div>
+                </div>
+              </li>
+            </ul>
+          </div>
 
-            <form onSubmit={handleDeepScanSubmit} className="space-y-4">
-              <div>
+          <form onSubmit={handleDeepScanSubmit} className="space-y-4">
+            <div>
                 <label htmlFor="deepScanUrl" className="block text-sm font-medium text-foreground mb-1">
                   Website URL
-                </label>
-                <div className={`flex flex-1 rounded-md overflow-hidden border ${
-                  deepScanUrlValidation?.valid === false 
-                    ? 'border-red-400 dark:border-red-700' 
-                    : deepScanUrlValidation?.valid === true 
-                      ? 'border-green-400 dark:border-green-700' 
-                      : 'border-input'
-                }`}>
-                  <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
-                    https://
-                  </div>
-                  <Input
-                    type="text"
-                    id="deepScanUrl"
-                    placeholder="example.com"
-                    value={deepScanUrl}
-                    onChange={handleDeepScanUrlChange}
-                    required
-                    className="flex-1 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
+              </label>
+              <div className={`flex flex-1 rounded-md overflow-hidden border ${
+                deepScanUrlValidation?.valid === false 
+                  ? 'border-red-400 dark:border-red-700' 
+                  : deepScanUrlValidation?.valid === true 
+                    ? 'border-green-400 dark:border-green-700' 
+                    : 'border-input'
+              }`}>
+                <div className="flex items-center bg-muted px-3 text-muted-foreground font-medium border-r border-input">
+                  https://
                 </div>
-                {deepScanUrlValidation && (
-                  <div className={`text-xs mt-1 ${
-                    deepScanUrlValidation.valid 
-                      ? 'text-green-600 dark:text-green-400' 
-                      : 'text-red-600 dark:text-red-400'
-                  }`}>
-                    {deepScanUrlValidation.message}
-                  </div>
-                )}
+                <Input
+                  type="text"
+                    id="deepScanUrl"
+                  placeholder="example.com"
+                    value={deepScanUrl}
+                  onChange={handleDeepScanUrlChange}
+                  required
+                  className="flex-1 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
               </div>
+              {deepScanUrlValidation && (
+                <div className={`text-xs mt-1 ${
+                  deepScanUrlValidation.valid 
+                    ? 'text-green-600 dark:text-green-400' 
+                    : 'text-red-600 dark:text-red-400'
+                }`}>
+                  {deepScanUrlValidation.message}
+                </div>
+              )}
+            </div>
 
               <div>
                 <label htmlFor="jwtToken" className="block text-sm font-medium text-foreground mb-1">
@@ -957,75 +957,75 @@ export default function DeepScanTool() {
                 <p className="text-xs text-muted-foreground mt-1">
                   Provide a JWT token to test authenticated endpoints and user permissions (optional but recommended for logged-in user testing)
                 </p>
-              </div>
+            </div>
 
-              <Alert className="bg-primary/5 border-primary/20">
-                <Info className="h-4 w-4 text-primary" />
+            <Alert className="bg-primary/5 border-primary/20">
+              <Info className="h-4 w-4 text-primary" />
                 <AlertTitle className="font-semibold text-primary">One-Time Payment: $4</AlertTitle>
-                <AlertDescription>
-                  This is a one-time payment for a comprehensive deep scan of the specified domain. 
+              <AlertDescription>
+                This is a one-time payment for a comprehensive deep scan of the specified domain. 
                   Payment will be processed securely via Paddle.
-                </AlertDescription>
+              </AlertDescription>
+            </Alert>
+
+            {deepScanMessage && (
+              <Alert variant={deepScanMessage.type === 'error' ? 'destructive' : 'default'} className={`${deepScanMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : ''}`}>
+                <AlertTitle>{deepScanMessage.type === 'success' ? 'Success' : 'Error'}</AlertTitle>
+                <AlertDescription>{deepScanMessage.text}</AlertDescription>
               </Alert>
+            )}
 
-              {deepScanMessage && (
-                <Alert variant={deepScanMessage.type === 'error' ? 'destructive' : 'default'} className={`${deepScanMessage.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : ''}`}>
-                  <AlertTitle>{deepScanMessage.type === 'success' ? 'Success' : 'Error'}</AlertTitle>
-                  <AlertDescription>{deepScanMessage.text}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button 
-                type="submit" 
+            <Button 
+              type="submit" 
                 disabled={isDeepScanLoading || !user || deepScanUrlValidation?.valid === false || !paddleLoaded}
-                className="w-full sm:w-auto"
-              >
-                {isDeepScanLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing Request...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-4 w-4" />
-                    Request Deep Scan ($4)
-                  </>
-                )}
-              </Button>
-              {!user && (
-                   <p className="text-xs text-red-600 dark:text-red-400 mt-2">Please log in to request a deep scan.</p>
-              )}
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Your Deep Scan Requests Section */}
-        {user && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl flex items-center">
-                <ListChecks className="mr-2 h-6 w-6 text-primary" />
-                Your Deep Scan Requests
-              </CardTitle>
-              <CardDescription>
-                Track the status of your deep security scan requests and download completed reports.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoadingRequests ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="ml-3 text-muted-foreground">Loading your requests...</p>
-                </div>
-              ) : userRequests.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">You haven't made any deep scan requests yet.</p>
-                </div>
+              className="w-full sm:w-auto"
+            >
+              {isDeepScanLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing Request...
+                </>
               ) : (
-                <ul className="space-y-4">
-                  {userRequests.map((request) => (
-                    <li key={request.id} className="p-4 border rounded-lg bg-card hover:shadow-md transition-shadow">
+                <>
+                  <Zap className="mr-2 h-4 w-4" />
+                    Request Deep Scan ($4)
+                </>
+              )}
+            </Button>
+            {!user && (
+                 <p className="text-xs text-red-600 dark:text-red-400 mt-2">Please log in to request a deep scan.</p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Your Deep Scan Requests Section */}
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center">
+              <ListChecks className="mr-2 h-6 w-6 text-primary" />
+              Your Deep Scan Requests
+            </CardTitle>
+            <CardDescription>
+                Track the status of your deep security scan requests and download completed reports.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRequests ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-3 text-muted-foreground">Loading your requests...</p>
+              </div>
+            ) : userRequests.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">You haven't made any deep scan requests yet.</p>
+              </div>
+            ) : (
+              <ul className="space-y-4">
+                {userRequests.map((request) => (
+                  <li key={request.id} className="p-4 border rounded-lg bg-card hover:shadow-md transition-shadow">
                       <div className="flex flex-col sm:flex-row justify-between sm:items-start mb-3">
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-primary break-all mb-1">{request.url}</h3>
@@ -1042,13 +1042,13 @@ export default function DeepScanTool() {
                         <div className="flex items-center gap-2 mt-2 sm:mt-0">
                           {getRequestActions(request)}
                         </div>
-                      </div>
+                    </div>
                       
                       <div className="text-sm text-muted-foreground space-y-1">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1.5 text-muted-foreground/70" />
-                          Requested: {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-1.5 text-muted-foreground/70" />
+                        Requested: {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                         {request.completed_at && (
                           <div className="flex items-center">
                             <CheckCircle className="w-4 h-4 mr-1.5 text-green-500" />
@@ -1062,20 +1062,20 @@ export default function DeepScanTool() {
                           </div>
                         )}
                         {request.scan_results && request.scan_results.overall_score && (
-                          <div className="flex items-center">
+                      <div className="flex items-center">
                             <Target className="w-4 h-4 mr-1.5 text-primary" />
                             Security Score: {request.scan_results.overall_score}/100
                           </div>
                         )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </motion.div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </motion.div>
 
       {/* Report Modal */}
       {showReportModal && selectedRequest && (
@@ -1111,4 +1111,4 @@ export default function DeepScanTool() {
       )}
     </>
   )
-}
+} 

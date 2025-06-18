@@ -8,7 +8,18 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
-    if (!authHeader || !authHeader.includes(serviceKey!)) {
+    // Check for proper Bearer token format OR direct service key inclusion
+    const isAuthorized = authHeader && (
+      authHeader === `Bearer ${serviceKey}` || 
+      authHeader.includes(serviceKey!)
+    );
+    
+    if (!isAuthorized) {
+      console.error('Orchestrator authorization failed:', {
+        hasAuthHeader: !!authHeader,
+        authHeaderFormat: authHeader ? 'Bearer ***' : 'none',
+        expectedFormat: 'Bearer <service_key>'
+      });
       return NextResponse.json(
         { error: 'Unauthorized - Service key required' },
         { status: 401 }
