@@ -89,9 +89,79 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Handle transaction completion events (new subscriptions)
+    // Handle transaction completion events
     if (payload.event_type === 'transaction.completed') {
-      // Extract data from the webhook payload
+      // Get the item from the transaction
+      const item = payload.data.items[0];
+      if (!item || !item.price) {
+        throw new Error('Missing price information in webhook payload');
+      }
+      
+      const priceId = item.price.id;
+      const transactionId = payload.data.id;
+      
+      // Check if this is a deep scan payment
+      if (priceId === process.env.NEXT_PUBLIC_PADDLE_DEEP_SCAN_PRICE_ID) {
+        console.log('Processing deep scan payment:', payload);
+        
+        // Extract custom data containing deep scan request ID
+        const customData = payload.data.custom_data;
+        if (!customData || !customData.deep_scan_request_id) {
+          throw new Error('Missing deep_scan_request_id in webhook payload');
+        }
+        
+        const requestId = customData.deep_scan_request_id;
+        
+        // Update the deep scan request with payment completion
+        const { error: updateError } = await supabase
+          .from('deep_scan_requests')
+          .update({
+            payment_status: 'completed',
+            status: 'processing',
+            paddle_transaction_id: transactionId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', requestId);
+        
+        if (updateError) {
+          console.error('Error updating deep scan request:', updateError);
+          throw updateError;
+        }
+        
+        console.log(`Successfully updated deep scan request ${requestId} - payment completed, scan processing started`);
+        
+        // TODO: Trigger background scan job here
+        // This could be a queue job, webhook to another service, or API call
+        try {
+          // Call the scan orchestrator API
+          const scanResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` // For internal API authentication
+            },
+            body: JSON.stringify({ 
+              deep_scan_request_id: requestId 
+            })
+          });
+          
+          if (!scanResponse.ok) {
+            const errorText = await scanResponse.text();
+            console.error('Failed to trigger scan orchestrator:', errorText);
+            // Don't throw here - payment was successful, just log the issue
+            // The scan can be retried manually or via cron
+          } else {
+            console.log('Successfully triggered scan orchestrator for request:', requestId);
+          }
+        } catch (scanError) {
+          console.error('Error triggering scan orchestrator:', scanError);
+          // Don't throw - payment processing should complete successfully
+        }
+        
+        return NextResponse.json({ success: true });
+      }
+      
+      // Handle subscription payments (existing logic)
       const customData = payload.data.custom_data;
       if (!customData || !customData.userId || !customData.plan) {
         throw new Error('Missing custom data in webhook payload');
@@ -100,14 +170,6 @@ export async function POST(request: Request) {
       const userId = customData.userId;
       const selectedPlan = customData.plan;
       
-      // Get the item from the transaction
-      const item = payload.data.items[0];
-      if (!item || !item.price) {
-        throw new Error('Missing price information in webhook payload');
-      }
-      
-      // Verify the price ID matches what we expect
-      const priceId = item.price.id;
       let planType;
       
       // Determine the correct plan based on the price ID

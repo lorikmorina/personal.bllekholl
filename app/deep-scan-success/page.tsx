@@ -1,103 +1,133 @@
-'use client'
+"use client"
 
-import Link from 'next/link'
-import { CheckCircle, Mail, Home } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { motion } from 'framer-motion'
-import ReactConfetti from 'react-confetti'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from "react"
+import { motion } from "framer-motion"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { CheckCircle, Loader2, Clock, FileText, Mail, ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function DeepScanSuccessPage() {
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [timeRemaining, setTimeRemaining] = useState(10)
 
   useEffect(() => {
-    // Show confetti for a few seconds
-    setShowConfetti(true);
-    const timer = setTimeout(() => setShowConfetti(false), 7000); // Confetti for 7 seconds
+    const timer = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          window.location.href = '/dashboard'
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
 
-    // Get window dimensions for confetti
-    const handleResize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-    
-    window.addEventListener('resize', handleResize);
-    handleResize(); // Initial size
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+    return () => clearInterval(timer)
+  }, [])
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-6 text-center relative overflow-hidden">
-      {showConfetti && windowSize.width > 0 && (
-        <ReactConfetti
-          width={windowSize.width}
-          height={windowSize.height}
-          recycle={false}
-          numberOfPieces={300}
-          gravity={0.1}
-          initialVelocityY={20}
-          tweenDuration={5000}
-        />
-      )}
-      <div className="bg-card p-8 sm:p-12 rounded-xl shadow-2xl max-w-lg w-full z-10">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.2 }}
-          className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
-        >
-          <CheckCircle className="h-12 w-12 text-green-500 dark:text-green-400" />
-        </motion.div>
-
-        <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-          Thank You!
-        </h1>
-        <p className="text-muted-foreground text-lg mb-8">
-          Your Deep Scan request has been successfully submitted and payment is confirmed. Our team will begin processing your request shortly.
-        </p>
-
-        <div className="bg-secondary/30 dark:bg-secondary/50 p-6 rounded-lg mb-8 text-left">
-          <h2 className="text-xl font-semibold text-foreground mb-3 flex items-center">
-            <Mail className="w-5 h-5 mr-2 text-primary" />
-            Codebase Submission (If Applicable)
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            If you opted to provide your website's codebase for a more in-depth analysis, please send a <strong>.zip</strong> file containing your code to:
-          </p>
-          <p className="font-semibold text-primary text-lg my-2 break-all">
-            lorik@securevibing.com
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Please include the domain name you submitted in the subject line of your email. This will help us match your codebase to your request quickly.
-          </p>
-        </div>
-
-        <div className="space-y-3 sm:flex sm:space-y-0 sm:space-x-4 justify-center">
-          <Link href="/dashboard">
-            <Button 
-              variant="outline"
-              className="w-full sm:w-auto bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary"
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-950/20 dark:to-blue-950/20 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-2xl"
+      >
+        <Card className="text-center">
+          <CardHeader className="pb-6">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="mx-auto mb-4"
             >
-              <Home className="mr-2 h-4 w-4" />
-              Go to Dashboard
-            </Button>
-          </Link>
-          <Link href="mailto:lorik@securevibing.com">
-            <Button className="w-full sm:w-auto">
-              <Mail className="mr-2 h-4 w-4" />
-              Email Codebase Now
-            </Button>
-          </Link>
-        </div>
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+              </div>
+            </motion.div>
+            <CardTitle className="text-3xl text-green-700 dark:text-green-300">
+              Payment Successful!
+            </CardTitle>
+            <CardDescription className="text-lg mt-2">
+              Your deep security scan has been initiated and is now processing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-center mb-3">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin text-blue-600 dark:text-blue-400" />
+                <span className="font-semibold text-blue-700 dark:text-blue-300">
+                  Scan In Progress
+                </span>
+              </div>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                Our AI and security experts are now analyzing your website. This process typically takes 15-30 minutes.
+              </p>
+            </div>
 
-        <p className="text-xs text-muted-foreground mt-10">
-          You will receive an email confirmation shortly. If you have any questions, please don't hesitate to contact our support team.
-        </p>
-      </div>
+            <div className="grid md:grid-cols-2 gap-4 text-left">
+              <div className="flex items-start space-x-3 p-4 bg-card border rounded-lg">
+                <Clock className="w-5 h-5 mt-0.5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Processing Time</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Most scans complete within 15-30 minutes. Complex sites may take up to 1 hour.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3 p-4 bg-card border rounded-lg">
+                <Mail className="w-5 h-5 mt-0.5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Email Notification</h3>
+                  <p className="text-xs text-muted-foreground">
+                    You'll receive an email when your scan is complete with your security report.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3 p-4 bg-card border rounded-lg">
+                <FileText className="w-5 h-5 mt-0.5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Detailed Report</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Your comprehensive security analysis will be available in your dashboard.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-3 p-4 bg-card border rounded-lg">
+                <CheckCircle className="w-5 h-5 mt-0.5 text-primary" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Next Steps</h3>
+                  <p className="text-xs text-muted-foreground">
+                    If you selected codebase analysis, please email your code to lorik@securevibing.com
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground mb-4">
+                Redirecting to dashboard in {timeRemaining} seconds...
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild>
+                  <Link href="/dashboard">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Go to Dashboard
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/tools">
+                    View All Tools
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
-  );
+  )
 } 
