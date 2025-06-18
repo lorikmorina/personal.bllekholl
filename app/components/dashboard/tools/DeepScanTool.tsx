@@ -6,12 +6,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Zap, Info, SearchCheck, ListChecks, FileText, Clock, CheckCircle, Target, Download, CreditCard, AlertCircle, Key } from "lucide-react"
+import { Loader2, Zap, Info, SearchCheck, ListChecks, FileText, Clock, CheckCircle, Target, Download, CreditCard, AlertCircle, Key, Shield, Database, AlertTriangle } from "lucide-react"
 import { useDashboard } from "../DashboardProvider"
 import { createClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
 import Script from "next/script"
 import { useToast } from "@/hooks/use-toast"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 declare global {
   interface Window {
@@ -91,6 +92,8 @@ export default function DeepScanTool() {
   
   const [userRequests, setUserRequests] = useState<DeepScanRequest[]>([])
   const [isLoadingRequests, setIsLoadingRequests] = useState(true)
+  const [selectedRequest, setSelectedRequest] = useState<DeepScanRequest | null>(null)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const { user } = useDashboard()
   const supabase = createClient()
@@ -332,14 +335,28 @@ export default function DeepScanTool() {
 
   // Function to get available actions for each request
   const getRequestActions = (request: DeepScanRequest) => {
-    if (request.status === 'completed' && request.pdf_url) {
+    if (request.status === 'completed' && request.scan_results) {
       return (
-        <Button size="sm" asChild>
-          <a href={request.pdf_url} download>
-            <Download className="w-4 h-4 mr-1" />
-            Download Report
-          </a>
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            size="sm" 
+            onClick={() => {
+              setSelectedRequest(request)
+              setShowReportModal(true)
+            }}
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            View Report
+          </Button>
+          {request.pdf_url && (
+            <Button size="sm" variant="outline" asChild>
+              <a href={request.pdf_url} download>
+                <Download className="w-4 h-4 mr-1" />
+                Download PDF
+              </a>
+            </Button>
+          )}
+        </div>
       );
     }
     
@@ -395,6 +412,439 @@ export default function DeepScanTool() {
     }
     
     return null;
+  };
+
+  // Helper function to format and display scan results
+  const formatScanResults = (results: any) => {
+    if (!results) return "No scan results available";
+
+    const {
+      scan_metadata,
+      security_headers,
+      api_keys_and_leaks,
+      supabase_analysis,
+      subdomain_analysis,
+      authenticated_analysis,
+      overall_score,
+      risk_summary
+    } = results;
+
+    return (
+      <div className="space-y-6">
+        {/* Scan Overview */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            🚀 Super Scan Overview
+            {scan_metadata?.scan_type === 'super_scan' && (
+              <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                v2.0
+              </span>
+            )}
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className={`text-3xl font-bold ${
+                overall_score >= 80 ? 'text-green-600' : 
+                overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {overall_score || 0}
+              </div>
+              <div className="text-sm text-gray-600">Overall Security Score</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-800">
+                {scan_metadata?.duration_ms ? `${Math.round(scan_metadata.duration_ms / 1000)}s` : 'N/A'}
+              </div>
+              <div className="text-sm text-gray-600">Scan Duration</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-800">
+                {scan_metadata?.started_at ? new Date(scan_metadata.started_at).toLocaleDateString() : 'N/A'}
+              </div>
+              <div className="text-sm text-gray-600">Scan Date</div>
+            </div>
+          </div>
+          
+          {/* Risk Summary */}
+          {risk_summary && (
+            <div className="mt-4 grid grid-cols-4 gap-2">
+              <div className="bg-red-100 p-2 rounded text-center">
+                <div className="text-lg font-bold text-red-800">{risk_summary.critical || 0}</div>
+                <div className="text-xs text-red-600">Critical</div>
+              </div>
+              <div className="bg-orange-100 p-2 rounded text-center">
+                <div className="text-lg font-bold text-orange-800">{risk_summary.high || 0}</div>
+                <div className="text-xs text-orange-600">High</div>
+              </div>
+              <div className="bg-yellow-100 p-2 rounded text-center">
+                <div className="text-lg font-bold text-yellow-800">{risk_summary.medium || 0}</div>
+                <div className="text-xs text-yellow-600">Medium</div>
+              </div>
+              <div className="bg-blue-100 p-2 rounded text-center">
+                <div className="text-lg font-bold text-blue-800">{risk_summary.low || 0}</div>
+                <div className="text-xs text-blue-600">Low</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Security Headers Analysis */}
+        {security_headers && !security_headers.error && (
+          <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              🛡️ Security Headers Analysis
+              <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                Score: {security_headers.score || 0}
+              </span>
+            </h3>
+            
+            {security_headers.present && security_headers.present.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-green-800 mb-2">✅ Present Headers ({security_headers.present.length})</h4>
+                <div className="space-y-1">
+                  {security_headers.present.map((header: any, index: number) => (
+                    <div key={index} className="text-sm bg-green-50 p-2 rounded border-l-4 border-green-400">
+                      <span className="font-medium">{header.name || header.header}</span>
+                      {header.value && <span className="text-gray-600 ml-2">: {header.value}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {security_headers.missing && security_headers.missing.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-red-800 mb-2">❌ Missing Headers ({security_headers.missing.length})</h4>
+                <div className="space-y-1">
+                  {security_headers.missing.map((header: any, index: number) => (
+                    <div key={index} className="text-sm bg-red-50 p-2 rounded border-l-4 border-red-400">
+                      <span className="font-medium">{header.name || header.header}</span>
+                      {header.recommendation && (
+                        <div className="text-xs text-gray-600 mt-1">{header.recommendation}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {security_headers.recommendations && security_headers.recommendations.length > 0 && (
+              <div className="bg-blue-50 p-3 rounded">
+                <h4 className="font-medium text-blue-800 mb-2">💡 Recommendations</h4>
+                <ul className="text-sm space-y-1">
+                  {security_headers.recommendations.map((rec: string, index: number) => (
+                    <li key={index} className="text-blue-700">• {rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* API Keys and Leaks Analysis */}
+        {api_keys_and_leaks && !api_keys_and_leaks.error && (
+          <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              🔑 API Keys & Security Leaks
+              <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                {api_keys_and_leaks.js_files_scanned || 0} files scanned
+              </span>
+            </h3>
+            
+            {api_keys_and_leaks.enhanced_analysis && (
+              <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-red-50 p-3 rounded text-center">
+                  <div className="text-xl font-bold text-red-700">
+                    {api_keys_and_leaks.enhanced_analysis.critical_leaks || 0}
+                  </div>
+                  <div className="text-xs text-red-600">Critical Leaks</div>
+                </div>
+                <div className="bg-orange-50 p-3 rounded text-center">
+                  <div className="text-xl font-bold text-orange-700">
+                    {api_keys_and_leaks.enhanced_analysis.high_leaks || 0}
+                  </div>
+                  <div className="text-xs text-orange-600">High Risk</div>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded text-center">
+                  <div className="text-xl font-bold text-yellow-700">
+                    {api_keys_and_leaks.enhanced_analysis.medium_leaks || 0}
+                  </div>
+                  <div className="text-xs text-yellow-600">Medium Risk</div>
+                </div>
+                <div className="bg-blue-50 p-3 rounded text-center">
+                  <div className="text-xl font-bold text-blue-700">
+                    {api_keys_and_leaks.enhanced_analysis.total_leaks || 0}
+                  </div>
+                  <div className="text-xs text-blue-600">Total Leaks</div>
+                </div>
+              </div>
+            )}
+            
+            {api_keys_and_leaks.leaks_found && api_keys_and_leaks.leaks_found.length > 0 ? (
+              <div className="space-y-2">
+                <h4 className="font-medium text-red-800">🚨 Security Issues Found:</h4>
+                {api_keys_and_leaks.leaks_found.slice(0, 10).map((leak: any, index: number) => (
+                  <div key={index} className={`p-3 rounded border-l-4 ${
+                    leak.severity === 'critical' ? 'bg-red-50 border-red-500' :
+                    leak.severity === 'warning' || leak.severity === 'high' ? 'bg-orange-50 border-orange-500' :
+                    leak.severity === 'medium' ? 'bg-yellow-50 border-yellow-500' :
+                    'bg-blue-50 border-blue-500'
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium">{leak.type || 'Security Issue'}</span>
+                        <div className="text-sm text-gray-600">{leak.description || leak.message}</div>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        leak.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                        leak.severity === 'warning' || leak.severity === 'high' ? 'bg-orange-200 text-orange-800' :
+                        leak.severity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                        'bg-blue-200 text-blue-800'
+                      }`}>
+                        {leak.severity || 'info'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {api_keys_and_leaks.leaks_found.length > 10 && (
+                  <div className="text-sm text-gray-600 italic">
+                    ... and {api_keys_and_leaks.leaks_found.length - 10} more issues
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-green-50 p-3 rounded border-l-4 border-green-400">
+                <span className="text-green-800 font-medium">✅ No security leaks detected!</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Subdomain Analysis */}
+        {subdomain_analysis && !subdomain_analysis.error && (
+          <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              🌐 Subdomain Discovery
+              <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                {subdomain_analysis.total_found || 0} found
+              </span>
+            </h3>
+            
+            <div className="mb-4 grid grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded">
+                <div className="text-xl font-bold text-blue-700">{subdomain_analysis.total_found || 0}</div>
+                <div className="text-xs text-blue-600">Total Found</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded">
+                <div className="text-xl font-bold text-green-700">{subdomain_analysis.accessible_count || 0}</div>
+                <div className="text-xs text-green-600">Accessible</div>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded">
+                <div className="text-sm font-medium text-gray-700">{subdomain_analysis.scan_method || 'N/A'}</div>
+                <div className="text-xs text-gray-600">Method</div>
+              </div>
+            </div>
+            
+            {subdomain_analysis.tested_subdomains && subdomain_analysis.tested_subdomains.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-800">🔍 Tested Subdomains:</h4>
+                {subdomain_analysis.tested_subdomains.map((sub: any, index: number) => (
+                  <div key={index} className={`p-3 rounded border-l-4 ${
+                    sub.accessible ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-gray-400'
+                  }`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{sub.subdomain}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          sub.accessible ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'
+                        }`}>
+                          {sub.status || 'Unknown'}
+                        </span>
+                        <span className={`w-2 h-2 rounded-full ${
+                          sub.accessible ? 'bg-green-500' : 'bg-gray-400'
+                        }`}></span>
+                      </div>
+                    </div>
+                    {sub.error && (
+                      <div className="text-xs text-gray-600 mt-1">{sub.error}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Supabase Analysis */}
+        {supabase_analysis && supabase_analysis.supabase_detected && !supabase_analysis.error && (
+          <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              🗄️ Supabase Database Analysis
+              {supabase_analysis.optimization_applied && (
+                <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                  Optimized
+                </span>
+              )}
+            </h3>
+            
+            {supabase_analysis.summary && (
+              <div className="mb-4 grid grid-cols-3 gap-4">
+                <div className="text-center p-3 bg-blue-50 rounded">
+                  <div className="text-xl font-bold text-blue-700">{supabase_analysis.summary.totalTables || 0}</div>
+                  <div className="text-xs text-blue-600">Total Tables</div>
+                </div>
+                <div className="text-center p-3 bg-red-50 rounded">
+                  <div className="text-xl font-bold text-red-700">{supabase_analysis.summary.publicTables || 0}</div>
+                  <div className="text-xs text-red-600">Public Tables</div>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded">
+                  <div className="text-xl font-bold text-green-700">{supabase_analysis.summary.protectedTables || 0}</div>
+                  <div className="text-xs text-green-600">Protected</div>
+                </div>
+              </div>
+            )}
+            
+            {supabase_analysis.tables && supabase_analysis.tables.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-800">📋 Database Tables:</h4>
+                {supabase_analysis.tables.slice(0, 10).map((table: any, index: number) => (
+                  <div key={index} className={`p-3 rounded border-l-4 ${
+                    table.isPublic ? 'bg-red-50 border-red-400' : 'bg-green-50 border-green-400'
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium">{table.name}</span>
+                        <div className="text-sm text-gray-600">
+                          {table.columns?.total_columns ? 
+                            `${table.columns.total_columns} columns (optimized view)` :
+                            `${table.columns?.length || 0} columns`
+                          }
+                          {table.columns?.has_sensitive_columns && (
+                            <span className="ml-2 text-orange-600">⚠️ Contains sensitive fields</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          table.isPublic ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'
+                        }`}>
+                          {table.isPublic ? 'Public' : 'Protected'}
+                        </span>
+                        {table.rlsEnabled !== undefined && (
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            table.rlsEnabled ? 'bg-blue-200 text-blue-800' : 'bg-yellow-200 text-yellow-800'
+                          }`}>
+                            RLS: {table.rlsEnabled ? 'On' : 'Off'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {supabase_analysis.tables.length > 10 && (
+                  <div className="text-sm text-gray-600 italic">
+                    ... and {supabase_analysis.tables.length - 10} more tables
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Authenticated Analysis */}
+        {authenticated_analysis && authenticated_analysis.jwt_token_valid && (
+          <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              🔐 Authenticated Access Analysis
+              <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                JWT Valid
+              </span>
+            </h3>
+            
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-blue-50 rounded">
+                <div className="text-xl font-bold text-blue-700">{authenticated_analysis.tested_endpoints?.length || 0}</div>
+                <div className="text-xs text-blue-600">Endpoints Tested</div>
+              </div>
+              <div className="text-center p-3 bg-green-50 rounded">
+                <div className="text-xl font-bold text-green-700">{authenticated_analysis.accessible_endpoints || 0}</div>
+                <div className="text-xs text-green-600">Accessible</div>
+              </div>
+            </div>
+            
+            {authenticated_analysis.permission_findings && authenticated_analysis.permission_findings.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <h4 className="font-medium text-orange-800">⚠️ Permission Findings:</h4>
+                {authenticated_analysis.permission_findings.map((finding: any, index: number) => (
+                  <div key={index} className={`p-3 rounded border-l-4 ${
+                    finding.severity === 'high' ? 'bg-red-50 border-red-400' :
+                    finding.severity === 'medium' ? 'bg-yellow-50 border-yellow-400' :
+                    'bg-blue-50 border-blue-400'
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <span className="text-sm">{finding.message}</span>
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        finding.severity === 'high' ? 'bg-red-200 text-red-800' :
+                        finding.severity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                        'bg-blue-200 text-blue-800'
+                      }`}>
+                        {finding.severity}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {authenticated_analysis.tested_endpoints && authenticated_analysis.tested_endpoints.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-800">🎯 Endpoint Test Results:</h4>
+                {authenticated_analysis.tested_endpoints.map((endpoint: any, index: number) => (
+                  <div key={index} className={`p-3 rounded border-l-4 ${
+                    endpoint.accessible ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-gray-400'
+                  }`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{endpoint.endpoint}</span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-600">{endpoint.response_size}</span>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          endpoint.accessible ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'
+                        }`}>
+                          {endpoint.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error states for individual scans */}
+        {(security_headers?.error || api_keys_and_leaks?.error || supabase_analysis?.error || subdomain_analysis?.error) && (
+          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <h3 className="text-lg font-semibold text-yellow-800 mb-2">⚠️ Partial Scan Results</h3>
+            <div className="space-y-1 text-sm">
+              {security_headers?.error && <div>• Security Headers: {security_headers.error}</div>}
+              {api_keys_and_leaks?.error && <div>• API Scan: {api_keys_and_leaks.error}</div>}
+              {supabase_analysis?.error && <div>• Supabase: {supabase_analysis.error}</div>}
+              {subdomain_analysis?.error && <div>• Subdomains: {subdomain_analysis.error}</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Raw Data (for debugging) */}
+        <details className="mt-6">
+          <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+            🔍 View Raw Scan Data (Advanced)
+          </summary>
+          <pre className="mt-2 text-xs bg-gray-100 p-4 rounded overflow-auto max-h-96">
+            {JSON.stringify(results, null, 2)}
+          </pre>
+        </details>
+      </div>
+    );
   };
 
   return (
@@ -626,6 +1076,39 @@ export default function DeepScanTool() {
           </Card>
         )}
       </motion.div>
+
+      {/* Report Modal */}
+      {showReportModal && selectedRequest && (
+        <Dialog open={showReportModal} onOpenChange={setShowReportModal}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Deep Scan Report - {selectedRequest.url}
+              </DialogTitle>
+              <DialogDescription>
+                Comprehensive security analysis completed on {new Date(selectedRequest.completed_at!).toLocaleString()}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-2">
+              {formatScanResults(selectedRequest.scan_results)}
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              {selectedRequest.pdf_url && (
+                <Button variant="outline" asChild>
+                  <a href={selectedRequest.pdf_url} download>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </a>
+                </Button>
+              )}
+              <Button onClick={() => setShowReportModal(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   )
 }
