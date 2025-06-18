@@ -102,7 +102,18 @@ async function performSuperScan(scanRequest: any, supabase: any) {
   
   console.log(`🚀 Starting SUPER SCAN for ${url} - This will be comprehensive!`);
   
+  // Set a maximum scan time limit (10 minutes)
+  const MAX_SCAN_TIME = 10 * 60 * 1000; // 10 minutes
+  let scanTimeout: NodeJS.Timeout;
+  
   try {
+    // Set up timeout to prevent stuck scans
+    const timeoutPromise = new Promise((_, reject) => {
+      scanTimeout = setTimeout(() => {
+        reject(new Error(`Scan timed out after ${MAX_SCAN_TIME / 1000} seconds`));
+      }, MAX_SCAN_TIME);
+    });
+
     // Initialize optimized scan results structure
     const scanResults = {
       scan_metadata: {
@@ -148,13 +159,17 @@ async function performSuperScan(scanRequest: any, supabase: any) {
       scanPromises.push(performAuthenticatedAnalysis(url, jwt_token));
     }
 
-    // Execute all scans
+    // Execute all scans with timeout protection
+    const scanExecution = Promise.allSettled(scanPromises);
     const [
       lightScanResults,
       supabaseAnalysis,
       subdomainAnalysis,
       authenticatedAnalysis
-    ] = await Promise.allSettled(scanPromises);
+    ] = await Promise.race([scanExecution, timeoutPromise]) as PromiseSettledResult<any>[];
+
+    // Clear timeout since scan completed
+    clearTimeout(scanTimeout);
 
     // Process results and handle failures gracefully
     if (lightScanResults.status === 'fulfilled') {
@@ -162,26 +177,29 @@ async function performSuperScan(scanRequest: any, supabase: any) {
       scanResults.api_keys_and_leaks = lightScanResults.value.api_keys_and_leaks;
     } else {
       console.error('Light scan failed:', lightScanResults.reason);
-      scanResults.security_headers = { error: 'Light scan failed' };
-      scanResults.api_keys_and_leaks = { error: 'API scan failed' };
+      scanResults.security_headers = { error: 'Light scan failed', details: lightScanResults.reason?.message || 'Unknown error' };
+      scanResults.api_keys_and_leaks = { error: 'API scan failed', details: lightScanResults.reason?.message || 'Unknown error' };
     }
 
     if (supabaseAnalysis.status === 'fulfilled') {
       scanResults.supabase_analysis = optimizeSupabaseData(supabaseAnalysis.value);
     } else {
       console.error('Supabase scan failed:', supabaseAnalysis.reason);
-      scanResults.supabase_analysis = { error: 'Supabase scan failed' };
+      scanResults.supabase_analysis = { error: 'Supabase scan failed', details: supabaseAnalysis.reason?.message || 'Unknown error' };
     }
 
     if (subdomainAnalysis.status === 'fulfilled') {
       scanResults.subdomain_analysis = subdomainAnalysis.value;
     } else {
       console.error('Subdomain scan failed:', subdomainAnalysis.reason);
-      scanResults.subdomain_analysis = { error: 'Subdomain scan failed' };
+      scanResults.subdomain_analysis = { error: 'Subdomain scan failed', details: subdomainAnalysis.reason?.message || 'Unknown error' };
     }
     
     if (jwt_token && authenticatedAnalysis && authenticatedAnalysis.status === 'fulfilled') {
       scanResults.authenticated_analysis = authenticatedAnalysis.value;
+    } else if (jwt_token && authenticatedAnalysis && authenticatedAnalysis.status === 'rejected') {
+      console.error('Authenticated analysis failed:', authenticatedAnalysis.reason);
+      scanResults.authenticated_analysis = { error: 'Authenticated analysis failed', details: authenticatedAnalysis.reason?.message || 'Unknown error' };
     }
 
     // Calculate overall security score and risk summary
@@ -215,7 +233,23 @@ async function performSuperScan(scanRequest: any, supabase: any) {
     console.log(`🎉 Super scan fully completed for request ${requestId}`);
 
   } catch (error) {
+    // Make sure to clear timeout on error
+    if (scanTimeout) {
+      clearTimeout(scanTimeout);
+    }
+    
     console.error('Super scan failed:', error);
+    
+    // Update status to failed with detailed error message
+    await supabase
+      .from('deep_scan_requests')
+      .update({
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown scan error',
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', requestId);
+    
     throw error;
   }
 }
@@ -226,41 +260,59 @@ async function performLightScanAnalysis(url: string) {
   try {
     console.log('🔍 Running light scan analysis for:', url);
     
-    // Use our existing /api/scan endpoint for comprehensive light scanning
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/scan`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Internal-Scan': 'true' // Flag to bypass auth for internal calls
-      },
-      body: JSON.stringify({ url })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Light scan API failed: ${response.statusText}`);
-    }
-
-    const lightScanResults = await response.json();
+    // Set a timeout for the light scan specifically (2 minutes)
+    const LIGHT_SCAN_TIMEOUT = 2 * 60 * 1000; // 2 minutes
     
-    // Split the results into security headers and API leaks
-    return {
-      security_headers: {
-        present: lightScanResults.headers?.present || [],
-        missing: lightScanResults.headers?.missing || [],
-        score: calculateHeadersScore(lightScanResults.headers),
-        recommendations: generateHeaderRecommendations(lightScanResults.headers?.missing || [])
-      },
-      api_keys_and_leaks: {
-        leaks_found: lightScanResults.leaks || [],
-        js_files_scanned: lightScanResults.jsFilesScanned || 0,
-        score: lightScanResults.score || 0,
-        auth_pages: lightScanResults.authPages || {},
-        enhanced_analysis: enhanceLeaksAnalysis(lightScanResults.leaks || [])
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), LIGHT_SCAN_TIMEOUT);
+    
+    try {
+      // Use our existing /api/scan endpoint for comprehensive light scanning
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/scan`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Internal-Scan': 'true' // Flag to bypass auth for internal calls
+        },
+        body: JSON.stringify({ url }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Light scan API failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
-    };
+
+      const lightScanResults = await response.json();
+      
+      // Split the results into security headers and API leaks
+      return {
+        security_headers: {
+          present: lightScanResults.headers?.present || [],
+          missing: lightScanResults.headers?.missing || [],
+          score: calculateHeadersScore(lightScanResults.headers),
+          recommendations: generateHeaderRecommendations(lightScanResults.headers?.missing || [])
+        },
+        api_keys_and_leaks: {
+          leaks_found: lightScanResults.leaks || [],
+          js_files_scanned: lightScanResults.jsFilesScanned || 0,
+          score: lightScanResults.score || 0,
+          auth_pages: lightScanResults.authPages || {},
+          enhanced_analysis: enhanceLeaksAnalysis(lightScanResults.leaks || [])
+        }
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
+    }
 
   } catch (error) {
     console.error('Light scan analysis failed:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Light scan timed out after 2 minutes');
+    }
     throw error;
   }
 }

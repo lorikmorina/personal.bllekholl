@@ -513,11 +513,13 @@ export async function POST(request: Request) {
     // Get the user session correctly
     const { data: { session } } = await supabase.auth.getSession();
     
-    // Check if this is an internal call from the free scan endpoint
+    // Check if this is an internal call from various sources
     const isInternalFreeScan = body._internal_free_scan === true;
+    const isInternalDeepScan = request.headers.get('X-Internal-Scan') === 'true';
+    const isInternalCall = isInternalFreeScan || isInternalDeepScan;
     
     // Require authentication for scanning unless it's an internal call
-    if (!session?.user && !isInternalFreeScan) {
+    if (!session?.user && !isInternalCall) {
       return NextResponse.json({
         error: "unauthorized",
         message: "Authentication required to scan websites",
@@ -526,7 +528,7 @@ export async function POST(request: Request) {
     }
     
     // Skip subscription check for internal calls
-    if (!isInternalFreeScan) {
+    if (!isInternalCall) {
       // Fetch user profile to check subscription
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
