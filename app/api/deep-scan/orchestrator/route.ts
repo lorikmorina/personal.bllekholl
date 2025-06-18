@@ -113,8 +113,8 @@ async function performSuperScan(scanRequest: any, supabase: any) {
   
   console.log(`🚀 Starting SUPER SCAN for ${url} - This will be comprehensive!`);
   
-  // Set a maximum scan time limit (10 minutes)
-  const MAX_SCAN_TIME = 10 * 60 * 1000; // 10 minutes
+  // Set a maximum scan time limit (8 minutes for production)
+  const MAX_SCAN_TIME = 8 * 60 * 1000; // 8 minutes (increased from 3)
   let scanTimeout: NodeJS.Timeout;
   
   try {
@@ -131,7 +131,7 @@ async function performSuperScan(scanRequest: any, supabase: any) {
         started_at: new Date().toISOString(),
         url: url,
         has_jwt_token: !!jwt_token,
-        scan_version: '2.0.0',
+        scan_version: '2.0.1', // Updated version
         scan_type: 'super_scan'
       },
       // Core security findings
@@ -154,66 +154,86 @@ async function performSuperScan(scanRequest: any, supabase: any) {
     // Run all scans in parallel for maximum efficiency
     console.log('🔍 Running parallel scans: Headers, API leaks, Supabase, Subdomains...');
     
+    // Create promises with individual timeouts (increased for production)
     const scanPromises = [
-      // 1. Light scan (security headers + API keys/leaks)
-      performLightScanAnalysis(url),
+      // 1. Light scan (security headers + API keys/leaks) - most critical
+      Promise.race([
+        performLightScanAnalysis(url),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Light scan timeout')), 120000)) // 2 minutes
+      ]),
       
-      // 2. Supabase deep scan (database analysis)
-      performSupabaseAnalysis(url),
+      // 2. Supabase deep scan (database analysis) - important
+      Promise.race([
+        performSupabaseAnalysis(url),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase scan timeout')), 90000)) // 90 seconds
+      ]),
       
-      // 3. Subdomain discovery
-      performSubdomainAnalysis(url),
+      // 3. Subdomain discovery - less critical, but allow more time
+      Promise.race([
+        performSubdomainAnalysis(url),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Subdomain scan timeout')), 60000)) // 1 minute
+      ]),
     ];
 
     // If JWT token provided, add authenticated analysis
     if (jwt_token) {
-      scanPromises.push(performAuthenticatedAnalysis(url, jwt_token));
+      scanPromises.push(
+        Promise.race([
+          performAuthenticatedAnalysis(url, jwt_token),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Auth analysis timeout')), 60000)) // 1 minute
+        ])
+      );
     }
 
     // Execute all scans with timeout protection
+    console.log('⏱️ Starting parallel scan execution with individual timeouts...');
     const scanExecution = Promise.allSettled(scanPromises);
-    const [
-      lightScanResults,
-      supabaseAnalysis,
-      subdomainAnalysis,
-      authenticatedAnalysis
-    ] = await Promise.race([scanExecution, timeoutPromise]) as PromiseSettledResult<any>[];
+    const results = await Promise.race([scanExecution, timeoutPromise]) as PromiseSettledResult<any>[];
 
-    // Clear timeout since scan completed
+    // Clear global timeout since scan completed
     clearTimeout(scanTimeout);
 
+    console.log('📊 Processing scan results...');
+    
     // Process results and handle failures gracefully
+    const [lightScanResults, supabaseAnalysis, subdomainAnalysis, authenticatedAnalysis] = results;
+
     if (lightScanResults.status === 'fulfilled') {
+      console.log('✅ Light scan completed successfully');
       scanResults.security_headers = lightScanResults.value.security_headers;
       scanResults.api_keys_and_leaks = lightScanResults.value.api_keys_and_leaks;
     } else {
-      console.error('Light scan failed:', lightScanResults.reason);
+      console.error('❌ Light scan failed:', lightScanResults.reason?.message || 'Unknown error');
       scanResults.security_headers = { error: 'Light scan failed', details: lightScanResults.reason?.message || 'Unknown error' };
       scanResults.api_keys_and_leaks = { error: 'API scan failed', details: lightScanResults.reason?.message || 'Unknown error' };
     }
 
     if (supabaseAnalysis.status === 'fulfilled') {
+      console.log('✅ Supabase analysis completed successfully');
       scanResults.supabase_analysis = optimizeSupabaseData(supabaseAnalysis.value);
     } else {
-      console.error('Supabase scan failed:', supabaseAnalysis.reason);
+      console.error('❌ Supabase scan failed:', supabaseAnalysis.reason?.message || 'Unknown error');
       scanResults.supabase_analysis = { error: 'Supabase scan failed', details: supabaseAnalysis.reason?.message || 'Unknown error' };
     }
 
     if (subdomainAnalysis.status === 'fulfilled') {
+      console.log('✅ Subdomain analysis completed successfully');
       scanResults.subdomain_analysis = subdomainAnalysis.value;
     } else {
-      console.error('Subdomain scan failed:', subdomainAnalysis.reason);
+      console.error('❌ Subdomain scan failed:', subdomainAnalysis.reason?.message || 'Unknown error');
       scanResults.subdomain_analysis = { error: 'Subdomain scan failed', details: subdomainAnalysis.reason?.message || 'Unknown error' };
     }
     
     if (jwt_token && authenticatedAnalysis && authenticatedAnalysis.status === 'fulfilled') {
+      console.log('✅ Authenticated analysis completed successfully');
       scanResults.authenticated_analysis = authenticatedAnalysis.value;
     } else if (jwt_token && authenticatedAnalysis && authenticatedAnalysis.status === 'rejected') {
-      console.error('Authenticated analysis failed:', authenticatedAnalysis.reason);
+      console.error('❌ Authenticated analysis failed:', authenticatedAnalysis.reason?.message || 'Unknown error');
       scanResults.authenticated_analysis = { error: 'Authenticated analysis failed', details: authenticatedAnalysis.reason?.message || 'Unknown error' };
     }
 
     // Calculate overall security score and risk summary
+    console.log('🧮 Calculating overall security score...');
     const { score, summary } = calculateOverallScore(scanResults);
     scanResults.overall_score = score;
     scanResults.risk_summary = summary;
@@ -224,10 +244,18 @@ async function performSuperScan(scanRequest: any, supabase: any) {
 
     console.log(`✅ Super scan completed for ${url} with score: ${score} in ${scanResults.scan_metadata.duration_ms}ms`);
 
-    // Generate PDF report
-    const pdfUrl = await generatePdfReport(scanResults, scanRequest);
+    // Generate PDF report (with timeout)
+    console.log('📄 Attempting PDF generation...');
+    const pdfUrl = await Promise.race([
+      generatePdfReport(scanResults, scanRequest),
+      new Promise<null>((resolve) => setTimeout(() => {
+        console.log('⚠️ PDF generation timed out, continuing without PDF');
+        resolve(null);
+      }, 10000)) // 10 second timeout for PDF
+    ]);
 
     // Update the database with optimized results
+    console.log('💾 Saving results to database...');
     await supabase
       .from('deep_scan_requests')
       .update({
@@ -238,8 +266,17 @@ async function performSuperScan(scanRequest: any, supabase: any) {
       })
       .eq('id', requestId);
 
-    // Send notification email
-    await sendCompletionEmail(scanRequest, scanResults, pdfUrl);
+    // Send notification email (with timeout, don't let it block completion)
+    console.log('📧 Sending completion email...');
+    Promise.race([
+      sendCompletionEmail(scanRequest, scanResults, pdfUrl),
+      new Promise((resolve) => setTimeout(() => {
+        console.log('⚠️ Email sending timed out, but scan is complete');
+        resolve(null);
+      }, 5000)) // 5 second timeout for email
+    ]).catch(error => {
+      console.error('Email sending failed (non-blocking):', error);
+    });
 
     console.log(`🎉 Super scan fully completed for request ${requestId}`);
 
@@ -249,7 +286,26 @@ async function performSuperScan(scanRequest: any, supabase: any) {
       clearTimeout(scanTimeout);
     }
     
-    console.error('Super scan failed:', error);
+    console.error('💥 Super scan failed:', error);
+    
+    // Create minimal results even on failure
+    const failureResults = {
+      scan_metadata: {
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        url: url,
+        scan_version: '2.0.0',
+        scan_type: 'super_scan',
+        duration_ms: Date.now() - startTime,
+        error: error instanceof Error ? error.message : 'Unknown scan error'
+      },
+      overall_score: 0,
+      risk_summary: { critical: 0, high: 0, medium: 0, low: 0 },
+      security_headers: { error: 'Scan failed', details: 'Scan did not complete' },
+      api_keys_and_leaks: { error: 'Scan failed', details: 'Scan did not complete' },
+      supabase_analysis: { error: 'Scan failed', details: 'Scan did not complete' },
+      subdomain_analysis: { error: 'Scan failed', details: 'Scan did not complete' }
+    };
     
     // Update status to failed with detailed error message
     await supabase
@@ -257,6 +313,7 @@ async function performSuperScan(scanRequest: any, supabase: any) {
       .update({
         status: 'failed',
         error_message: error instanceof Error ? error.message : 'Unknown scan error',
+        scan_results: failureResults,
         completed_at: new Date().toISOString()
       })
       .eq('id', requestId);
