@@ -104,74 +104,96 @@ export default function DeepScanTool() {
 
   // Initialize Paddle and set up event listener
   useEffect(() => {
+    // Debug environment variables
+    console.log('🔧 Paddle Environment Variables:');
+    console.log('NEXT_PUBLIC_PADDLE_CLIENT_TOKEN:', !!process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN);
+    console.log('NEXT_PUBLIC_PADDLE_DEEP_SCAN_PRICE_ID:', process.env.NEXT_PUBLIC_PADDLE_DEEP_SCAN_PRICE_ID);
+    console.log('NEXT_PUBLIC_PADDLE_SANDBOX_MODE:', process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE);
+    
     const initializePaddle = () => {
       if (window.Paddle && !paddleLoaded) {
-        // Set environment if in sandbox mode
-        if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
-          window.Paddle.Environment.set("sandbox");
-        }
-        
-        // Initialize Paddle with client-side token AND event callback
-        window.Paddle.Initialize({ 
-          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
-          eventCallback: async (eventData: any) => {
-            console.log('Paddle Event: ', eventData);
-            
-            // Check if checkout was completed AND initiated by this component
-            if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
-              console.log("Checkout completed event received for Deep Scan", eventData);
+        try {
+          console.log('Initializing Paddle...');
+          
+          // Set environment if in sandbox mode
+          if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
+            window.Paddle.Environment.set("sandbox");
+          }
+          
+          // Initialize Paddle with client-side token AND event callback
+          window.Paddle.Initialize({ 
+            token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+            eventCallback: async (eventData: any) => {
+              console.log('Paddle Event: ', eventData);
               
-              try {
-                // Show success toast
-                toast({
-                  title: "Payment Successful!",
-                  description: "Your deep security scan is now processing. You'll receive results shortly.",
-                  duration: 5000,
-                });
+              // Check if checkout was completed AND initiated by this component
+              if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
+                console.log("Checkout completed event received for Deep Scan", eventData);
                 
-                // Reset form
-                setDeepScanUrl("")
-                setDeepScanMessage({ type: 'success', text: "Payment completed! Your scan is now processing." });
-                
-                // Refresh user requests
-                await fetchUserRequests();
+                try {
+                  // Show success toast
+                  toast({
+                    title: "Payment Successful!",
+                    description: "Your deep security scan is now processing. You'll receive results shortly.",
+                    duration: 5000,
+                  });
+                  
+                  // Reset form
+                  setDeepScanUrl("")
+                  setDeepScanMessage({ type: 'success', text: "Payment completed! Your scan is now processing." });
+                  
+                  // Refresh user requests
+                  await fetchUserRequests();
 
-              } catch (error) {
-                console.error("Error processing checkout.completed event:", error);
-                toast({
-                  title: "Payment Processed",
-                  description: "Your payment went through, but there was an issue updating the view. Please refresh the page.",
-                  variant: "destructive",
-                  duration: 5000,
-                });
-              } finally {
-                checkoutInitiated.current = false;
-                userRef.current = null;
-                setIsDeepScanLoading(false);
+                } catch (error) {
+                  console.error("Error processing checkout.completed event:", error);
+                  toast({
+                    title: "Payment Processed",
+                    description: "Your payment went through, but there was an issue updating the view. Please refresh the page.",
+                    variant: "destructive",
+                    duration: 5000,
+                  });
+                } finally {
+                  checkoutInitiated.current = false;
+                  userRef.current = null;
+                  setIsDeepScanLoading(false);
+                }
               }
             }
-          }
-        });
-        
-        setPaddleLoaded(true);
+          });
+          
+          console.log('Paddle initialized successfully');
+          setPaddleLoaded(true);
+        } catch (error) {
+          console.error('Error initializing Paddle:', error);
+        }
       }
     };
 
-    // Try to initialize immediately
-    initializePaddle();
+    // Try to initialize immediately if Paddle is available
+    if (window.Paddle) {
+      initializePaddle();
+    } else {
+      // If Paddle script isn't loaded yet, wait for it
+      const checkPaddle = setInterval(() => {
+        if (window.Paddle) {
+          clearInterval(checkPaddle);
+          initializePaddle();
+        }
+      }, 100);
 
-    // Also set up a fallback timeout in case Paddle takes too long to load
-    const paddleTimeout = setTimeout(() => {
-      if (!paddleLoaded) {
-        console.warn('Paddle took too long to load, enabling button anyway');
-        setPaddleLoaded(true);
-      }
-    }, 5000); // 5 second timeout
+      // Clean up interval after 10 seconds if Paddle never loads
+      setTimeout(() => {
+        clearInterval(checkPaddle);
+        if (!paddleLoaded) {
+          console.warn('Paddle script failed to load after 10 seconds');
+        }
+      }, 10000);
+    }
 
     return () => {
       checkoutInitiated.current = false;
       userRef.current = null;
-      clearTimeout(paddleTimeout);
     };
   }, [paddleLoaded, supabase, toast]);
 
@@ -246,17 +268,24 @@ export default function DeepScanTool() {
     e.preventDefault();
     setDeepScanMessage(null);
 
+    console.log('🚀 Deep scan submit initiated');
+    console.log('User:', !!user, 'Email:', user?.email);
+    console.log('Paddle loaded:', paddleLoaded);
+    console.log('Window.Paddle available:', !!window.Paddle);
+
     if (!user || !user.email) {
       setDeepScanMessage({ type: 'error', text: "You must be logged in to request a deep scan." });
       return;
     }
 
-    if (!paddleLoaded) {
-      setDeepScanMessage({ type: 'error', text: "Payment system is loading. Please try again in a moment." });
+    if (!paddleLoaded || !window.Paddle) {
+      setDeepScanMessage({ type: 'error', text: "Payment system is not ready. Please refresh the page and try again." });
       return;
     }
 
     const deepScanPriceId = getDeepScanPriceId();
+    console.log('Deep scan price ID:', deepScanPriceId);
+    
     if (!deepScanPriceId) {
       setDeepScanMessage({ type: 'error', text: "Deep scan pricing not configured. Please contact support." });
       return;
@@ -277,6 +306,8 @@ export default function DeepScanTool() {
     userRef.current = null;
 
     try {
+      console.log('💾 Saving request to database...');
+      
       // Step 1: Save the request to Supabase FIRST
       const { data: insertedRequest, error: insertError } = await supabase
         .from('deep_scan_requests')
@@ -296,8 +327,17 @@ export default function DeepScanTool() {
       }
       
       const requestId = insertedRequest.id;
+      console.log('✅ Request saved with ID:', requestId);
+      
       userRef.current = user;
       checkoutInitiated.current = true;
+
+      console.log('🎯 Opening Paddle checkout...');
+      console.log('Checkout config:', {
+        priceId: deepScanPriceId,
+        email: user.email,
+        requestId: requestId
+      });
 
       // Step 2: Open Paddle checkout overlay
       window.Paddle.Checkout.open({
@@ -316,8 +356,8 @@ export default function DeepScanTool() {
           _afficoneRef: (window as any).Afficone?.referral
         },
         closeCallback: () => {
+          console.log("🚪 Paddle checkout closed manually");
           if (checkoutInitiated.current) { 
-            console.log("Paddle checkout closed manually before completion.");
             checkoutInitiated.current = false;
             userRef.current = null;
             setIsDeepScanLoading(false);
@@ -325,8 +365,10 @@ export default function DeepScanTool() {
         }
       });
 
+      console.log('✅ Paddle checkout opened successfully');
+
     } catch (error: any) {
-      console.error('Error during deep scan submission process:', error);
+      console.error('❌ Error during deep scan submission process:', error);
       setDeepScanMessage({ type: 'error', text: `An error occurred: ${error.message}` });
       checkoutInitiated.current = false;
       userRef.current = null;
@@ -508,7 +550,7 @@ export default function DeepScanTool() {
       let authenticatedResults = null;
 
       // Combine all results
-      const finalResults = {
+      const finalResults: any = {
         scan_metadata: {
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
@@ -523,6 +565,12 @@ export default function DeepScanTool() {
         authenticated_analysis: authenticatedResults,
         overall_score: calculateOverallScore(lightScanResults, supabaseResults)
       };
+
+      console.log('🤖 Generating AI security recommendations...');
+      const aiRecommendations = await generateAIRecommendations(finalResults);
+      if (aiRecommendations) {
+        finalResults.ai_recommendations = aiRecommendations;
+      }
 
       console.log('💾 Saving final results to database...');
       console.log('Final results object:', finalResults);
@@ -632,6 +680,29 @@ export default function DeepScanTool() {
     return Math.max(0, score);
   };
 
+  // AI Analysis function
+  const generateAIRecommendations = async (scanResults: any) => {
+    try {
+      const response = await fetch('/api/ai-security-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ scanResults }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI analysis failed');
+      }
+
+      const data = await response.json();
+      return data.recommendations;
+    } catch (error) {
+      console.error('Error generating AI recommendations:', error);
+      return null;
+    }
+  };
+
   // Helper function to format and display scan results
   const formatScanResults = (results: any) => {
     if (!results) return "No scan results available";
@@ -644,11 +715,79 @@ export default function DeepScanTool() {
       subdomain_analysis,
       authenticated_analysis,
       overall_score,
-      risk_summary
+      risk_summary,
+      ai_recommendations
     } = results;
 
     return (
       <div className="space-y-6">
+        {/* AI Security Recommendations - Show first if available */}
+        {ai_recommendations && (
+          <div className={`p-6 rounded-lg border-2 ${
+            ai_recommendations.severity === 'critical' ? 'bg-red-50 border-red-300' :
+            ai_recommendations.severity === 'high' ? 'bg-orange-50 border-orange-300' :
+            ai_recommendations.severity === 'medium' ? 'bg-yellow-50 border-yellow-300' :
+            'bg-green-50 border-green-300'
+          }`}>
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              🤖 AI Security Analysis
+              <span className={`ml-3 px-3 py-1 text-sm rounded-full font-medium ${
+                ai_recommendations.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                ai_recommendations.severity === 'high' ? 'bg-orange-200 text-orange-800' :
+                ai_recommendations.severity === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                'bg-green-200 text-green-800'
+              }`}>
+                {ai_recommendations.severity.toUpperCase()}
+              </span>
+            </h3>
+            
+            <div className="mb-4">
+              <p className="text-lg font-medium text-gray-800">{ai_recommendations.summary}</p>
+            </div>
+
+            {ai_recommendations.key_findings && ai_recommendations.key_findings.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-semibold text-gray-700 mb-2">🔍 Key Findings:</h4>
+                <ul className="space-y-1">
+                  {ai_recommendations.key_findings.map((finding: string, index: number) => (
+                    <li key={index} className="flex items-start">
+                      <span className="text-gray-600 mr-2">•</span>
+                      <span className="text-gray-700">{finding}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {ai_recommendations.recommendations && ai_recommendations.recommendations.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-3">💡 Recommended Actions:</h4>
+                <div className="space-y-3">
+                  {ai_recommendations.recommendations.map((rec: any, index: number) => (
+                    <div key={index} className={`p-4 rounded-lg border-l-4 ${
+                      rec.priority === 'high' ? 'bg-red-50 border-red-400' :
+                      rec.priority === 'medium' ? 'bg-yellow-50 border-yellow-400' :
+                      'bg-blue-50 border-blue-400'
+                    }`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <h5 className="font-medium text-gray-800">{rec.issue}</h5>
+                        <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                          rec.priority === 'high' ? 'bg-red-200 text-red-800' :
+                          rec.priority === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                          'bg-blue-200 text-blue-800'
+                        }`}>
+                          {rec.priority.toUpperCase()} PRIORITY
+                        </span>
+                      </div>
+                      <p className="text-gray-700 text-sm">{rec.solution}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Scan Overview */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
