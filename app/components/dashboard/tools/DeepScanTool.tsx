@@ -446,20 +446,27 @@ export default function DeepScanTool() {
     setDeepScanMessage(null);
 
     try {
-      // Update status to processing
-      await supabase
+      // Update status to processing with error handling
+      console.log('🔄 Updating status to processing...');
+      const { error: statusError } = await supabase
         .from('deep_scan_requests')
         .update({ status: 'processing' })
         .eq('id', requestId);
 
+      if (statusError) {
+        console.error('Error updating status to processing:', statusError);
+        throw new Error(`Failed to update status: ${statusError.message}`);
+      }
+
       // Get the request details
-      const { data: scanRequest } = await supabase
+      const { data: scanRequest, error: fetchError } = await supabase
         .from('deep_scan_requests')
         .select('*')
         .eq('id', requestId)
         .single();
 
-      if (!scanRequest) {
+      if (fetchError || !scanRequest) {
+        console.error('Error fetching scan request:', fetchError);
         throw new Error('Scan request not found');
       }
 
@@ -501,8 +508,11 @@ export default function DeepScanTool() {
         overall_score: calculateOverallScore(lightScanResults, supabaseResults)
       };
 
-      // Update database with final results
-      await supabase
+      console.log('💾 Saving final results to database...');
+      console.log('Final results object:', finalResults);
+
+      // Update database with final results - with detailed error handling
+      const { error: updateError } = await supabase
         .from('deep_scan_requests')
         .update({
           status: 'completed',
@@ -510,6 +520,13 @@ export default function DeepScanTool() {
           completed_at: new Date().toISOString()
         })
         .eq('id', requestId);
+
+      if (updateError) {
+        console.error('❌ Database update error:', updateError);
+        throw new Error(`Failed to save results: ${updateError.message}`);
+      }
+
+      console.log('✅ Results saved successfully!');
 
       // Refresh the requests list
       await fetchUserRequests();
@@ -520,16 +537,20 @@ export default function DeepScanTool() {
       });
 
     } catch (error: any) {
-      console.error('Scan failed:', error);
+      console.error('❌ Scan failed:', error);
       
-      // Update status to failed
-      await supabase
+      // Update status to failed with error handling
+      const { error: failError } = await supabase
         .from('deep_scan_requests')
         .update({
           status: 'failed',
           error_message: error.message
         })
         .eq('id', requestId);
+
+      if (failError) {
+        console.error('Error updating failed status:', failError);
+      }
 
       setDeepScanMessage({ 
         type: 'error', 
