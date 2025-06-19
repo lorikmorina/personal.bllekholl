@@ -104,60 +104,74 @@ export default function DeepScanTool() {
 
   // Initialize Paddle and set up event listener
   useEffect(() => {
-    if (window.Paddle && !paddleLoaded) {
-      // Set environment if in sandbox mode
-      if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
-        window.Paddle.Environment.set("sandbox");
-      }
-      
-      // Initialize Paddle with client-side token AND event callback
-      window.Paddle.Initialize({ 
-        token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
-        eventCallback: async (eventData: any) => {
-          console.log('Paddle Event: ', eventData);
-          
-          // Check if checkout was completed AND initiated by this component
-          if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
-            console.log("Checkout completed event received for Deep Scan", eventData);
+    const initializePaddle = () => {
+      if (window.Paddle && !paddleLoaded) {
+        // Set environment if in sandbox mode
+        if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
+          window.Paddle.Environment.set("sandbox");
+        }
+        
+        // Initialize Paddle with client-side token AND event callback
+        window.Paddle.Initialize({ 
+          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN,
+          eventCallback: async (eventData: any) => {
+            console.log('Paddle Event: ', eventData);
             
-            try {
-              // Show success toast
-              toast({
-                title: "Payment Successful!",
-                description: "Your deep security scan is now processing. You'll receive results shortly.",
-                duration: 5000,
-              });
+            // Check if checkout was completed AND initiated by this component
+            if (eventData.name === "checkout.completed" && checkoutInitiated.current) {
+              console.log("Checkout completed event received for Deep Scan", eventData);
               
-              // Reset form
-              setDeepScanUrl("")
-              setDeepScanMessage({ type: 'success', text: "Payment completed! Your scan is now processing." });
-              
-              // Refresh user requests
-              await fetchUserRequests();
+              try {
+                // Show success toast
+                toast({
+                  title: "Payment Successful!",
+                  description: "Your deep security scan is now processing. You'll receive results shortly.",
+                  duration: 5000,
+                });
+                
+                // Reset form
+                setDeepScanUrl("")
+                setDeepScanMessage({ type: 'success', text: "Payment completed! Your scan is now processing." });
+                
+                // Refresh user requests
+                await fetchUserRequests();
 
-            } catch (error) {
-              console.error("Error processing checkout.completed event:", error);
-              toast({
-                title: "Payment Processed",
-                description: "Your payment went through, but there was an issue updating the view. Please refresh the page.",
-                variant: "destructive",
-                duration: 5000,
-              });
-            } finally {
-              checkoutInitiated.current = false;
-              userRef.current = null;
-              setIsDeepScanLoading(false);
+              } catch (error) {
+                console.error("Error processing checkout.completed event:", error);
+                toast({
+                  title: "Payment Processed",
+                  description: "Your payment went through, but there was an issue updating the view. Please refresh the page.",
+                  variant: "destructive",
+                  duration: 5000,
+                });
+              } finally {
+                checkoutInitiated.current = false;
+                userRef.current = null;
+                setIsDeepScanLoading(false);
+              }
             }
           }
-        }
-      });
-      
-      setPaddleLoaded(true);
-    }
+        });
+        
+        setPaddleLoaded(true);
+      }
+    };
+
+    // Try to initialize immediately
+    initializePaddle();
+
+    // Also set up a fallback timeout in case Paddle takes too long to load
+    const paddleTimeout = setTimeout(() => {
+      if (!paddleLoaded) {
+        console.warn('Paddle took too long to load, enabling button anyway');
+        setPaddleLoaded(true);
+      }
+    }, 5000); // 5 second timeout
 
     return () => {
       checkoutInitiated.current = false;
       userRef.current = null;
+      clearTimeout(paddleTimeout);
     };
   }, [paddleLoaded, supabase, toast]);
 
@@ -190,6 +204,15 @@ export default function DeepScanTool() {
   useEffect(() => {
     fetchUserRequests();
   }, [user]);
+
+  // Cleanup effect to reset loading states when component unmounts
+  useEffect(() => {
+    return () => {
+      setIsDeepScanLoading(false);
+      checkoutInitiated.current = false;
+      userRef.current = null;
+    };
+  }, []);
 
   const handleDeepScanUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const cleanedUrl = cleanUrl(e.target.value);
@@ -1279,23 +1302,37 @@ export default function DeepScanTool() {
               </Alert>
             )}
 
-            <Button 
-              type="submit" 
-                disabled={isDeepScanLoading || !user || deepScanUrlValidation?.valid === false || !paddleLoaded}
-              className="w-full sm:w-auto"
-            >
-              {isDeepScanLoading ? (
+            {/* Compute button disabled state */}
+            {(() => {
+              const hasUser = !!user;
+              const hasUrl = !!deepScanUrl.trim();
+              const urlIsValid = deepScanUrlValidation?.valid !== false; // Allow null/undefined as valid
+              const notLoading = !isDeepScanLoading;
+              
+              const isButtonEnabled = hasUser && hasUrl && urlIsValid && notLoading && paddleLoaded;
+              
+              return (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing Request...
+                  <Button 
+                    type="submit" 
+                    disabled={!isButtonEnabled}
+                    className="w-full sm:w-auto"
+                  >
+                    {isDeepScanLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing Request...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Request Deep Scan ($4)
+                      </>
+                    )}
+                  </Button>
                 </>
-              ) : (
-                <>
-                  <Zap className="mr-2 h-4 w-4" />
-                    Request Deep Scan ($4)
-                </>
-              )}
-            </Button>
+              );
+            })()}
             {!user && (
                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">Please log in to request a deep scan.</p>
             )}
