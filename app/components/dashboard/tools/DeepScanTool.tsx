@@ -632,7 +632,7 @@ export default function DeepScanTool() {
             🚀 Deep Security Scan Overview
             {scan_metadata?.scan_type === 'user_initiated' && (
               <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                v3.0
+                v{scan_metadata?.scan_version || '3.0'}
               </span>
             )}
           </h3>
@@ -648,7 +648,11 @@ export default function DeepScanTool() {
             </div>
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-800">
-                {scan_metadata?.duration_ms ? `${Math.round(scan_metadata.duration_ms / 1000)}s` : 'N/A'}
+                {scan_metadata?.completed_at && scan_metadata?.started_at ? 
+                  `${Math.round((new Date(scan_metadata.completed_at).getTime() - new Date(scan_metadata.started_at).getTime()) / 1000)}s` : 
+                  subdomain_analysis?.scanTimeMs ? `${Math.round(subdomain_analysis.scanTimeMs / 1000)}s` :
+                  'N/A'
+                }
               </div>
               <div className="text-sm text-gray-600">Scan Duration</div>
             </div>
@@ -821,57 +825,98 @@ export default function DeepScanTool() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               🌐 Subdomain Discovery
               <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                {subdomain_analysis.total_found || 0} found
+                {subdomain_analysis.summary?.totalFound || subdomain_analysis.subdomains?.length || 0} found
               </span>
             </h3>
             
             <div className="mb-4 grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-blue-50 rounded">
-                <div className="text-xl font-bold text-blue-700">{subdomain_analysis.total_found || 0}</div>
+                <div className="text-xl font-bold text-blue-700">
+                  {subdomain_analysis.summary?.totalFound || subdomain_analysis.subdomains?.length || 0}
+                </div>
                 <div className="text-xs text-blue-600">Total Found</div>
               </div>
               <div className="text-center p-3 bg-green-50 rounded">
-                <div className="text-xl font-bold text-green-700">{subdomain_analysis.accessible_count || 0}</div>
+                <div className="text-xl font-bold text-green-700">
+                  {subdomain_analysis.subdomains?.filter((sub: any) => sub.exists).length || 0}
+                </div>
                 <div className="text-xs text-green-600">Accessible</div>
               </div>
               <div className="text-center p-3 bg-gray-50 rounded">
-                <div className="text-sm font-medium text-gray-700">{subdomain_analysis.scan_method || 'N/A'}</div>
-                <div className="text-xs text-gray-600">Method</div>
+                <div className="text-sm font-medium text-gray-700">
+                  {subdomain_analysis.mode || 'Multi-method'}
+                </div>
+                <div className="text-xs text-gray-600">Scan Mode</div>
               </div>
             </div>
             
-            {subdomain_analysis.tested_subdomains && subdomain_analysis.tested_subdomains.length > 0 && (
+            {subdomain_analysis.subdomains && subdomain_analysis.subdomains.length > 0 && (
               <div className="space-y-2">
-                <h4 className="font-medium text-gray-800">🔍 Tested Subdomains:</h4>
-                {subdomain_analysis.tested_subdomains.map((sub: any, index: number) => (
+                <h4 className="font-medium text-gray-800">🔍 Discovered Subdomains:</h4>
+                {subdomain_analysis.subdomains.map((sub: any, index: number) => (
                   <div key={index} className={`p-3 rounded border-l-4 ${
-                    sub.accessible ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-gray-400'
+                    sub.exists ? 'bg-green-50 border-green-400' : 'bg-gray-50 border-gray-400'
                   }`}>
                     <div className="flex justify-between items-center">
                       <span className="font-medium">{sub.subdomain}</span>
                       <div className="flex items-center space-x-2">
+                        <span className="text-xs text-gray-600">
+                          {sub.method || 'unknown'}
+                        </span>
                         <span className={`px-2 py-1 text-xs rounded-full ${
-                          sub.accessible ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'
+                          sub.exists ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'
                         }`}>
-                          {sub.status || 'Unknown'}
+                          {sub.exists ? 'Active' : 'Inactive'}
                         </span>
                         <span className={`w-2 h-2 rounded-full ${
-                          sub.accessible ? 'bg-green-500' : 'bg-gray-400'
+                          sub.exists ? 'bg-green-500' : 'bg-gray-400'
                         }`}></span>
                       </div>
                     </div>
+                    {sub.ip && (
+                      <div className="text-xs text-gray-600 mt-1">IP: {sub.ip}</div>
+                    )}
                     {sub.error && (
-                      <div className="text-xs text-gray-600 mt-1">{sub.error}</div>
+                      <div className="text-xs text-red-600 mt-1">Error: {sub.error}</div>
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+            
+            {/* Scan Methods Summary */}
+            {subdomain_analysis.summary?.methods && (
+              <div className="mt-4 p-3 bg-gray-50 rounded">
+                <h5 className="font-medium text-gray-700 mb-2">Discovery Methods Used:</h5>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                  <div className="text-center">
+                    <div className="font-bold text-blue-600">{subdomain_analysis.summary.methods.certificate_transparency || 0}</div>
+                    <div className="text-gray-600">Cert Transparency</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-green-600">{subdomain_analysis.summary.methods.dns_enumeration || 0}</div>
+                    <div className="text-gray-600">DNS Enum</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-purple-600">{subdomain_analysis.summary.methods.port_scanning || 0}</div>
+                    <div className="text-gray-600">Port Scan</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-orange-600">{subdomain_analysis.summary.methods.san_analysis || 0}</div>
+                    <div className="text-gray-600">SAN Analysis</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-bold text-red-600">{subdomain_analysis.summary.methods.wordlist || 0}</div>
+                    <div className="text-gray-600">Wordlist</div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         )}
 
         {/* Enhanced Supabase Analysis */}
-        {supabase_analysis && supabase_analysis.supabase_detected && !supabase_analysis.error && (
+        {supabase_analysis && supabase_analysis.tables && !supabase_analysis.error && (
           <div className="bg-white p-6 rounded-lg border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               🗄️ Supabase Database Analysis
