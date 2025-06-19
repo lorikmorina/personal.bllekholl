@@ -112,82 +112,31 @@ export async function POST(request: Request) {
         
         const requestId = customData.deep_scan_request_id;
         
-        // Update the deep scan request with payment completion
-        const { error: updateError } = await supabase
+        // Update the deep scan request payment status ONLY
+        // Don't trigger scan automatically - user will start it manually
+        const { data: updatedRequest, error: updateError } = await supabase
           .from('deep_scan_requests')
-          .update({
+          .update({ 
             payment_status: 'completed',
-            status: 'processing',
+            status: 'ready',  // Changed from 'processing' to 'ready'
             paddle_transaction_id: transactionId
           })
-          .eq('id', requestId);
-        
+          .eq('id', requestId)
+          .select()
+          .single();
+
         if (updateError) {
           console.error('Error updating deep scan request:', updateError);
-          throw updateError;
+          return NextResponse.json({ 
+            error: 'Failed to update scan request',
+            details: updateError.message 
+          }, { status: 500 });
         }
-        
-        console.log(`Successfully updated deep scan request ${requestId} - payment completed, scan processing started`);
-        
-        // TODO: Trigger background scan job here
-        // This could be a queue job, webhook to another service, or API call
-        try {
-          console.log('🚀 Attempting to trigger scan orchestrator for request:', requestId);
-          console.log('📍 Using SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
-          
-          // Call the scan orchestrator API
-          const scanResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` // For internal API authentication
-            },
-            body: JSON.stringify({ 
-              deep_scan_request_id: requestId 
-            })
-          });
-          
-          console.log('📊 Orchestrator response status:', scanResponse.status);
-          
-          if (!scanResponse.ok) {
-            const errorText = await scanResponse.text();
-            console.error('❌ Failed to trigger scan orchestrator:', {
-              status: scanResponse.status,
-              statusText: scanResponse.statusText,
-              errorBody: errorText,
-              requestId: requestId
-            });
-            
-            // Update the request with error information
-            await supabase
-              .from('deep_scan_requests')
-              .update({
-                status: 'failed',
-                error_message: `Orchestrator call failed: ${scanResponse.status} ${scanResponse.statusText} - ${errorText}`
-              })
-              .eq('id', requestId);
-              
-          } else {
-            const responseData = await scanResponse.text();
-            console.log('✅ Successfully triggered scan orchestrator for request:', requestId, 'Response:', responseData);
-          }
-        } catch (scanError) {
-          console.error('💥 Error triggering scan orchestrator:', {
-            error: scanError,
-            message: scanError instanceof Error ? scanError.message : 'Unknown error',
-            requestId: requestId,
-            siteUrl: process.env.NEXT_PUBLIC_SITE_URL
-          });
-          
-          // Update the request with error information
-          await supabase
-            .from('deep_scan_requests')
-            .update({
-              status: 'failed',
-              error_message: `Failed to trigger scan: ${scanError instanceof Error ? scanError.message : 'Unknown error'}`
-            })
-            .eq('id', requestId);
-        }
+
+        console.log(`✅ Deep scan request ${requestId} payment completed - status set to 'ready'`);
+
+        // Remove the orchestrator trigger - user will start scan manually
+        // No automatic scan initiation
         
         return NextResponse.json({ success: true });
       }

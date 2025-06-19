@@ -8,10 +8,7 @@
 [functions]
   external_node_modules = ["sharp"]
 
-# Configure specific function timeouts
-[functions."api/deep-scan/orchestrator"]
-  timeout = 900  # 15 minutes for background processing
-  
+# Configure webhook timeout
 [functions."api/webhooks/paddle"]
   timeout = 60  # 1 minute for webhook processing
 

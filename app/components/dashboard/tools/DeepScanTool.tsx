@@ -72,7 +72,7 @@ interface DeepScanRequest {
   url: string;
   domain: string;
   jwt_token?: string;
-  status: 'pending_payment' | 'processing' | 'completed' | 'failed';
+  status: 'pending_payment' | 'processing' | 'completed' | 'failed' | 'ready';
   payment_status: 'pending' | 'completed' | 'failed';
   user_email: string;
   paddle_transaction_id?: string;
@@ -323,6 +323,8 @@ export default function DeepScanTool() {
     switch (request.status) {
       case 'pending_payment':
         return <Badge variant="outline" className="text-yellow-600 border-yellow-600">Payment Pending</Badge>;
+      case 'ready':
+        return <Badge variant="outline" className="text-green-600 border-green-600">Ready to Scan</Badge>;
       case 'processing':
         return <Badge variant="outline" className="text-blue-600 border-blue-600">Processing</Badge>;
       case 'completed':
@@ -358,6 +360,29 @@ export default function DeepScanTool() {
             </Button>
           )}
         </div>
+      );
+    }
+    
+    // NEW: Start Scan button for ready requests
+    if (request.status === 'ready' && request.payment_status === 'completed') {
+      return (
+        <Button 
+          size="sm" 
+          onClick={() => handleStartScan(request.id)}
+          disabled={isDeepScanLoading}
+        >
+          {isDeepScanLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <Zap className="w-4 h-4 mr-1" />
+              Start Scan
+            </>
+          )}
+        </Button>
       );
     }
     
@@ -413,6 +438,175 @@ export default function DeepScanTool() {
     }
     
     return null;
+  };
+
+  // NEW: Function to handle manual scan start
+  const handleStartScan = async (requestId: string) => {
+    setIsDeepScanLoading(true);
+    setDeepScanMessage(null);
+
+    try {
+      // Update status to processing
+      await supabase
+        .from('deep_scan_requests')
+        .update({ status: 'processing' })
+        .eq('id', requestId);
+
+      // Get the request details
+      const { data: scanRequest } = await supabase
+        .from('deep_scan_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+
+      if (!scanRequest) {
+        throw new Error('Scan request not found');
+      }
+
+      console.log('🚀 Starting manual deep scan for:', scanRequest.url);
+
+      // Step 1: Light Scan
+      console.log('Step 1: Light scan analysis...');
+      const lightScanResults = await performLightScan(scanRequest.url);
+      
+      // Step 2: Supabase Analysis
+      console.log('Step 2: Supabase analysis...');
+      const supabaseResults = await performSupabaseAnalysis(scanRequest.url);
+      
+      // Step 3: Subdomain Analysis
+      console.log('Step 3: Subdomain analysis...');
+      const subdomainResults = await performSubdomainAnalysis(scanRequest.url);
+      
+      // Step 4: Authenticated Analysis (if JWT provided)
+      let authenticatedResults = null;
+      if (scanRequest.jwt_token) {
+        console.log('Step 4: Authenticated analysis...');
+        authenticatedResults = await performAuthenticatedAnalysis(scanRequest.url, scanRequest.jwt_token);
+      }
+
+      // Combine all results
+      const finalResults = {
+        scan_metadata: {
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          url: scanRequest.url,
+          scan_version: '3.0.0',
+          scan_type: 'user_initiated'
+        },
+        security_headers: lightScanResults?.security_headers,
+        api_keys_and_leaks: lightScanResults?.api_keys_and_leaks,
+        supabase_analysis: supabaseResults,
+        subdomain_analysis: subdomainResults,
+        authenticated_analysis: authenticatedResults,
+        overall_score: calculateOverallScore(lightScanResults, supabaseResults)
+      };
+
+      // Update database with final results
+      await supabase
+        .from('deep_scan_requests')
+        .update({
+          status: 'completed',
+          scan_results: finalResults,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', requestId);
+
+      // Refresh the requests list
+      await fetchUserRequests();
+
+      toast({
+        title: "Scan Completed!",
+        description: "Your deep security scan has finished successfully.",
+      });
+
+    } catch (error: any) {
+      console.error('Scan failed:', error);
+      
+      // Update status to failed
+      await supabase
+        .from('deep_scan_requests')
+        .update({
+          status: 'failed',
+          error_message: error.message
+        })
+        .eq('id', requestId);
+
+      setDeepScanMessage({ 
+        type: 'error', 
+        text: `Scan failed: ${error.message}` 
+      });
+    } finally {
+      setIsDeepScanLoading(false);
+    }
+  };
+
+  // Helper functions for individual scans
+  const performLightScan = async (url: string) => {
+    const response = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    if (!response.ok) throw new Error('Light scan failed');
+    return await response.json();
+  };
+
+  const performSupabaseAnalysis = async (url: string) => {
+    try {
+      const domain = new URL(url).hostname;
+      const response = await fetch('/api/supabase-deep-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain })
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.error === 'credentials_not_found') {
+          return { supabase_detected: false };
+        }
+        throw new Error('Supabase scan failed');
+      }
+      return await response.json();
+    } catch (error) {
+      return { error: 'Supabase analysis failed', supabase_detected: false };
+    }
+  };
+
+  const performSubdomainAnalysis = async (url: string) => {
+    try {
+      const domain = new URL(url).hostname.replace(/^www\./, '');
+      const response = await fetch('/api/subdomain-deep-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain })
+      });
+      if (!response.ok) throw new Error('Subdomain scan failed');
+      return await response.json();
+    } catch (error) {
+      return { error: 'Subdomain analysis failed', subdomains_found: [] };
+    }
+  };
+
+  const performAuthenticatedAnalysis = async (url: string, jwtToken: string) => {
+    try {
+      const response = await fetch('/api/authenticated-deep-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, jwt_token: jwtToken })
+      });
+      if (!response.ok) throw new Error('Authenticated scan failed');
+      return await response.json();
+    } catch (error) {
+      return { error: 'Authenticated analysis failed', authenticated_analysis: false };
+    }
+  };
+
+  const calculateOverallScore = (lightScan: any, supabaseScan: any) => {
+    // Simple scoring logic
+    let score = 100;
+    if (lightScan?.leaks?.length > 0) score -= lightScan.leaks.length * 10;
+    if (supabaseScan?.summary?.publicTables > 0) score -= supabaseScan.summary.publicTables * 15;
+    return Math.max(0, score);
   };
 
   // Helper function to format and display scan results
