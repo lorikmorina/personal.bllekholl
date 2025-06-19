@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Zap, Info, SearchCheck, ListChecks, FileText, Clock, CheckCircle, Target, Download, CreditCard, AlertCircle, Key, Shield, Database, AlertTriangle } from "lucide-react"
+import { Loader2, Zap, Info, SearchCheck, ListChecks, FileText, Clock, CheckCircle, Target, Download, CreditCard, AlertCircle, Shield, Database, AlertTriangle } from "lucide-react"
 import { useDashboard } from "../DashboardProvider"
 import { createClient } from "@/lib/supabase/client"
 import { Badge } from "@/components/ui/badge"
@@ -84,7 +84,6 @@ interface DeepScanRequest {
 
 export default function DeepScanTool() {
   const [deepScanUrl, setDeepScanUrl] = useState("")
-  const [jwtToken, setJwtToken] = useState("")
   const [isDeepScanLoading, setIsDeepScanLoading] = useState(false)
   const [deepScanMessage, setDeepScanMessage] = useState<{type: 'success' | 'error'; text: string} | null>(null)
   const [deepScanUrlValidation, setDeepScanUrlValidation] = useState<{valid: boolean; message?: string} | null>(null)
@@ -131,7 +130,6 @@ export default function DeepScanTool() {
               
               // Reset form
               setDeepScanUrl("")
-              setJwtToken("")
               setDeepScanMessage({ type: 'success', text: "Payment completed! Your scan is now processing." });
               
               // Refresh user requests
@@ -264,7 +262,6 @@ export default function DeepScanTool() {
           user_email: user.email,
           url: fullUrl,
           domain: finalUrl,
-          jwt_token: jwtToken.trim() || null,
           status: 'pending_payment',
           payment_status: 'pending'
         })
@@ -486,10 +483,6 @@ export default function DeepScanTool() {
       
       // Step 4: Authenticated Analysis (if JWT provided)
       let authenticatedResults = null;
-      if (scanRequest.jwt_token) {
-        console.log('Step 4: Authenticated analysis...');
-        authenticatedResults = await performAuthenticatedAnalysis(scanRequest.url, scanRequest.jwt_token);
-      }
 
       // Combine all results
       const finalResults = {
@@ -605,20 +598,6 @@ export default function DeepScanTool() {
       return await response.json();
     } catch (error) {
       return { error: 'Subdomain analysis failed', subdomains_found: [] };
-    }
-  };
-
-  const performAuthenticatedAnalysis = async (url: string, jwtToken: string) => {
-    try {
-      const response = await fetch('/api/authenticated-deep-scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, jwt_token: jwtToken })
-      });
-      if (!response.ok) throw new Error('Authenticated scan failed');
-      return await response.json();
-    } catch (error) {
-      return { error: 'Authenticated analysis failed', authenticated_analysis: false };
     }
   };
 
@@ -1224,13 +1203,13 @@ export default function DeepScanTool() {
               <li className="flex items-start">
                 <CheckCircle className="w-5 h-5 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
                 <div>
-                    <span className="font-semibold text-foreground">Comprehensive Analysis:</span> Advanced automated scanning for API keys, database misconfigurations, authentication bypasses, and security headers.
+                    <span className="font-semibold text-foreground">Comprehensive Analysis:</span> Advanced automated scanning for API keys, database misconfigurations, security headers, and subdomain discovery.
                 </div>
               </li>
               <li className="flex items-start">
                   <Target className="w-5 h-5 mr-3 mt-0.5 text-blue-500 flex-shrink-0" />
                 <div>
-                    <span className="font-semibold text-foreground">JWT Token Testing:</span> Optional authenticated scanning with your JWT token to test user-specific endpoints and permissions.
+                    <span className="font-semibold text-foreground">Multi-Layer Security Testing:</span> Tests multiple attack vectors including exposed APIs, database configurations, and security header analysis.
                 </div>
               </li>
               <li className="flex items-start">
@@ -1282,26 +1261,6 @@ export default function DeepScanTool() {
                   {deepScanUrlValidation.message}
                 </div>
               )}
-            </div>
-
-              <div>
-                <label htmlFor="jwtToken" className="block text-sm font-medium text-foreground mb-1">
-                  JWT Token (Optional)
-                </label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    id="jwtToken"
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    value={jwtToken}
-                    onChange={(e) => setJwtToken(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Provide a JWT token to test authenticated endpoints and user permissions (optional but recommended for logged-in user testing)
-                </p>
             </div>
 
             <Alert className="bg-primary/5 border-primary/20">
@@ -1376,12 +1335,6 @@ export default function DeepScanTool() {
                           <h3 className="text-lg font-semibold text-primary break-all mb-1">{request.url}</h3>
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             {getStatusBadge(request)}
-                            {request.jwt_token && (
-                              <Badge variant="secondary" className="text-xs">
-                                <Key className="w-3 h-3 mr-1" />
-                                JWT Provided
-                              </Badge>
-                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2 sm:mt-0">
