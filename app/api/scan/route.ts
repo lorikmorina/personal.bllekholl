@@ -120,7 +120,7 @@ const checkForApiKeys = (content: string): Array<LeakWithSupabase> => {
       return;
     }
     
-    patterns.forEach(pattern => {
+  patterns.forEach(pattern => {
       const matches = line.match(pattern.regex);
       if (matches) {
         const fullMatch = matches[0];
@@ -171,10 +171,10 @@ const checkSecurityHeaders = (headers: Record<string, string>): {
     'referrer-policy',
     'permissions-policy'
   ];
-
+  
   const present: string[] = [];
   const missing: string[] = [];
-
+  
   for (const header of importantHeaders) {
     if (headers[header.toLowerCase()]) {
       present.push(header);
@@ -182,7 +182,7 @@ const checkSecurityHeaders = (headers: Record<string, string>): {
       missing.push(header);
     }
   }
-
+  
   return { present, missing };
 };
 
@@ -212,7 +212,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
   const authPagesFound: string[] = [];
   const captchaProtected: string[] = [];
   const unprotectedPages: string[] = [];
-
+  
   // Find potential auth-related links
   const potentialAuthUrls = [
     '/login', '/signin', '/signup', '/register',
@@ -224,10 +224,10 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
     const href = $(element).attr('href') || '';
     if (href.includes('login') || href.includes('signin') || href.includes('signup') || href.includes('register')) {
       const fullUrl = href.startsWith('http') ? href : `${baseUrl}${href.startsWith('/') ? '' : '/'}${href}`;
-      authPagesFound.push(fullUrl);
+        authPagesFound.push(fullUrl);
     }
   });
-
+  
   // Check for forms that might be auth forms
   const hasAuthForm = $('form').filter((_, element) => {
     const action = $(element).attr('action') || '';
@@ -238,7 +238,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
            formHtmlLower.includes('password') || formHtmlLower.includes('login') || 
            formHtmlLower.includes('signin') || formHtmlLower.includes('signup');
   }).length > 0;
-
+  
   if (hasAuthForm) {
     authPagesFound.push(`${baseUrl} (form detected)`);
   }
@@ -250,7 +250,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
       authPagesFound.push(fullUrl);
     }
   });
-
+  
   // Check each auth page for CAPTCHA
   for (const authUrl of authPagesFound) {
     try {
@@ -260,7 +260,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
       });
-
+      
       const pageHtml = response.data;
       const hasCaptcha = pageHtml.toLowerCase().includes('recaptcha') || 
                         pageHtml.toLowerCase().includes('captcha') ||
@@ -277,7 +277,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
       // Don't add to either list
     }
   }
-
+  
   return {
     authPagesFound,
     captchaProtected,
@@ -288,7 +288,7 @@ const checkAuthPagesForCaptcha = async (baseUrl: string, html: string): Promise<
 export async function POST(request: Request) {
   try {
     const { url, deepScanRequest, deep_scan_request_id } = await request.json();
-
+    
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
@@ -361,7 +361,7 @@ export async function POST(request: Request) {
       }
 
       if (!profile.subscription_plan || profile.subscription_plan === 'free') {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Premium subscription required',
           message: 'This feature requires a premium subscription'
         }, { status: 403 })
@@ -371,12 +371,12 @@ export async function POST(request: Request) {
     // Proceed with the scan
     const response = await axios.get(targetUrl, {
       timeout: 10000,
-      headers: {
+        headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-
-    const html = response.data;
+        }
+      });
+      
+      const html = response.data;
     const responseHeaders = response.headers;
 
     // Convert axios headers to Record<string, string> format
@@ -402,16 +402,16 @@ export async function POST(request: Request) {
     let jsFilesScanned = inlineCode.length;
 
     for (const jsUrl of jsUrls.slice(0, 10)) { // Limit to first 10 JS files
-      try {
-        const jsResponse = await axios.get(jsUrl, {
+        try {
+          const jsResponse = await axios.get(jsUrl, {
           timeout: 5000,
-          headers: {
+            headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        });
+            }
+          });
         allJsContent.push(jsResponse.data);
         jsFilesScanned++;
-      } catch (error) {
+        } catch (error) {
         // Skip files that can't be fetched
         continue;
       }
@@ -420,10 +420,10 @@ export async function POST(request: Request) {
     // Check for API keys and leaks in all content
     const htmlLeaks = checkForApiKeys(html);
     const jsLeaks = allJsContent.flatMap(js => checkForApiKeys(js));
-    const allLeaks = [...htmlLeaks, ...jsLeaks];
+      const allLeaks = [...htmlLeaks, ...jsLeaks];
 
     // Remove duplicates based on type and preview
-    const uniqueLeaks = allLeaks.filter((leak, index, self) => 
+      const uniqueLeaks = allLeaks.filter((leak, index, self) => 
       index === self.findIndex(l => l.type === leak.type && l.preview === leak.preview)
     );
 
@@ -434,11 +434,11 @@ export async function POST(request: Request) {
     const score = calculateScore(headerCheck.present.length, headerCheck.missing.length, uniqueLeaks.length);
 
     // Test Supabase RLS if credentials were found
-    let rlsVulnerability = null;
-    for (const leak of uniqueLeaks) {
-      if (leak.type === 'Supabase Credentials' && leak.supabaseCreds) {
-        try {
-          // Call the RLS testing endpoint
+      let rlsVulnerability = null;
+      for (const leak of uniqueLeaks) {
+        if (leak.type === 'Supabase Credentials' && leak.supabaseCreds) {
+          try {
+            // Call the RLS testing endpoint
           const rlsTestResponse = await fetch(`${new URL(request.url).origin}/api/testRLS`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -463,9 +463,9 @@ export async function POST(request: Request) {
       score,
       security_headers: {
         score: Math.round((headerCheck.present.length / (headerCheck.present.length + headerCheck.missing.length)) * 100) || 0,
-        present: headerCheck.present,
-        missing: headerCheck.missing
-      },
+          present: headerCheck.present,
+          missing: headerCheck.missing
+        },
       api_keys_and_leaks: {
         js_files_scanned: jsFilesScanned,
         leaks_found: uniqueLeaks,
@@ -485,11 +485,11 @@ export async function POST(request: Request) {
       }
     });
 
-  } catch (error: any) {
+    } catch (error: any) {
     console.error('Scan error:', error);
     
     if (error.code === 'ENOTFOUND' || error.message?.includes('getaddrinfo')) {
-      return NextResponse.json({
+          return NextResponse.json({
         error: 'domain_not_found',
         message: 'Website not found. Please check the URL and try again.'
       }, { status: 404 });
@@ -502,7 +502,7 @@ export async function POST(request: Request) {
       }, { status: 503 });
     }
     
-    return NextResponse.json({
+    return NextResponse.json({ 
       error: 'scan_failed',
       message: error.message || 'An unexpected error occurred while scanning the website.'
     }, { status: 500 });
