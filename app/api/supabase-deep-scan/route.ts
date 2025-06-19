@@ -342,41 +342,43 @@ const testTableRLS = async (supabaseUrl: string, apiKey: string, tableName: stri
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { domain, supabaseUrl: directUrl, supabaseKey: directKey } = body;
+    const { domain, supabaseUrl: directUrl, supabaseKey: directKey, deepScanRequest = false } = body;
 
-    // Authentication checks
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    // Authentication checks - bypass for deep scan requests
+    if (!deepScanRequest) {
+      const cookieStore = cookies();
+      const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session?.user) {
-      return NextResponse.json({
-        error: "unauthorized",
-        message: "Authentication required to use SupabaseDeepScan",
-        redirectTo: "/signup"
-      }, { status: 401 });
-    }
+      if (!session?.user) {
+        return NextResponse.json({
+          error: "unauthorized",
+          message: "Authentication required to use SupabaseDeepScan",
+          redirectTo: "/signup"
+        }, { status: 401 });
+      }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('subscription_plan')
-      .eq('id', session.user.id)
-      .single();
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_plan')
+        .eq('id', session.user.id)
+        .single();
 
-    if (profileError) {
-      return NextResponse.json({
-        error: "profile_error",
-        message: "Error checking subscription status",
-      }, { status: 500 });
-    }
+      if (profileError) {
+        return NextResponse.json({
+          error: "profile_error",
+          message: "Error checking subscription status",
+        }, { status: 500 });
+      }
 
-    if (!profile || profile.subscription_plan === 'free') {
-      return NextResponse.json({
-        error: "subscription_required",
-        message: "A paid subscription is required to use SupabaseDeepScan",
-        redirectTo: "/pricing"
-      }, { status: 403 });
+      if (!profile || profile.subscription_plan === 'free') {
+        return NextResponse.json({
+          error: "subscription_required",
+          message: "A paid subscription is required to use SupabaseDeepScan",
+          redirectTo: "/pricing"
+        }, { status: 403 });
+      }
     }
 
     const startTime = Date.now();

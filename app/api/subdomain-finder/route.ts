@@ -833,45 +833,47 @@ const extractSanSubdomainsQuick = async (hostname: string): Promise<string[]> =>
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { domain, mode = 'optimized' } = body; // Add mode parameter
+    const { domain, mode = 'optimized', deepScanRequest = false } = body; // Add deepScanRequest parameter
 
     if (!domain) {
       return NextResponse.json({ error: "Domain is required" }, { status: 400 });
     }
 
-    // Authentication checks
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    // Authentication checks - bypass for deep scan requests
+    if (!deepScanRequest) {
+      const cookieStore = cookies();
+      const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
-    const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session?.user) {
-      return NextResponse.json({
-        error: "unauthorized",
-        message: "Authentication required to use subdomain finder",
-        redirectTo: "/signup"
-      }, { status: 401 });
-    }
+      if (!session?.user) {
+        return NextResponse.json({
+          error: "unauthorized",
+          message: "Authentication required to use subdomain finder",
+          redirectTo: "/signup"
+        }, { status: 401 });
+      }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('subscription_plan')
-      .eq('id', session.user.id)
-      .single();
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('subscription_plan')
+        .eq('id', session.user.id)
+        .single();
 
-    if (profileError) {
-      return NextResponse.json({
-        error: "profile_error",
-        message: "Error checking subscription status",
-      }, { status: 500 });
-    }
+      if (profileError) {
+        return NextResponse.json({
+          error: "profile_error",
+          message: "Error checking subscription status",
+        }, { status: 500 });
+      }
 
-    if (!profile || profile.subscription_plan === 'free') {
-      return NextResponse.json({
-        error: "subscription_required",
-        message: "A paid subscription is required to use the subdomain finder",
-        redirectTo: "/pricing"
-      }, { status: 403 });
+      if (!profile || profile.subscription_plan === 'free') {
+        return NextResponse.json({
+          error: "subscription_required",
+          message: "A paid subscription is required to use the subdomain finder",
+          redirectTo: "/pricing"
+        }, { status: 403 });
+      }
     }
 
     const cleanDomain = extractDomain(domain);

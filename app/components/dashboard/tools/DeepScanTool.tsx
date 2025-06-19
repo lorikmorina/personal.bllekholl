@@ -545,7 +545,7 @@ export default function DeepScanTool() {
     const response = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url, deepScanRequest: true })
     });
     if (!response.ok) throw new Error('Light scan failed');
     return await response.json();
@@ -575,10 +575,10 @@ export default function DeepScanTool() {
   const performSubdomainAnalysis = async (url: string) => {
     try {
       const domain = new URL(url).hostname.replace(/^www\./, '');
-      const response = await fetch('/api/subdomain-deep-scan', {
+      const response = await fetch('/api/subdomain-finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain, deepScanRequest: true })
       });
       if (!response.ok) throw new Error('Subdomain scan failed');
       return await response.json();

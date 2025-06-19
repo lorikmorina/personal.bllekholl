@@ -476,7 +476,7 @@ export async function POST(request: Request) {
   try {
     // Get the request body
     const body = await request.json();
-    const { url } = body;
+    const { url, deepScanRequest = false } = body;
     
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
@@ -516,9 +516,9 @@ export async function POST(request: Request) {
     // Check if this is an internal call from various sources
     const isInternalFreeScan = body._internal_free_scan === true;
     const isInternalDeepScan = request.headers.get('X-Internal-Scan') === 'true';
-    const isInternalCall = isInternalFreeScan || isInternalDeepScan;
+    const isInternalCall = isInternalFreeScan || isInternalDeepScan || deepScanRequest;
     
-    // Require authentication for scanning unless it's an internal call
+    // Require authentication for scanning unless it's an internal call or deep scan request
     if (!session?.user && !isInternalCall) {
       return NextResponse.json({
         error: "unauthorized",
@@ -527,7 +527,7 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
     
-    // Skip subscription check for internal calls
+    // Skip subscription check for internal calls or deep scan requests
     if (!isInternalCall) {
       // Fetch user profile to check subscription
       const { data: profile, error: profileError } = await supabase
