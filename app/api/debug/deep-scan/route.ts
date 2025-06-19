@@ -6,6 +6,10 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🔧 Debug: Testing deep scan orchestrator connectivity');
     
+    // Check for specific request ID in query params
+    const { searchParams } = new URL(request.url);
+    const requestId = searchParams.get('request_id');
+    
     // Check environment variables
     const envCheck = {
       NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -23,6 +27,33 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
     
+    // If specific request ID provided, check that request
+    let specificRequest = null;
+    if (requestId) {
+      const { data: specificData, error: specificError } = await supabase
+        .from('deep_scan_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single();
+      
+      specificRequest = {
+        found: !!specificData,
+        error: specificError?.message,
+        data: specificData ? {
+          id: specificData.id,
+          status: specificData.status,
+          payment_status: specificData.payment_status,
+          created_at: specificData.created_at,
+          completed_at: specificData.completed_at,
+          error_message: specificData.error_message,
+          url: specificData.url,
+          has_scan_results: !!specificData.scan_results,
+          scan_duration: specificData.created_at ? 
+            Math.round((new Date().getTime() - new Date(specificData.created_at).getTime()) / 1000) : null
+        } : null
+      };
+    }
+    
     // Get recent deep scan requests to check database connectivity
     const { data: requests, error: dbError } = await supabase
       .from('deep_scan_requests')
@@ -39,7 +70,7 @@ export async function GET(request: NextRequest) {
     
     // Test orchestrator endpoint connectivity with a real request ID if available
     let orchestratorTest = null;
-    const testRequestId = requests && requests.length > 0 ? requests[0].id : 'test-connection-only';
+    const testRequestId = requestId || (requests && requests.length > 0 ? requests[0].id : 'test-connection-only');
     
     try {
       const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
@@ -70,6 +101,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       timestamp: new Date().toISOString(),
+      requestedScanId: requestId,
+      specificRequest,
       environmentVariables: envCheck,
       databaseConnection: {
         success: !dbError,
@@ -85,7 +118,7 @@ export async function GET(request: NextRequest) {
         totalFound: requests?.length || 0
       },
       orchestratorConnectivity: orchestratorTest,
-      recommendations: generateRecommendations(envCheck, dbError, orchestratorTest)
+      recommendations: generateRecommendations(envCheck, dbError, orchestratorTest, specificRequest)
     });
     
   } catch (error) {
@@ -97,7 +130,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function generateRecommendations(envCheck: any, dbError: any, orchestratorTest: any): string[] {
+function generateRecommendations(envCheck: any, dbError: any, orchestratorTest: any, specificRequest?: any): string[] {
   const recommendations = [];
   
   // Check for missing environment variables
@@ -112,6 +145,18 @@ function generateRecommendations(envCheck: any, dbError: any, orchestratorTest: 
   // Check database connectivity
   if (dbError) {
     recommendations.push(`❌ Database connection failed: ${dbError.message}`);
+  }
+  
+  // Check specific request if provided
+  if (specificRequest) {
+    if (!specificRequest.found) {
+      recommendations.push(`❌ Requested scan ID not found in database`);
+    } else if (specificRequest.data?.status === 'processing' && specificRequest.data?.scan_duration > 600) {
+      recommendations.push(`⚠️ Scan has been processing for ${specificRequest.data.scan_duration} seconds (over 10 minutes) - likely stuck`);
+      recommendations.push(`💡 Try manually restarting the scan using the POST endpoint`);
+    } else if (specificRequest.data?.status === 'failed') {
+      recommendations.push(`❌ Scan failed: ${specificRequest.data.error_message || 'Unknown error'}`);
+    }
   }
   
   // Check orchestrator connectivity
@@ -130,10 +175,10 @@ function generateRecommendations(envCheck: any, dbError: any, orchestratorTest: 
   return recommendations;
 }
 
-// POST method to manually trigger a scan for testing
+// POST method to manually trigger a scan for testing or restart a stuck scan
 export async function POST(request: NextRequest) {
   try {
-    const { request_id } = await request.json();
+    const { request_id, force_restart } = await request.json();
     
     if (!request_id) {
       return NextResponse.json({
@@ -142,6 +187,24 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('🔧 Debug: Manually triggering scan for request:', request_id);
+    
+    // If force_restart is true, reset the status to processing first
+    if (force_restart) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      
+      await supabase
+        .from('deep_scan_requests')
+        .update({ 
+          status: 'processing',
+          error_message: null 
+        })
+        .eq('id', request_id);
+        
+      console.log('🔄 Reset scan status to processing');
+    }
     
     // Call the orchestrator directly
     const orchestratorResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
@@ -160,6 +223,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       timestamp: new Date().toISOString(),
       requestId: request_id,
+      forceRestart: force_restart,
       orchestratorResponse: {
         status: orchestratorResponse.status,
         statusText: orchestratorResponse.statusText,

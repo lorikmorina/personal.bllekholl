@@ -184,7 +184,7 @@ async function performSuperScan(scanRequest: any, supabase: any) {
   
   // Set a maximum scan time limit (8 minutes for production)
   const MAX_SCAN_TIME = 8 * 60 * 1000; // 8 minutes (increased from 3)
-  let scanTimeout: NodeJS.Timeout;
+  let scanTimeout: NodeJS.Timeout | undefined;
   
   try {
     // Set up timeout to prevent stuck scans
@@ -201,14 +201,16 @@ async function performSuperScan(scanRequest: any, supabase: any) {
         url: url,
         has_jwt_token: !!jwt_token,
         scan_version: '2.0.1', // Updated version
-        scan_type: 'super_scan'
+        scan_type: 'super_scan',
+        completed_at: null as string | null,
+        duration_ms: null as number | null
       },
       // Core security findings
-      security_headers: null,
-      api_keys_and_leaks: null,
-      supabase_analysis: null,
-      subdomain_analysis: null,
-      authenticated_analysis: null,
+      security_headers: null as any,
+      api_keys_and_leaks: null as any,
+      supabase_analysis: null as any,
+      subdomain_analysis: null as any,
+      authenticated_analysis: null as any,
       
       // Summary data for quick access
       overall_score: 0,
@@ -260,7 +262,9 @@ async function performSuperScan(scanRequest: any, supabase: any) {
     const results = await Promise.race([scanExecution, timeoutPromise]) as PromiseSettledResult<any>[];
 
     // Clear global timeout since scan completed
-    clearTimeout(scanTimeout);
+    if (scanTimeout) {
+      clearTimeout(scanTimeout);
+    }
 
     console.log('📊 Processing scan results...');
     
@@ -508,11 +512,16 @@ async function performSubdomainAnalysis(url: string) {
     for (const subdomain of subdomains.slice(0, 10)) { // Limit to 10 for performance
       try {
         const subdomainUrl = `https://${subdomain}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch(subdomainUrl, { 
           method: 'HEAD', 
-          timeout: 5000,
+          signal: controller.signal,
           headers: { 'User-Agent': 'SecureVibing-SuperScan/2.0' }
         });
+        
+        clearTimeout(timeoutId);
         
         subdomainResults.push({
           subdomain,
