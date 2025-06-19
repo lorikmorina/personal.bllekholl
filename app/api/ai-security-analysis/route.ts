@@ -28,6 +28,8 @@ You are a cybersecurity expert analyzing website security scan results. Based on
 Scan Results:
 ${JSON.stringify(scanSummary, null, 2)}
 
+IMPORTANT: Respond with ONLY valid JSON. Do not wrap your response in markdown code blocks or add any other text.
+
 Please provide your analysis in the following JSON format:
 
 {
@@ -53,6 +55,7 @@ Guidelines:
 - Limit to maximum 5 recommendations
 - For each recommendation, provide specific steps to fix the issue
 - Consider API key leaks, database exposures, missing security headers, and subdomain vulnerabilities
+- Return ONLY the JSON object, no other text or formatting
 `;
 
     const completion = await openai.chat.completions.create({
@@ -60,7 +63,7 @@ Guidelines:
       messages: [
         {
           role: "system",
-          content: "You are a cybersecurity expert providing concise, actionable security recommendations. Always respond with valid JSON."
+          content: "You are a cybersecurity expert providing concise, actionable security recommendations. Always respond with valid JSON only - no markdown code blocks, no additional text, just the pure JSON object."
         },
         {
           role: "user",
@@ -80,9 +83,21 @@ Guidelines:
     // Parse the AI response as JSON
     let recommendations;
     try {
-      recommendations = JSON.parse(aiResponse);
+      // Clean the response - remove markdown code blocks if present
+      let cleanedResponse = aiResponse.trim();
+      
+      // Remove ```json and ``` if present
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      recommendations = JSON.parse(cleanedResponse);
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', aiResponse);
+      console.error('Parse error:', parseError);
+      
       // Fallback response
       recommendations = {
         severity: "medium",
