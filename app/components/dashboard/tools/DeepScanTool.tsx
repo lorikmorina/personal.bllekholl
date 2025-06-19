@@ -557,7 +557,7 @@ export default function DeepScanTool() {
       const response = await fetch('/api/supabase-deep-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain, deepScanRequest: true })
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -629,10 +629,10 @@ export default function DeepScanTool() {
         {/* Scan Overview */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
           <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            🚀 Super Scan Overview
-            {scan_metadata?.scan_type === 'super_scan' && (
+            🚀 Deep Security Scan Overview
+            {scan_metadata?.scan_type === 'user_initiated' && (
               <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                v2.0
+                v3.0
               </span>
             )}
           </h3>
@@ -870,20 +870,33 @@ export default function DeepScanTool() {
           </div>
         )}
 
-        {/* Supabase Analysis */}
+        {/* Enhanced Supabase Analysis */}
         {supabase_analysis && supabase_analysis.supabase_detected && !supabase_analysis.error && (
           <div className="bg-white p-6 rounded-lg border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               🗄️ Supabase Database Analysis
-              {supabase_analysis.optimization_applied && (
-                <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                  Optimized
-                </span>
-              )}
+              <span className="ml-2 px-2 py-1 text-xs bg-indigo-100 text-indigo-800 rounded-full">
+                Project: {supabase_analysis.projectId}
+              </span>
             </h3>
             
+            {/* Project Info */}
+            <div className="mb-4 p-3 bg-gray-50 rounded">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Supabase URL:</span> 
+                  <span className="ml-2 text-blue-600">{supabase_analysis.supabaseUrl}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Scan Time:</span> 
+                  <span className="ml-2">{supabase_analysis.scanTimeMs}ms</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Summary Stats */}
             {supabase_analysis.summary && (
-              <div className="mb-4 grid grid-cols-3 gap-4">
+              <div className="mb-6 grid grid-cols-4 gap-4">
                 <div className="text-center p-3 bg-blue-50 rounded">
                   <div className="text-xl font-bold text-blue-700">{supabase_analysis.summary.totalTables || 0}</div>
                   <div className="text-xs text-blue-600">Total Tables</div>
@@ -896,51 +909,100 @@ export default function DeepScanTool() {
                   <div className="text-xl font-bold text-green-700">{supabase_analysis.summary.protectedTables || 0}</div>
                   <div className="text-xs text-green-600">Protected</div>
                 </div>
+                <div className="text-center p-3 bg-gray-50 rounded">
+                  <div className="text-xl font-bold text-gray-700">{supabase_analysis.summary.errorTables || 0}</div>
+                  <div className="text-xs text-gray-600">Errors</div>
+                </div>
               </div>
             )}
             
+            {/* Database Schema - Collapsible Tables */}
             {supabase_analysis.tables && supabase_analysis.tables.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-medium text-gray-800">📋 Database Tables:</h4>
-                {supabase_analysis.tables.slice(0, 10).map((table: any, index: number) => (
-                  <div key={index} className={`p-3 rounded border-l-4 ${
-                    table.isPublic ? 'bg-red-50 border-red-400' : 'bg-green-50 border-green-400'
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-800 text-lg">📋 Database Schema ({supabase_analysis.tables.length} tables)</h4>
+                {supabase_analysis.tables.map((table: any, index: number) => (
+                  <details key={index} className={`border rounded-lg overflow-hidden ${
+                    table.isPublic ? 'bg-yellow-50 border-yellow-300' : 'bg-white border-gray-200'
                   }`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-medium">{table.name}</span>
-                        <div className="text-sm text-gray-600">
-                          {table.columns?.total_columns ? 
-                            `${table.columns.total_columns} columns (optimized view)` :
-                            `${table.columns?.length || 0} columns`
-                          }
-                          {table.columns?.has_sensitive_columns && (
-                            <span className="ml-2 text-orange-600">⚠️ Contains sensitive fields</span>
+                    <summary className={`cursor-pointer p-4 font-medium hover:bg-opacity-50 ${
+                      table.isPublic ? 'bg-yellow-100 text-yellow-900' : 'bg-gray-50 text-gray-900'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <span className="font-semibold">{table.name}</span>
+                          {table.isPublic && (
+                            <span className="px-2 py-1 text-xs bg-yellow-200 text-yellow-800 rounded-full font-medium">
+                              ⚠️ PUBLIC ACCESS
+                            </span>
                           )}
+                          <span className="text-sm text-gray-600">
+                            {table.columns?.length || 0} columns
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            table.rlsEnabled ? 'bg-blue-200 text-blue-800' : 'bg-red-200 text-red-800'
+                          }`}>
+                            RLS: {table.rlsEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                          <span className="text-gray-400">▼</span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end space-y-1">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          table.isPublic ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'
-                        }`}>
-                          {table.isPublic ? 'Public' : 'Protected'}
-                        </span>
-                        {table.rlsEnabled !== undefined && (
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            table.rlsEnabled ? 'bg-blue-200 text-blue-800' : 'bg-yellow-200 text-yellow-800'
-                          }`}>
-                            RLS: {table.rlsEnabled ? 'On' : 'Off'}
-                          </span>
-                        )}
+                    </summary>
+                    
+                    <div className="p-4 border-t bg-white">
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-gray-700 mb-3">Table Columns:</h5>
+                        <div className="grid gap-2">
+                          {table.columns && table.columns.map((column: any, colIndex: number) => (
+                            <div key={colIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-gray-900">{column.name}</span>
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                                  {column.type}
+                                </span>
+                                {!column.nullable && (
+                                  <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
+                                    NOT NULL
+                                  </span>
+                                )}
+                              </div>
+                              {column.description && (
+                                <span className="text-xs text-gray-600 italic">
+                                  {column.description}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Security Analysis for this table */}
+                        <div className="mt-4 p-3 bg-gray-50 rounded">
+                          <h6 className="font-medium text-gray-700 mb-2">Security Analysis:</h6>
+                          <div className="space-y-1 text-sm">
+                            <div className={`flex items-center ${table.isPublic ? 'text-red-600' : 'text-green-600'}`}>
+                              {table.isPublic ? '🔓' : '🔒'} 
+                              <span className="ml-2">
+                                {table.isPublic ? 'Publicly accessible without authentication' : 'Protected by authentication'}
+                              </span>
+                            </div>
+                            <div className={`flex items-center ${table.rlsEnabled ? 'text-green-600' : 'text-yellow-600'}`}>
+                              {table.rlsEnabled ? '✅' : '⚠️'} 
+                              <span className="ml-2">
+                                Row Level Security is {table.rlsEnabled ? 'enabled' : 'disabled'}
+                              </span>
+                            </div>
+                            {table.errorMessage && (
+                              <div className="flex items-center text-red-600">
+                                ❌ <span className="ml-2">{table.errorMessage}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </details>
                 ))}
-                {supabase_analysis.tables.length > 10 && (
-                  <div className="text-sm text-gray-600 italic">
-                    ... and {supabase_analysis.tables.length - 10} more tables
-                  </div>
-                )}
               </div>
             )}
           </div>
