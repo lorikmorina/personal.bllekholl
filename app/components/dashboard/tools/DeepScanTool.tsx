@@ -104,17 +104,9 @@ export default function DeepScanTool() {
 
   // Initialize Paddle and set up event listener
   useEffect(() => {
-    // Debug environment variables
-    console.log('🔧 Paddle Environment Variables:');
-    console.log('NEXT_PUBLIC_PADDLE_CLIENT_TOKEN:', !!process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN);
-    console.log('NEXT_PUBLIC_PADDLE_DEEP_SCAN_PRICE_ID:', process.env.NEXT_PUBLIC_PADDLE_DEEP_SCAN_PRICE_ID);
-    console.log('NEXT_PUBLIC_PADDLE_SANDBOX_MODE:', process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE);
-    
     const initializePaddle = () => {
       if (window.Paddle && !paddleLoaded) {
         try {
-          console.log('Initializing Paddle...');
-          
           // Set environment if in sandbox mode
           if (process.env.NEXT_PUBLIC_PADDLE_SANDBOX_MODE === 'true') {
             window.Paddle.Environment.set("sandbox");
@@ -162,7 +154,6 @@ export default function DeepScanTool() {
             }
           });
           
-          console.log('Paddle initialized successfully');
           setPaddleLoaded(true);
         } catch (error) {
           console.error('Error initializing Paddle:', error);
@@ -268,11 +259,6 @@ export default function DeepScanTool() {
     e.preventDefault();
     setDeepScanMessage(null);
 
-    console.log('🚀 Deep scan submit initiated');
-    console.log('User:', !!user, 'Email:', user?.email);
-    console.log('Paddle loaded:', paddleLoaded);
-    console.log('Window.Paddle available:', !!window.Paddle);
-
     if (!user || !user.email) {
       setDeepScanMessage({ type: 'error', text: "You must be logged in to request a deep scan." });
       return;
@@ -284,7 +270,6 @@ export default function DeepScanTool() {
     }
 
     const deepScanPriceId = getDeepScanPriceId();
-    console.log('Deep scan price ID:', deepScanPriceId);
     
     if (!deepScanPriceId) {
       setDeepScanMessage({ type: 'error', text: "Deep scan pricing not configured. Please contact support." });
@@ -306,8 +291,6 @@ export default function DeepScanTool() {
     userRef.current = null;
 
     try {
-      console.log('💾 Saving request to database...');
-      
       // Step 1: Save the request to Supabase FIRST
       const { data: insertedRequest, error: insertError } = await supabase
         .from('deep_scan_requests')
@@ -327,17 +310,9 @@ export default function DeepScanTool() {
       }
       
       const requestId = insertedRequest.id;
-      console.log('✅ Request saved with ID:', requestId);
       
       userRef.current = user;
       checkoutInitiated.current = true;
-
-      console.log('🎯 Opening Paddle checkout...');
-      console.log('Checkout config:', {
-        priceId: deepScanPriceId,
-        email: user.email,
-        requestId: requestId
-      });
 
       // Step 2: Open Paddle checkout overlay
       window.Paddle.Checkout.open({
@@ -356,7 +331,6 @@ export default function DeepScanTool() {
           _afficoneRef: (window as any).Afficone?.referral
         },
         closeCallback: () => {
-          console.log("🚪 Paddle checkout closed manually");
           if (checkoutInitiated.current) { 
             checkoutInitiated.current = false;
             userRef.current = null;
@@ -365,10 +339,8 @@ export default function DeepScanTool() {
         }
       });
 
-      console.log('✅ Paddle checkout opened successfully');
-
     } catch (error: any) {
-      console.error('❌ Error during deep scan submission process:', error);
+      console.error('Error during deep scan submission process:', error);
       setDeepScanMessage({ type: 'error', text: `An error occurred: ${error.message}` });
       checkoutInitiated.current = false;
       userRef.current = null;
@@ -692,7 +664,9 @@ export default function DeepScanTool() {
       });
 
       if (!response.ok) {
-        throw new Error('AI analysis failed');
+        const errorText = await response.text();
+        console.error('AI analysis failed:', errorText);
+        throw new Error(`AI analysis failed with status ${response.status}`);
       }
 
       const data = await response.json();

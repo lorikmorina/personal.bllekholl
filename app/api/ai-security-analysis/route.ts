@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -7,13 +8,33 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
+    // Security: Verify authentication
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Unauthorized AI analysis request');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { scanResults } = await request.json();
 
     if (!scanResults) {
       return NextResponse.json({ error: 'No scan results provided' }, { status: 400 });
     }
 
-    // Prepare the scan results summary for AI analysis
+    // Security: Validate scan results structure
+    if (typeof scanResults !== 'object' || Array.isArray(scanResults)) {
+      return NextResponse.json({ error: 'Invalid scan results format' }, { status: 400 });
+    }
+
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY not configured');
+      return NextResponse.json({ error: 'AI analysis not available' }, { status: 503 });
+    }
+
+    // Prepare the scan results summary for AI analysis (sanitized)
     const scanSummary = {
       security_headers: scanResults.security_headers,
       api_keys_and_leaks: scanResults.api_keys_and_leaks,
@@ -94,9 +115,9 @@ Guidelines:
       }
       
       recommendations = JSON.parse(cleanedResponse);
+      
     } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', aiResponse);
-      console.error('Parse error:', parseError);
+      console.error('Failed to parse AI response as JSON');
       
       // Fallback response
       recommendations = {
