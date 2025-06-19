@@ -467,15 +467,15 @@ export default function DeepScanTool() {
 
       // Step 1: Light Scan
       console.log('Step 1: Light scan analysis...');
-      const lightScanResults = await performLightScan(scanRequest.url);
+      const lightScanResults = await performLightScan(scanRequest.url, requestId);
       
       // Step 2: Supabase Analysis
       console.log('Step 2: Supabase analysis...');
-      const supabaseResults = await performSupabaseAnalysis(scanRequest.url);
+      const supabaseResults = await performSupabaseAnalysis(scanRequest.url, requestId);
       
       // Step 3: Subdomain Analysis
       console.log('Step 3: Subdomain analysis...');
-      const subdomainResults = await performSubdomainAnalysis(scanRequest.url);
+      const subdomainResults = await performSubdomainAnalysis(scanRequest.url, requestId);
       
       // Step 4: Authenticated Analysis (if JWT provided)
       let authenticatedResults = null;
@@ -541,23 +541,23 @@ export default function DeepScanTool() {
   };
 
   // Helper functions for individual scans
-  const performLightScan = async (url: string) => {
+  const performLightScan = async (url: string, requestId: string) => {
     const response = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, deepScanRequest: true })
+      body: JSON.stringify({ url, deepScanRequest: true, deep_scan_request_id: requestId })
     });
     if (!response.ok) throw new Error('Light scan failed');
     return await response.json();
   };
 
-  const performSupabaseAnalysis = async (url: string) => {
+  const performSupabaseAnalysis = async (url: string, requestId: string) => {
     try {
       const domain = new URL(url).hostname;
       const response = await fetch('/api/supabase-deep-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain, deepScanRequest: true })
+        body: JSON.stringify({ domain, deepScanRequest: true, deep_scan_request_id: requestId })
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -572,13 +572,13 @@ export default function DeepScanTool() {
     }
   };
 
-  const performSubdomainAnalysis = async (url: string) => {
+  const performSubdomainAnalysis = async (url: string, requestId: string) => {
     try {
       const domain = new URL(url).hostname.replace(/^www\./, '');
       const response = await fetch('/api/subdomain-finder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain, deepScanRequest: true })
+        body: JSON.stringify({ domain, deepScanRequest: true, deep_scan_request_id: requestId })
       });
       if (!response.ok) throw new Error('Subdomain scan failed');
       return await response.json();

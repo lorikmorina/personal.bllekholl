@@ -832,46 +832,59 @@ const extractSanSubdomainsQuick = async (hostname: string): Promise<string[]> =>
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { domain, mode = 'optimized', deepScanRequest = false } = body; // Add deepScanRequest parameter
+    const { domain, deepScanRequest, deep_scan_request_id } = await request.json();
 
     if (!domain) {
-      return NextResponse.json({ error: "Domain is required" }, { status: 400 });
+      return NextResponse.json({ error: 'Domain is required' }, { status: 400 });
     }
 
-    // Authentication checks - bypass for deep scan requests
-    if (!deepScanRequest) {
-      const cookieStore = cookies();
-      const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient({ cookies: () => cookies() });
+    let bypassPremiumCheck = false;
 
-      const { data: { session } } = await supabase.auth.getSession();
+    // Secure deep scan verification
+    if (deepScanRequest && deep_scan_request_id) {
+      // Verify the deep scan request exists and is paid for
+      const { data: deepScanData, error: deepScanError } = await supabase
+        .from('deep_scan_requests')
+        .select('id, payment_status, status')
+        .eq('id', deep_scan_request_id)
+        .eq('payment_status', 'completed')
+        .single();
 
-      if (!session?.user) {
-        return NextResponse.json({
-          error: "unauthorized",
-          message: "Authentication required to use subdomain finder",
-          redirectTo: "/signup"
-        }, { status: 401 });
+      if (deepScanError || !deepScanData) {
+        return NextResponse.json({ 
+          error: 'Invalid or unpaid deep scan request',
+          details: 'Deep scan request not found or payment not completed'
+        }, { status: 403 });
       }
 
+      // Verified paid deep scan request - bypass premium check
+      bypassPremiumCheck = true;
+    }
+
+    // Authentication and subscription checks (skip if verified deep scan)
+    if (!bypassPremiumCheck) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Check user subscription
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('subscription_plan')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
 
       if (profileError) {
-        return NextResponse.json({
-          error: "profile_error",
-          message: "Error checking subscription status",
-        }, { status: 500 });
+        return NextResponse.json({ error: 'User profile not found' }, { status: 404 });
       }
 
-      if (!profile || profile.subscription_plan === 'free') {
-        return NextResponse.json({
-          error: "subscription_required",
-          message: "A paid subscription is required to use the subdomain finder",
-          redirectTo: "/pricing"
+      if (!profile.subscription_plan || profile.subscription_plan === 'free') {
+        return NextResponse.json({ 
+          error: 'Premium subscription required',
+          message: 'This feature requires a premium subscription'
         }, { status: 403 });
       }
     }
