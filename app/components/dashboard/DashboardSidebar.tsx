@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion"
 import Link from "next/link"
-import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, Bell, Clipboard, FileText, Clock, Home, Settings, CreditCard, Database, Search, Zap } from "lucide-react"
+import { Shield, BarChart3, Users, Menu, X, LogOut, ChevronRight, ChevronDown, Bell, Clipboard, FileText, Clock, Home, Settings, CreditCard, Database, Search, Zap } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useDashboard } from "./DashboardProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -17,6 +17,7 @@ interface DashboardSidebarProps {
 
 export default function DashboardSidebar({ activeTool, setActiveTool }: DashboardSidebarProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [premiumToolsOpen, setPremiumToolsOpen] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const { user, signOut } = useDashboard()
@@ -48,6 +49,14 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
     
     fetchUserProfile()
   }, [user, supabase])
+
+  // Auto-expand premium tools if a premium tool is active
+  useEffect(() => {
+    const premiumTools = ['light-scan', 'domains', 'supabase-check', 'supabase-deep-scan', 'subdomain-finder']
+    if (premiumTools.includes(activeTool)) {
+      setPremiumToolsOpen(true)
+    }
+  }, [activeTool])
 
   useEffect(() => {
     const getCustomerPortalUrl = async () => {
@@ -97,25 +106,10 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
     return plan === 'free' ? "Free Plan" : "Premium Plan"
   }
 
-  // In the navigation array, update to make Reports a tool instead of a direct link
-  const navigation = [
-    {
-      name: "Overview",
-      value: "overview",
-      icon: <Home className="h-5 w-5" />,
-    },
-    {
-      name: "Security Scan",
-      value: "lightscan",
-      icon: <Clock className="h-5 w-5" />,
-    },
-    {
-      name: "Reports",
-      value: "reports", // Now this is a tool value, not a direct link
-      icon: <FileText className="h-5 w-5" />,
-    },
-    // ... other navigation items ...
-  ]
+  // Check if user has premium access
+  const isPremiumUser = () => {
+    return userProfile?.subscription_plan && userProfile.subscription_plan !== 'free'
+  }
 
   return (
     <>
@@ -159,119 +153,162 @@ export default function DashboardSidebar({ activeTool, setActiveTool }: Dashboar
           
           <div className="flex-1 px-3">
             <div className="space-y-1">
-              <h3 className="px-3 text-xs font-semibold text-muted-foreground">
-                TOOLS
-              </h3>
               
-              {/* Periodic Scans Tool - Rebranded from Domains */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'domains' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('domains')}
-              >
-                <div className="flex items-center">
-                  <Clock className="w-5 h-5 mr-3" />
-                  <span>Periodic Scans</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              {/* One Time Scan (Free Tool) */}
+              <div className="mb-4">
+                <h3 className="px-3 text-xs font-semibold text-muted-foreground mb-2">
+                  SECURITY SCAN
+                </h3>
+                <button 
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                    activeTool === 'deep-scan' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-foreground hover:bg-secondary/10'
+                  }`}
+                  onClick={() => setActiveTool('deep-scan')}
+                >
+                  <div className="flex items-center">
+                    <Zap className="w-5 h-5 mr-3" />
+                    <span>One Time Scan</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
               
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'light-scan' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('light-scan')}
-              >
-                <div className="flex items-center">
-                  <Shield className="w-5 h-5 mr-3" />
-                  <span>Light Scan</span>
+              {/* Premium Tools Section */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="px-3 text-xs font-semibold text-muted-foreground">
+                    PREMIUM TOOLS
+                  </h3>
+                  {!isPremiumUser() && (
+                    <Badge variant="outline" className="text-xs mr-3">Pro</Badge>
+                  )}
                 </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+                
+                {/* Premium Tools Dropdown Toggle */}
+                <button 
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md mt-2 ${
+                    premiumToolsOpen 
+                      ? 'bg-secondary/20 text-foreground' 
+                      : 'text-muted-foreground hover:bg-secondary/10 hover:text-foreground'
+                  }`}
+                  onClick={() => setPremiumToolsOpen(!premiumToolsOpen)}
+                >
+                  <div className="flex items-center">
+                    <Shield className="w-5 h-5 mr-3" />
+                    <span>Advanced Security Tools</span>
+                  </div>
+                  {premiumToolsOpen ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                
+                {/* Premium Tools List */}
+                {premiumToolsOpen && (
+                  <div className="ml-4 mt-2 space-y-1 border-l border-border pl-4">
+                    
+                    {/* Light Scan Tool */}
+                    <button 
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                        activeTool === 'light-scan' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'text-foreground hover:bg-secondary/10'
+                      }`}
+                      onClick={() => setActiveTool('light-scan')}
+                    >
+                      <div className="flex items-center">
+                        <Shield className="w-4 h-4 mr-3" />
+                        <span>Light Scan</span>
+                      </div>
+                    </button>
+                    
+                    {/* Periodic Scans Tool */}
+                    <button 
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                        activeTool === 'domains' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'text-foreground hover:bg-secondary/10'
+                      }`}
+                      onClick={() => setActiveTool('domains')}
+                    >
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 mr-3" />
+                        <span>Periodic Scans</span>
+                      </div>
+                    </button>
+                    
+                    {/* Supabase Check Tool */}
+                    <button 
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                        activeTool === 'supabase-check' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'text-foreground hover:bg-secondary/10'
+                      }`}
+                      onClick={() => setActiveTool('supabase-check')}
+                    >
+                      <div className="flex items-center">
+                        <Database className="w-4 h-4 mr-3" />
+                        <span>Supabase Check</span>
+                      </div>
+                    </button>
+                    
+                    {/* SupabaseDeepScan Tool */}
+                    <button 
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                        activeTool === 'supabase-deep-scan' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'text-foreground hover:bg-secondary/10'
+                      }`}
+                      onClick={() => setActiveTool('supabase-deep-scan')}
+                    >
+                      <div className="flex items-center">
+                        <Database className="w-4 h-4 mr-3" />
+                        <span>SupabaseDeepScan</span>
+                      </div>
+                    </button>
+                    
+                    {/* Subdomain Finder Tool */}
+                    <button 
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                        activeTool === 'subdomain-finder' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'text-foreground hover:bg-secondary/10'
+                      }`}
+                      onClick={() => setActiveTool('subdomain-finder')}
+                    >
+                      <div className="flex items-center">
+                        <Search className="w-4 h-4 mr-3" />
+                        <span>Subdomain Finder</span>
+                      </div>
+                    </button>
+                    
+                  </div>
+                )}
+              </div>
               
-              {/* Deep Scan Tool */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'deep-scan' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('deep-scan')}
-              >
-                <div className="flex items-center">
-                  <Zap className="w-5 h-5 mr-3" />
-                  <span>Deep Security Scan</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              
-              {/* Supabase Check Tool */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'supabase-check' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('supabase-check')}
-              >
-                <div className="flex items-center">
-                  <Database className="w-5 h-5 mr-3" />
-                  <span>Supabase Check</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              
-              {/* SupabaseDeepScan Tool */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'supabase-deep-scan' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('supabase-deep-scan')}
-              >
-                <div className="flex items-center">
-                  <Database className="w-5 h-5 mr-3" />
-                  <span>SupabaseDeepScan</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              
-              {/* Subdomain Finder Tool */}
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'subdomain-finder' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('subdomain-finder')}
-              >
-                <div className="flex items-center">
-                  <Search className="w-5 h-5 mr-3" />
-                  <span>Subdomain Finder</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              
-              <button 
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
-                  activeTool === 'reports' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'text-foreground hover:bg-secondary/10'
-                }`}
-                onClick={() => setActiveTool('reports')}
-              >
-                <div className="flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-3" />
-                  <span>Reports</span>
-                </div>
-                <ChevronRight className="w-4 h-4" />
-              </button>
+              {/* Reports Section */}
+              <div className="mb-4">
+                <h3 className="px-3 text-xs font-semibold text-muted-foreground mb-2">
+                  ANALYTICS
+                </h3>
+                <button 
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${
+                    activeTool === 'reports' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'text-foreground hover:bg-secondary/10'
+                  }`}
+                  onClick={() => setActiveTool('reports')}
+                >
+                  <div className="flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-3" />
+                    <span>Reports</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
               
             </div>
           </div>

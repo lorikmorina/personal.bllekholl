@@ -657,31 +657,18 @@ export default function DeepScanTool() {
               </span>
             )}
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className={`text-3xl font-bold ${
-                overall_score >= 80 ? 'text-green-600' : 
-                overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
-              }`}>
-                {overall_score || 0}
-              </div>
-              <div className="text-sm text-gray-600">Overall Security Score</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-800">
-                {scan_metadata?.completed_at && scan_metadata?.started_at ? 
-                  `${Math.round((new Date(scan_metadata.completed_at).getTime() - new Date(scan_metadata.started_at).getTime()) / 1000)}s` : 
-                  subdomain_analysis?.scanTimeMs ? `${Math.round(subdomain_analysis.scanTimeMs / 1000)}s` :
-                  'N/A'
-                }
-              </div>
-              <div className="text-sm text-gray-600">Scan Duration</div>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-800">
                 {scan_metadata?.started_at ? new Date(scan_metadata.started_at).toLocaleDateString() : 'N/A'}
               </div>
               <div className="text-sm text-gray-600">Scan Date</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-800">
+                {scan_metadata?.url || 'N/A'}
+              </div>
+              <div className="text-sm text-gray-600">Target URL</div>
             </div>
           </div>
           
@@ -713,9 +700,6 @@ export default function DeepScanTool() {
           <div className="bg-white p-6 rounded-lg border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               🛡️ Security Headers Analysis
-              <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                Score: {security_headers.score || 0}
-              </span>
             </h3>
             
             {security_headers.present && security_headers.present.length > 0 && (
@@ -724,8 +708,8 @@ export default function DeepScanTool() {
                 <div className="space-y-1">
                   {security_headers.present.map((header: any, index: number) => (
                     <div key={index} className="text-sm bg-green-50 p-2 rounded border-l-4 border-green-400">
-                      <span className="font-medium">{header.name || header.header}</span>
-                      {header.value && <span className="text-gray-600 ml-2">: {header.value}</span>}
+                      <span className="font-medium">{header.name || header.header || header}</span>
+                      {(header.value || header.val) && <span className="text-gray-600 ml-2">: {header.value || header.val}</span>}
                     </div>
                   ))}
                 </div>
@@ -738,9 +722,9 @@ export default function DeepScanTool() {
                 <div className="space-y-1">
                   {security_headers.missing.map((header: any, index: number) => (
                     <div key={index} className="text-sm bg-red-50 p-2 rounded border-l-4 border-red-400">
-                      <span className="font-medium">{header.name || header.header}</span>
-                      {header.recommendation && (
-                        <div className="text-xs text-gray-600 mt-1">{header.recommendation}</div>
+                      <span className="font-medium">{header.name || header.header || header}</span>
+                      {(header.recommendation || header.desc) && (
+                        <div className="text-xs text-gray-600 mt-1">{header.recommendation || header.desc}</div>
                       )}
                     </div>
                   ))}
@@ -766,9 +750,11 @@ export default function DeepScanTool() {
           <div className="bg-white p-6 rounded-lg border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               🔑 API Keys & Security Leaks
-              <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                {api_keys_and_leaks.js_files_scanned || 0} files scanned
-              </span>
+              {(api_keys_and_leaks.js_files_scanned || api_keys_and_leaks.total_js_files || api_keys_and_leaks.files_analyzed) && (
+                <span className="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                  {api_keys_and_leaks.js_files_scanned || api_keys_and_leaks.total_js_files || api_keys_and_leaks.files_analyzed} files scanned
+                </span>
+              )}
             </h3>
             
             {api_keys_and_leaks.enhanced_analysis && (
@@ -793,7 +779,7 @@ export default function DeepScanTool() {
                 </div>
                 <div className="bg-blue-50 p-3 rounded text-center">
                   <div className="text-xl font-bold text-blue-700">
-                    {api_keys_and_leaks.enhanced_analysis.total_leaks || 0}
+                    {api_keys_and_leaks.enhanced_analysis.total_leaks || api_keys_and_leaks.leaks_found?.length || 0}
                   </div>
                   <div className="text-xs text-blue-600">Total Leaks</div>
                 </div>
@@ -814,6 +800,9 @@ export default function DeepScanTool() {
                       <div>
                         <span className="font-medium">{leak.type || 'Security Issue'}</span>
                         <div className="text-sm text-gray-600">{leak.description || leak.message}</div>
+                        {leak.location && (
+                          <div className="text-xs text-gray-500 mt-1">Found in: {leak.location}</div>
+                        )}
                       </div>
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         leak.severity === 'critical' ? 'bg-red-200 text-red-800' :
@@ -835,6 +824,39 @@ export default function DeepScanTool() {
             ) : (
               <div className="bg-green-50 p-3 rounded border-l-4 border-green-400">
                 <span className="text-green-800 font-medium">✅ No security leaks detected!</span>
+              </div>
+            )}
+            
+            {/* Additional scan statistics */}
+            {(api_keys_and_leaks.scan_stats || api_keys_and_leaks.files_scanned) && (
+              <div className="mt-4 p-3 bg-gray-50 rounded">
+                <h5 className="font-medium text-gray-700 mb-2">Scan Statistics:</h5>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  {api_keys_and_leaks.scan_stats?.js_files && (
+                    <div className="text-center">
+                      <div className="font-bold text-blue-600">{api_keys_and_leaks.scan_stats.js_files}</div>
+                      <div className="text-gray-600">JS Files</div>
+                    </div>
+                  )}
+                  {api_keys_and_leaks.scan_stats?.css_files && (
+                    <div className="text-center">
+                      <div className="font-bold text-green-600">{api_keys_and_leaks.scan_stats.css_files}</div>
+                      <div className="text-gray-600">CSS Files</div>
+                    </div>
+                  )}
+                  {api_keys_and_leaks.scan_stats?.html_files && (
+                    <div className="text-center">
+                      <div className="font-bold text-purple-600">{api_keys_and_leaks.scan_stats.html_files}</div>
+                      <div className="text-gray-600">HTML Files</div>
+                    </div>
+                  )}
+                  {api_keys_and_leaks.scan_stats?.total_size && (
+                    <div className="text-center">
+                      <div className="font-bold text-orange-600">{api_keys_and_leaks.scan_stats.total_size}</div>
+                      <div className="text-gray-600">Total Size</div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
