@@ -138,32 +138,107 @@ export async function POST(request: NextRequest) {
     // Update status to processing
     await supabase
       .from('deep_scan_requests')
-      .update({ status: 'processing' })
+      .update({ 
+        status: 'processing',
+        scan_results: {
+          scan_metadata: {
+            started_at: new Date().toISOString(),
+            url: scanRequest.url,
+            has_jwt_token: !!scanRequest.jwt_token,
+            scan_version: '2.0.2',
+            scan_type: 'super_scan_stepped',
+            step: 1,
+            total_steps: 4
+          }
+        }
+      })
       .eq('id', deep_scan_request_id);
 
-    // Start the comprehensive scan in the background
-    // Using setTimeout to allow the response to return immediately
-    setTimeout(async () => {
-      try {
-        await performSuperScan(scanRequest, supabase);
-      } catch (error) {
-        console.error('Background super scan failed:', error);
-        
-        // Update status to failed
-        await supabase
-          .from('deep_scan_requests')
-          .update({
-            status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown scan error'
-          })
-          .eq('id', deep_scan_request_id);
-      }
-    }, 1000);
+    // Instead of running everything at once, start the first step
+    // This approach works within Netlify's timeout limits
+    console.log('🚀 Starting Step 1: Light Scan Analysis');
+    
+    try {
+      // Step 1: Light scan (most critical, fastest)
+      const lightScanResults = await performLightScanAnalysis(scanRequest.url);
+      
+      // Update database with Step 1 results
+      await supabase
+        .from('deep_scan_requests')
+        .update({
+          scan_results: {
+            scan_metadata: {
+              started_at: new Date().toISOString(),
+              url: scanRequest.url,
+              has_jwt_token: !!scanRequest.jwt_token,
+              scan_version: '2.0.2',
+              scan_type: 'super_scan_stepped',
+              step: 1,
+              total_steps: 4,
+              step_1_completed: new Date().toISOString()
+            },
+            security_headers: lightScanResults.security_headers,
+            api_keys_and_leaks: lightScanResults.api_keys_and_leaks
+          }
+        })
+        .eq('id', deep_scan_request_id);
+      
+      console.log('✅ Step 1 completed, triggering Step 2');
+      
+      // Trigger Step 2 in a new function call
+      setTimeout(async () => {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/step2`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+            },
+            body: JSON.stringify({ deep_scan_request_id })
+          });
+        } catch (error) {
+          console.error('Failed to trigger Step 2:', error);
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Step 1 failed:', error);
+      
+      // Update with partial results and error
+      await supabase
+        .from('deep_scan_requests')
+        .update({
+          status: 'failed',
+          error_message: `Step 1 failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          scan_results: {
+            scan_metadata: {
+              started_at: new Date().toISOString(),
+              url: scanRequest.url,
+              scan_version: '2.0.2',
+              scan_type: 'super_scan_stepped',
+              step: 1,
+              total_steps: 4,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            },
+            security_headers: { error: 'Step 1 failed', details: error instanceof Error ? error.message : 'Unknown error' },
+            api_keys_and_leaks: { error: 'Step 1 failed', details: error instanceof Error ? error.message : 'Unknown error' }
+          }
+        })
+        .eq('id', deep_scan_request_id);
+      
+      return NextResponse.json({
+        success: false,
+        error: 'Step 1 failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Comprehensive super scan started successfully',
-      request_id: deep_scan_request_id
+      message: 'Step 1 completed, continuing with remaining steps',
+      request_id: deep_scan_request_id,
+      step: 1,
+      total_steps: 4
     });
 
   } catch (error: any) {

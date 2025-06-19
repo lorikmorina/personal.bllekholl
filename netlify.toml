@@ -5,3 +5,19 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+[functions]
+  external_node_modules = ["sharp"]
+
+# Configure deep scan orchestrator as background function
+[[functions]]
+  path = "api/deep-scan/orchestrator"
+  included_files = ["app/api/deep-scan/orchestrator/**"]
+  node_bundler = "esbuild"
+  
+[functions."api/deep-scan/orchestrator"]
+  timeout = 900  # 15 minutes for background processing
+  
+# Also configure webhook with longer timeout
+[functions."api/webhooks/paddle"]
+  timeout = 60  # 1 minute for webhook processing
+
