@@ -26,12 +26,21 @@ export async function GET(request: NextRequest) {
     // Get recent deep scan requests to check database connectivity
     const { data: requests, error: dbError } = await supabase
       .from('deep_scan_requests')
-      .select('id, status, created_at, error_message')
+      .select('id, status, created_at, error_message, payment_status, user_id')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(10);
     
-    // Test orchestrator endpoint connectivity
+    console.log('📋 Recent deep scan requests:', requests?.map(r => ({
+      id: r.id,
+      status: r.status,
+      payment_status: r.payment_status,
+      created_at: r.created_at
+    })));
+    
+    // Test orchestrator endpoint connectivity with a real request ID if available
     let orchestratorTest = null;
+    const testRequestId = requests && requests.length > 0 ? requests[0].id : 'test-connection-only';
+    
     try {
       const testResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
         method: 'POST',
@@ -40,19 +49,22 @@ export async function GET(request: NextRequest) {
           'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
         },
         body: JSON.stringify({ 
-          deep_scan_request_id: 'test-connection-only' 
+          deep_scan_request_id: testRequestId 
         })
       });
       
       orchestratorTest = {
         status: testResponse.status,
         statusText: testResponse.statusText,
-        responseText: await testResponse.text()
+        responseText: await testResponse.text(),
+        testedWithRequestId: testRequestId,
+        isRealRequest: testRequestId !== 'test-connection-only'
       };
     } catch (orchError) {
       orchestratorTest = {
         error: orchError instanceof Error ? orchError.message : 'Unknown error',
-        stack: orchError instanceof Error ? orchError.stack : undefined
+        stack: orchError instanceof Error ? orchError.stack : undefined,
+        testedWithRequestId: testRequestId
       };
     }
     
@@ -65,9 +77,12 @@ export async function GET(request: NextRequest) {
         recentRequests: requests?.map(r => ({
           id: r.id,
           status: r.status,
+          payment_status: r.payment_status,
           created_at: r.created_at,
-          has_error: !!r.error_message
-        }))
+          has_error: !!r.error_message,
+          user_id: r.user_id?.substring(0, 8) + '...' // Partially hide user ID for privacy
+        })),
+        totalFound: requests?.length || 0
       },
       orchestratorConnectivity: orchestratorTest,
       recommendations: generateRecommendations(envCheck, dbError, orchestratorTest)
@@ -113,4 +128,50 @@ function generateRecommendations(envCheck: any, dbError: any, orchestratorTest: 
   }
   
   return recommendations;
+}
+
+// POST method to manually trigger a scan for testing
+export async function POST(request: NextRequest) {
+  try {
+    const { request_id } = await request.json();
+    
+    if (!request_id) {
+      return NextResponse.json({
+        error: 'Missing request_id parameter'
+      }, { status: 400 });
+    }
+    
+    console.log('🔧 Debug: Manually triggering scan for request:', request_id);
+    
+    // Call the orchestrator directly
+    const orchestratorResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+      },
+      body: JSON.stringify({ 
+        deep_scan_request_id: request_id 
+      })
+    });
+    
+    const responseText = await orchestratorResponse.text();
+    
+    return NextResponse.json({
+      timestamp: new Date().toISOString(),
+      requestId: request_id,
+      orchestratorResponse: {
+        status: orchestratorResponse.status,
+        statusText: orchestratorResponse.statusText,
+        body: responseText
+      },
+      success: orchestratorResponse.ok
+    });
+    
+  } catch (error) {
+    console.error('🚨 Debug POST error:', error);
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 } 

@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    console.log(`🔍 Attempting to fetch deep scan request: ${deep_scan_request_id}`);
+
     // Get the scan request details
     const { data: scanRequest, error: fetchError } = await supabase
       .from('deep_scan_requests')
@@ -82,10 +84,43 @@ export async function POST(request: NextRequest) {
       .eq('id', deep_scan_request_id)
       .single();
 
+    console.log('📊 Database fetch result:', {
+      found: !!scanRequest,
+      error: fetchError?.message,
+      errorCode: fetchError?.code,
+      errorDetails: fetchError?.details,
+      requestId: deep_scan_request_id
+    });
+
     if (fetchError || !scanRequest) {
-      console.error('Failed to fetch scan request:', fetchError);
+      console.error('❌ Failed to fetch scan request:', {
+        requestId: deep_scan_request_id,
+        error: fetchError,
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+      });
+      
+      // Try to fetch all requests to see if RLS is the issue
+      const { data: allRequests, error: allError } = await supabase
+        .from('deep_scan_requests')
+        .select('id, status, created_at')
+        .limit(5);
+        
+      console.log('🔍 Debug: Recent requests accessible:', {
+        count: allRequests?.length || 0,
+        error: allError?.message,
+        requests: allRequests?.map(r => ({ id: r.id, status: r.status }))
+      });
+      
       return NextResponse.json(
-        { error: 'Scan request not found' },
+        { 
+          error: 'Scan request not found',
+          details: fetchError?.message,
+          debug: {
+            requestId: deep_scan_request_id,
+            accessibleRequestsCount: allRequests?.length || 0
+          }
+        },
         { status: 404 }
       );
     }
