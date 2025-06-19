@@ -4,19 +4,28 @@ import { createClient } from '@supabase/supabase-js';
 // Deep scan orchestrator - handles comprehensive security scanning
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔍 Deep scan orchestrator called');
+    
     // Verify authorization (should be called internally or with service key)
     const authHeader = request.headers.get('authorization');
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     
+    console.log('🔑 Authorization check:', {
+      hasAuthHeader: !!authHeader,
+      hasServiceKey: !!serviceKey,
+      authHeaderFormat: authHeader ? `Bearer ${authHeader.substring(7, 20)}...` : 'none'
+    });
+    
     // Check for proper Bearer token format OR direct service key inclusion
-    const isAuthorized = authHeader && (
+    const isAuthorized = authHeader && serviceKey && (
       authHeader === `Bearer ${serviceKey}` || 
-      authHeader.includes(serviceKey!)
+      authHeader.includes(serviceKey)
     );
     
     if (!isAuthorized) {
-      console.error('Orchestrator authorization failed:', {
+      console.error('❌ Orchestrator authorization failed:', {
         hasAuthHeader: !!authHeader,
+        hasServiceKey: !!serviceKey,
         authHeaderFormat: authHeader ? 'Bearer ***' : 'none',
         expectedFormat: 'Bearer <service_key>'
       });
@@ -26,14 +35,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { deep_scan_request_id } = await request.json();
+    const body = await request.json();
+    console.log('📋 Request body:', body);
+    
+    const { deep_scan_request_id } = body;
     
     if (!deep_scan_request_id) {
+      console.error('❌ Missing deep_scan_request_id in request body');
       return NextResponse.json(
         { error: 'Missing deep_scan_request_id' },
         { status: 400 }
       );
     }
+
+    // Validate required environment variables
+    const requiredEnvVars = {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL
+    };
+    
+    const missingEnvVars = Object.entries(requiredEnvVars)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+    
+    if (missingEnvVars.length > 0) {
+      console.error('❌ Missing required environment variables:', missingEnvVars);
+      return NextResponse.json(
+        { error: `Missing environment variables: ${missingEnvVars.join(', ')}` },
+        { status: 500 }
+      );
+    }
+    
+    console.log('✅ Environment variables validated successfully');
 
     // Create Supabase client with service role
     const supabase = createClient(

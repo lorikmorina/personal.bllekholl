@@ -263,6 +263,7 @@ export default function DeepScanTool() {
           user_id: user.id,
           user_email: user.email,
           url: fullUrl,
+          domain: finalUrl,
           jwt_token: jwtToken.trim() || null,
           status: 'pending_payment',
           payment_status: 'pending'

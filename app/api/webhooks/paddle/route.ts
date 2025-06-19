@@ -132,6 +132,9 @@ export async function POST(request: Request) {
         // TODO: Trigger background scan job here
         // This could be a queue job, webhook to another service, or API call
         try {
+          console.log('🚀 Attempting to trigger scan orchestrator for request:', requestId);
+          console.log('📍 Using SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL);
+          
           // Call the scan orchestrator API
           const scanResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/deep-scan/orchestrator`, {
             method: 'POST',
@@ -144,17 +147,46 @@ export async function POST(request: Request) {
             })
           });
           
+          console.log('📊 Orchestrator response status:', scanResponse.status);
+          
           if (!scanResponse.ok) {
             const errorText = await scanResponse.text();
-            console.error('Failed to trigger scan orchestrator:', errorText);
-            // Don't throw here - payment was successful, just log the issue
-            // The scan can be retried manually or via cron
+            console.error('❌ Failed to trigger scan orchestrator:', {
+              status: scanResponse.status,
+              statusText: scanResponse.statusText,
+              errorBody: errorText,
+              requestId: requestId
+            });
+            
+            // Update the request with error information
+            await supabase
+              .from('deep_scan_requests')
+              .update({
+                status: 'failed',
+                error_message: `Orchestrator call failed: ${scanResponse.status} ${scanResponse.statusText} - ${errorText}`
+              })
+              .eq('id', requestId);
+              
           } else {
-            console.log('Successfully triggered scan orchestrator for request:', requestId);
+            const responseData = await scanResponse.text();
+            console.log('✅ Successfully triggered scan orchestrator for request:', requestId, 'Response:', responseData);
           }
         } catch (scanError) {
-          console.error('Error triggering scan orchestrator:', scanError);
-          // Don't throw - payment processing should complete successfully
+          console.error('💥 Error triggering scan orchestrator:', {
+            error: scanError,
+            message: scanError instanceof Error ? scanError.message : 'Unknown error',
+            requestId: requestId,
+            siteUrl: process.env.NEXT_PUBLIC_SITE_URL
+          });
+          
+          // Update the request with error information
+          await supabase
+            .from('deep_scan_requests')
+            .update({
+              status: 'failed',
+              error_message: `Failed to trigger scan: ${scanError instanceof Error ? scanError.message : 'Unknown error'}`
+            })
+            .eq('id', requestId);
         }
         
         return NextResponse.json({ success: true });
