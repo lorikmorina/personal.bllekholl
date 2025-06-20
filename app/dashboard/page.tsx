@@ -10,11 +10,13 @@ import DomainsManagement from "@/app/components/dashboard/tools/DomainsManagemen
 import ReportsList from "@/app/components/dashboard/reports/ReportsList"
 import DeepScanTool from "@/app/components/dashboard/tools/DeepScanTool"
 import DashboardProvider, { useDashboard } from "@/app/components/dashboard/DashboardProvider"
+import PaywallModal from "@/app/components/dashboard/PaywallModal"
 import { createClient } from "@/lib/supabase/client"
 
 function DashboardContent() {
   const [activeTool, setActiveTool] = useState("deep-scan") // Default to free tool
   const [isLoading, setIsLoading] = useState(true)
+  const [showPaywallModal, setShowPaywallModal] = useState(false)
   const { user } = useDashboard()
   const supabase = createClient()
 
@@ -41,6 +43,15 @@ function DashboardContent() {
           // Set default tool based on subscription
           const isPremium = userProfile?.subscription_plan && userProfile.subscription_plan !== 'free'
           setActiveTool(isPremium ? "light-scan" : "deep-scan")
+          
+          // Show paywall modal for free users on first visit
+          if (!isPremium) {
+            const hasSeenPaywall = localStorage.getItem(`paywall_seen_${user.id}`)
+            if (!hasSeenPaywall) {
+              setShowPaywallModal(true)
+              localStorage.setItem(`paywall_seen_${user.id}`, 'true')
+            }
+          }
         }
       } catch (error) {
         console.error('Error determining default tool:', error)
@@ -52,6 +63,18 @@ function DashboardContent() {
 
     setDefaultTool()
   }, [user, supabase])
+
+  const handleClosePaywall = () => {
+    setShowPaywallModal(false)
+  }
+
+  const handleUpgrade = async (plan: string) => {
+    // Handle upgrade logic - this could trigger a refresh or update the user state
+    console.log(`Upgraded to ${plan}`)
+    setShowPaywallModal(false)
+    // You might want to refresh the user profile or trigger a re-fetch here
+    window.location.reload() // Simple approach to refresh and update subscription status
+  }
 
   // Don't render content until we've determined the default tool
   if (isLoading) {
@@ -82,6 +105,12 @@ function DashboardContent() {
       {activeTool === "supabase-deep-scan" && <SupabaseDeepScanTool />}
       {activeTool === "reports" && <ReportsList />}
       {activeTool === "deep-scan" && <DeepScanTool />}
+      
+      <PaywallModal
+        isOpen={showPaywallModal}
+        onClose={handleClosePaywall}
+        onUpgrade={handleUpgrade}
+      />
     </DashboardLayout>
   )
 }
