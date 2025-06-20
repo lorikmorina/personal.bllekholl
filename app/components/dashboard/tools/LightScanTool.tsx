@@ -629,25 +629,6 @@ export default function LightScanTool() {
     const medium: typeof leaks = [];
     const low: typeof leaks = [];
     
-    // Add missing security headers as low risk items
-    const missingHeaders = result?.headers?.missing || [];
-    if (missingHeaders.length > 0) {
-      missingHeaders.forEach(header => {
-        const headerInfo = securityHeadersInfo[header] || {
-          name: header.replace(/-/g, ' '),
-          importance: 'medium',
-          description: 'Security header'
-        };
-        
-        low.push({
-          type: 'Missing Security Header',
-          preview: headerInfo.name,
-          details: `The ${headerInfo.name} security header is missing. ${headerInfo.description}`,
-          severity: 'info'
-        });
-      });
-    }
-    
     // Filter out database keys with properly configured security
     // We still want to show Supabase with secure severity in a separate section
     // so we need to filter them out from the risk categories
@@ -656,11 +637,6 @@ export default function LightScanTool() {
     );
     
     filteredLeaks.forEach(leak => {
-      // Skip missing security headers (we've already added them above)
-      if (leak.type.includes('Missing Security Header')) {
-        return;
-      }
-      
       // Categorize by severity (with default fallbacks)
       switch(leak.severity) {
         case 'critical':
@@ -670,7 +646,12 @@ export default function LightScanTool() {
           high.push(leak);
           break;
         case 'info':
-          medium.push(leak);
+          // Missing security headers and low-risk items go to low category
+          if (leak.type.includes('Missing Security Header')) {
+            low.push(leak);
+          } else {
+            medium.push(leak);
+          }
           break;
         case 'secure':
           low.push(leak);
@@ -679,8 +660,17 @@ export default function LightScanTool() {
           // Default categorization based on leak type
           if (leak.type.includes('API Key') && !leak.type.toLowerCase().includes('captcha')) {
             critical.push({...leak, severity: 'critical'});
-          } else if (leak.type.includes('Supabase') && leak.details?.includes('RLS')) {
-            high.push({...leak, severity: 'warning'});
+          } else if (leak.type.includes('Supabase')) {
+            // For Supabase without explicit severity, check if RLS testing was done
+            if (leak.details?.includes('RLS appears to be misconfigured')) {
+              critical.push({...leak, severity: 'critical'});
+            } else if (leak.details?.includes('RLS appears to be properly configured')) {
+              // This should be filtered out above, but just in case
+              low.push({...leak, severity: 'secure'});
+            } else {
+              // Default for Supabase without RLS testing
+              high.push({...leak, severity: 'warning'});
+            }
           } else if (leak.type.includes('Unprotected Auth Page')) {
             medium.push({...leak, severity: 'info'});
           } else if (leak.type.toLowerCase().includes('captcha')) {
@@ -1059,7 +1049,7 @@ export default function LightScanTool() {
                           <span className="font-medium">Supabase Database Detected</span>
                         </div>
                         <p className="text-sm ml-6">
-                          Supabase db found - RLS is enabled - it's recommended to use our tool Supacheck to see if further vulnerabilities exist when a user is signed in.
+                          Supabase credentials found but RLS is properly configured - no tables are publicly accessible. For additional security testing when users are authenticated, consider using our Supacheck tool.
                         </p>
                       </div>
                     )}
@@ -1072,13 +1062,13 @@ export default function LightScanTool() {
                      result.leaks.some(leak => 
                         leak.type.includes('Supabase')
                      ) && (
-                      <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-300 rounded-md border border-red-200 dark:border-red-800">
+                      <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-900/10 text-orange-700 dark:text-orange-300 rounded-md border border-orange-200 dark:border-orange-800">
                         <div className="flex items-center mb-1">
-                          <AlertCircle className="w-4 h-4 mr-2 text-red-500" />
+                          <AlertCircle className="w-4 h-4 mr-2 text-orange-500" />
                           <span className="font-medium">Supabase Database Detected</span>
                         </div>
                         <p className="text-sm ml-6">
-                          Supabase db found - We recommend using our tool Supacheck to thoroughly test for vulnerabilities when users are signed in.
+                          Supabase credentials found - we recommend using our Supacheck tool to thoroughly test for vulnerabilities when users are signed in.
                         </p>
                       </div>
                     )}
