@@ -76,6 +76,7 @@ interface LeakWithSupabase {
   type: string;
   preview: string;
   details: string;
+  severity?: 'critical' | 'warning' | 'info' | 'secure';
   supabaseCreds?: SupabaseCredentials;
 }
 
@@ -360,6 +361,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'User profile not found' }, { status: 404 })
       }
 
+      // Allow premium users to use light scan, block only free users
       if (!profile.subscription_plan || profile.subscription_plan === 'free') {
         return NextResponse.json({
           error: 'Premium subscription required',
@@ -461,11 +463,26 @@ export async function POST(request: Request) {
     return NextResponse.json({
       url: targetUrl,
       score,
+      headers: {
+        present: headerCheck.present,
+        missing: headerCheck.missing
+      },
+      leaks: uniqueLeaks.map(leak => ({
+        type: leak.type,
+        preview: leak.preview,
+        details: leak.details,
+        severity: leak.severity || 'info'
+      })),
+      jsFilesScanned: jsFilesScanned,
+      is_blocked: false,
+      status: 200,
+      scan_message: null,
+      // Include new format fields for compatibility
       security_headers: {
         score: Math.round((headerCheck.present.length / (headerCheck.present.length + headerCheck.missing.length)) * 100) || 0,
-          present: headerCheck.present,
-          missing: headerCheck.missing
-        },
+        present: headerCheck.present,
+        missing: headerCheck.missing
+      },
       api_keys_and_leaks: {
         js_files_scanned: jsFilesScanned,
         leaks_found: uniqueLeaks,
